@@ -41,9 +41,9 @@ Follow these steps to get the project running locally:
     This project is a client-side application and doesn't require a complex build step for development view. We use `serve`, a simple static file server.
     To start the development server, run:
     ```bash
-    npm start
+    npm run dev
     ```
-    This will typically start the server on `http://localhost:3000`. Open this URL in your web browser to view the application.
+    This will typically start the server on `http://localhost:5173`. Open this URL in your web browser to view the application.
 
     The dummy credentials for login are:
     *   **Usuario:** `cibercom`
