@@ -1,0 +1,319 @@
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { Sidebar } from './components/Sidebar';
+import { Header } from './components/Header';
+import { MainContent } from './components/MainContent';
+import { InvoiceForm } from './components/InvoiceForm'; // Facturacion Articulos
+// import { SettingsModal } from './components/SettingsModal'; // Removed
+import { LoginPage } from './components/LoginPage';
+import { NAV_ITEMS, DEFAULT_USER, DEFAULT_COLORS, DUMMY_CREDENTIALS } from './constants';
+import type { Theme, CustomColors, User } from './types';
+
+// Icons
+import { SunIcon } from './components/icons/SunIcon';
+import { MoonIcon } from './components/icons/MoonIcon';
+// import { CogIcon } from './components/icons/CogIcon'; // No longer used for modal in header
+import { CubeIcon } from './components/icons/CubeIcon';
+import { HomeIcon } from './components/icons/HomeIcon';
+
+// Page Components
+import { DashboardPage } from './components/DashboardPage';
+
+// Facturacion Pages
+import { FacturacionInteresesPage } from './components/FacturacionInteresesPage';
+import { FacturacionCartaFacturaPage } from './components/FacturacionCartaFacturaPage';
+import { FacturacionGlobalPage } from './components/FacturacionGlobalPage';
+import { FacturacionMonederosPage } from './components/FacturacionMonederosPage';
+import { FacturacionCapturaLibrePage } from './components/FacturacionCapturaLibrePage';
+import { FacturacionMotosPage } from './components/FacturacionMotosPage';
+import { FacturacionCancelacionMasivaPage } from './components/FacturacionCancelacionMasivaPage';
+
+
+// Consultas Pages
+import { ConsultasFacturasPage } from './components/ConsultasFacturasPage';
+import { ConsultasSkuPage } from './components/ConsultasSkuPage';
+import { ConsultasBoletasPage } from './components/ConsultasBoletasPage';
+import { ConsultasReportesPage } from './components/ConsultasReportesPage';
+import { ConsultasRepsSustituidosPage } from './components/ConsultasRepsSustituidosPage';
+
+// Administracion Pages
+import { AdminEmpleadosPage } from './components/AdminEmpleadosPage';
+import { AdminTiendasPage } from './components/AdminTiendasPage';
+import { AdminPeriodosPerfilPage } from './components/AdminPeriodosPerfilPage';
+import { AdminPeriodosPlataformaPage } from './components/AdminPeriodosPlataformaPage';
+import { AdminKioscosPage } from './components/AdminKioscosPage';
+import { AdminExcepcionesPage } from './components/AdminExcepcionesPage';
+import { AdminSeccionesPage } from './components/AdminSeccionesPage';
+
+// Reportes Fiscales Pages
+import { ReportesBoletasNoAuditadasPage } from './components/ReportesBoletasNoAuditadasPage';
+import { ReportesIngresoFacturacionPage } from './components/ReportesIngresoFacturacionPage';
+import { ReportesIntegracionFacturaGlobalPage } from './components/ReportesIntegracionFacturaGlobalPage';
+import { ReportesIntegracionClientesPage } from './components/ReportesIntegracionClientesPage';
+import { ReportesFacturacionClientesGlobalPage } from './components/ReportesFacturacionClientesGlobalPage';
+import { ReportesIntegracionSustitucionCfdiPage } from './components/ReportesIntegracionSustitucionCfdiPage';
+import { ReportesControlEmisionRepPage } from './components/ReportesControlEmisionRepPage';
+import { ReportesRepgcpPage } from './components/ReportesRepgcpPage';
+import { ReportesControlCambiosPage } from './components/ReportesControlCambiosPage';
+import { ReportesConciliacionPage } from './components/ReportesConciliacionPage';
+import { ReportesFiscalesRepsSustituidosPage } from './components/ReportesFiscalesRepsSustituidosPage';
+
+// Configuracion Pages
+import { ConfiguracionTemasPage } from './components/ConfiguracionTemasPage';
+
+
+export const ThemeContext = React.createContext<{
+  theme: Theme;
+  toggleTheme: () => void;
+  customColors: CustomColors;
+  setCustomColors: React.Dispatch<React.SetStateAction<CustomColors>>;
+  logoUrl: string;
+  setLogoUrl: React.Dispatch<React.SetStateAction<string>>;
+}>({
+  theme: 'light',
+  toggleTheme: () => {},
+  customColors: DEFAULT_COLORS,
+  setCustomColors: () => {},
+  logoUrl: '/images/Logo Cibercom.png',
+  setLogoUrl: () => {},
+});
+
+const App: React.FC = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return localStorage.getItem('isAuthenticated') === 'true';
+  });
+  const [theme, setTheme] = useState<Theme>('light');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  // const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false); // Removed
+  const [currentUser, setCurrentUser] = useState<User>(DEFAULT_USER);
+  
+  const [activePage, setActivePage] = useState<string>('Dashboard');
+  const [activePageIcon, setActivePageIcon] = useState<React.FC<React.SVGProps<SVGSVGElement>>>(() => HomeIcon);
+
+  const [customColors, setCustomColors] = useState<CustomColors>(() => {
+    const storedColors = localStorage.getItem('customColors');
+    return storedColors ? JSON.parse(storedColors) : DEFAULT_COLORS;
+  });
+
+  const [logoUrl, setLogoUrl] = useState<string>(() => {
+    const storedLogoUrl = localStorage.getItem('logoUrl');
+    return storedLogoUrl || '/images/Logo Cibercom.png';
+  });
+
+  useEffect(() => {
+    const storedTheme = localStorage.getItem('theme') as Theme | null;
+    if (storedTheme) {
+      setTheme(storedTheme);
+    } else {
+      const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setTheme(prefersDark ? 'dark' : 'light');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--color-primary', customColors.primary);
+    root.style.setProperty('--color-primary-dark', customColors.primaryDark);
+    root.style.setProperty('--color-secondary', customColors.secondary);
+    root.style.setProperty('--color-secondary-dark', customColors.secondaryDark);
+    root.style.setProperty('--color-accent', customColors.accent);
+    root.style.setProperty('--color-accent-dark', customColors.accentDark);
+    localStorage.setItem('customColors', JSON.stringify(customColors));
+  }, [customColors]);
+
+  useEffect(() => {
+    localStorage.setItem('logoUrl', logoUrl);
+  }, [logoUrl]);
+
+   useEffect(() => {
+    if (isAuthenticated) {
+        const dashboardItem = NAV_ITEMS.find(item => item.label === 'Dashboard');
+        if (dashboardItem) {
+            setActivePage(dashboardItem.label);
+            setActivePageIcon(() => dashboardItem.icon as React.FC<React.SVGProps<SVGSVGElement>>);
+        }
+    }
+  }, [isAuthenticated]);
+
+
+  const toggleTheme = useCallback(() => {
+    setTheme((prevTheme) => (prevTheme === 'light' ? 'dark' : 'light'));
+  }, []);
+
+  const toggleSidebar = useCallback(() => {
+    setIsSidebarOpen((prev) => !prev);
+  }, []);
+
+  // const openSettingsModal = useCallback(() => { // Removed
+  //   setIsSettingsModalOpen(true);
+  // }, []);
+
+  // const closeSettingsModal = useCallback(() => { // Removed
+  //   setIsSettingsModalOpen(false);
+  // }, []);
+
+  const handleNavItemClick = useCallback((label: string, icon?: React.FC<React.SVGProps<SVGSVGElement>>) => {
+    setActivePage(label);
+    if (icon && typeof icon === 'function') {
+      setActivePageIcon(() => icon);
+    } else {
+      const item = NAV_ITEMS.flatMap(i => i.children ? [i, ...i.children] : [i]).find(i => i.label === label);
+      if (item && item.icon) {
+        setActivePageIcon(() => item.icon);
+      } else {
+        const topLevelItem = NAV_ITEMS.find(i => i.label === label);
+        if (topLevelItem && topLevelItem.icon) {
+           setActivePageIcon(() => topLevelItem.icon);
+        } else {
+           setActivePageIcon(() => CubeIcon); 
+        }
+      }
+    }
+    if (window.innerWidth < 768) {
+      setIsSidebarOpen(false);
+    }
+  }, []);
+  
+  const handleLogin = useCallback((usernameInput: string, passwordInput: string): boolean => {
+    if (usernameInput === DUMMY_CREDENTIALS.username && passwordInput === DUMMY_CREDENTIALS.password) {
+      localStorage.setItem('isAuthenticated', 'true');
+      setIsAuthenticated(true);
+      
+      const dashboardItem = NAV_ITEMS.find(item => item.label === 'Dashboard');
+      if (dashboardItem) {
+          setActivePage(dashboardItem.label);
+          setActivePageIcon(() => dashboardItem.icon as React.FC<React.SVGProps<SVGSVGElement>>);
+      } else { 
+          setActivePage('Dashboard');
+          setActivePageIcon(() => HomeIcon);
+      }
+
+      if (window.innerWidth >= 768) {
+        setIsSidebarOpen(true);
+      }
+      return true;
+    }
+    return false;
+  }, []);
+
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem('isAuthenticated');
+    setIsAuthenticated(false);
+    setActivePage('Dashboard'); 
+    setActivePageIcon(() => HomeIcon);
+  }, []);
+
+
+  if (!isAuthenticated) {
+    return (
+      <ThemeContext.Provider value={{ theme, toggleTheme, customColors, setCustomColors, logoUrl, setLogoUrl }}>
+        <LoginPage onLogin={handleLogin} logoUrl={logoUrl} appName="Cibercom" />
+      </ThemeContext.Provider>
+    );
+  }
+
+  const renderPageContent = () => {
+    // Dashboard
+    if (activePage === 'Dashboard') return <DashboardPage />;
+
+    // Facturación
+    if (activePage === 'Artículos') return <InvoiceForm />;
+    if (activePage === 'Intereses') return <FacturacionInteresesPage />;
+    if (activePage === 'Carta Factura') return <FacturacionCartaFacturaPage />;
+    if (activePage === 'Factura Global') return <FacturacionGlobalPage />;
+    if (activePage === 'Monederos') return <FacturacionMonederosPage />;
+    if (activePage === 'Captura Libre') return <FacturacionCapturaLibrePage />;
+    if (activePage === 'Motos') return <FacturacionMotosPage />;
+    if (activePage === 'Cancelación Masiva') return <FacturacionCancelacionMasivaPage />;
+
+    // Consultas
+    if (activePage === 'Facturas') return <ConsultasFacturasPage />;
+    if (activePage === 'SKU') return <ConsultasSkuPage />;
+    if (activePage === 'Boletas') return <ConsultasBoletasPage />;
+    if (activePage === 'Reportes') return <ConsultasReportesPage />;
+    if (activePage === 'REPs Sustituidos') return <ConsultasRepsSustituidosPage />;
+    
+    // Administración
+    if (activePage === 'Empleados') return <AdminEmpleadosPage />;
+    if (activePage === 'Tiendas') return <AdminTiendasPage />;
+    if (activePage === 'Periodos por Perfil') return <AdminPeriodosPerfilPage />;
+    if (activePage === 'Periodos Plataforma') return <AdminPeriodosPlataformaPage />;
+    if (activePage === 'Kioscos') return <AdminKioscosPage />;
+    if (activePage === 'Excepciones') return <AdminExcepcionesPage />;
+    if (activePage === 'Secciones') return <AdminSeccionesPage />;
+
+    // Reportes Facturación Fiscal
+    if (activePage === 'Boletas No Auditadas') return <ReportesBoletasNoAuditadasPage />;
+    if (activePage === 'Reporte Ingreso-Facturación') return <ReportesIngresoFacturacionPage />;
+    if (activePage === 'Integración Factura Global') return <ReportesIntegracionFacturaGlobalPage />;
+    if (activePage === 'Integración Clientes') return <ReportesIntegracionClientesPage />;
+    if (activePage === 'Facturación clientes posterior a Global') return <ReportesFacturacionClientesGlobalPage />;
+    if (activePage === 'Integración Sustitución CFDI') return <ReportesIntegracionSustitucionCfdiPage />;
+    if (activePage === 'Control de emisión de REP') return <ReportesControlEmisionRepPage />;
+    if (activePage === 'Reportes REPgcp') return <ReportesRepgcpPage />;
+    if (activePage === 'Control de cambios') return <ReportesControlCambiosPage />;
+    if (activePage === 'Conciliación') return <ReportesConciliacionPage />;
+    if (activePage === 'REPs Sustituidos (Fiscal)') return <ReportesFiscalesRepsSustituidosPage />;
+
+    // Configuración
+    if (activePage === 'Temas') return <ConfiguracionTemasPage />;
+    
+    const navItemExists = NAV_ITEMS.flatMap(item => item.children ? [item, ...item.children] : [item]).some(nav => nav.label === activePage);
+    if (navItemExists) {
+      return (
+        <div className="p-6 text-gray-700 dark:text-gray-300">
+          Contenido para "{activePage}" aún no implementado.
+        </div>
+      );
+    }
+    
+    return <DashboardPage />; 
+  };
+
+  return (
+    <ThemeContext.Provider value={{ theme, toggleTheme, customColors, setCustomColors, logoUrl, setLogoUrl }}>
+      <div className="flex h-screen bg-gray-100 dark:bg-gray-900 transition-colors duration-300">
+        <Sidebar
+          navItems={NAV_ITEMS}
+          isOpen={isSidebarOpen}
+          toggleSidebar={toggleSidebar}
+          onNavItemClick={handleNavItemClick}
+          logoUrl={logoUrl}
+          appName="Cibercom"
+        />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Header
+            user={currentUser}
+            toggleSidebar={toggleSidebar}
+            onLogout={handleLogout}
+            isSidebarOpen={isSidebarOpen}
+            isAuthenticated={isAuthenticated}
+            ThemeToggleButton={
+              <button
+                onClick={toggleTheme}
+                className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+              >
+                {theme === 'light' ? <MoonIcon className="w-6 h-6" /> : <SunIcon className="w-6 h-6" />}
+              </button>
+            }
+          />
+          <MainContent pageTitle={activePage} PageIcon={activePageIcon}>
+            {renderPageContent()}
+          </MainContent>
+        </div>
+      </div>
+    </ThemeContext.Provider>
+  );
+};
+
+export default App;
