@@ -17,6 +17,10 @@ import {
   FaChartBar, FaFileAlt, FaUsers, FaExchangeAlt, FaClipboardCheck, FaSyncAlt, FaFileSignature, FaHistory
 } from 'react-icons/fa';
 import { FiFileText, FiUsers, FiRepeat, FiSettings } from 'react-icons/fi';
+import { ChartPieIcon } from './components/icons/ChartPieIcon';
+import { SignalIcon } from './components/icons/SignalIcon';
+import { DocumentMagnifyingGlassIcon } from './components/icons/DocumentMagnifyingGlassIcon';
+import { ClipboardDocumentListIcon } from './components/icons/ClipboardDocumentListIcon';
 
 export const DEFAULT_USER: User = {
   name: 'RODRIGUEZ MARTINEZ CHRISTIAN JESUS',
@@ -90,10 +94,21 @@ export const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
+    label: 'Monitor',
+    icon: ChartPieIcon,
+    children: [
+      { label: 'Gráficas', path: 'monitor-graficas', icon: ChartBarIcon },
+      { label: 'Semáforo de Servicios', path: 'monitor-semaforo', icon: SignalIcon },
+      { label: 'Recuperación de Logs', path: 'monitor-logs', icon: DocumentMagnifyingGlassIcon },
+      { label: 'Bitácora', path: 'monitor-bitacora', icon: ClipboardDocumentListIcon },
+      { label: 'Permisos', path: 'monitor-permisos', icon: FiSettings }, // Updated with path and icon
+    ],
+  },
+  {
     label: 'Configuración',
     icon: CogIcon,
     children: [
-        { label: 'Temas', path: 'configuracion-temas', icon: PaintBrushIcon }
+      { label: 'Temas', path: 'configuracion-temas', icon: PaintBrushIcon }
     ]
   }
 ];

@@ -62,6 +62,13 @@ import { ReportesFiscalesRepsSustituidosPage } from './components/ReportesFiscal
 import { ConfiguracionTemasPage } from './components/ConfiguracionTemasPage';
 
 
+// Monitor Pages
+import { MonitorGraficasPage } from './components/MonitorGraficasPage';
+import { MonitorSemaforoServiciosPage } from './components/MonitorSemaforoServiciosPage';
+import { MonitorRecuperacionLogsPage } from './components/MonitorRecuperacionLogsPage';
+import { MonitorBitacoraPage } from './components/MonitorBitacoraPage'; // Añadir esta línea
+import { MonitorPermisosPage } from './components/MonitorPermisosPage';
+
 export const ThemeContext = React.createContext<{
   theme: Theme;
   toggleTheme: () => void;
@@ -266,6 +273,13 @@ const App: React.FC = () => {
 
     // Configuración
     if (activePage === 'Temas') return <ConfiguracionTemasPage />;
+    
+    // Monitor
+    if (activePage === 'Gráficas') return <MonitorGraficasPage />;
+    if (activePage === 'Semáforo de Servicios') return <MonitorSemaforoServiciosPage />;
+    if (activePage === 'Recuperación de Logs') return <MonitorRecuperacionLogsPage />;
+    if (activePage === 'Bitácora') return <MonitorBitacoraPage />;
+    if (activePage === 'Permisos') return <MonitorPermisosPage />; // Add this line
     
     const navItemExists = NAV_ITEMS.flatMap(item => item.children ? [item, ...item.children] : [item]).some(nav => nav.label === activePage);
     if (navItemExists) {
