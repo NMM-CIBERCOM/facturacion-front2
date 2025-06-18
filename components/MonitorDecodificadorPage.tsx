@@ -20,7 +20,7 @@ export const MonitorDecodificadorPage: React.FC = () => {
       <form
         onSubmit={handleSubmit}
         className="w-full max-w-5xl dark:bg-gray-800 rounded-2xl p-8 mt-8"
-        style={{ backgroundColor: 'var(--color-primary)', border: '4px solid var(--color-primary)' }}
+        style={{ backgroundColor: 'var(--color-primary-dark)', border: '4px solid var(--color-primary)' }}
       >
         <h2 className="text-2xl font-semibold text-center text-white mb-6">Decodificador de Facturas</h2>
         <div className="grid grid-cols-2 gap-8">

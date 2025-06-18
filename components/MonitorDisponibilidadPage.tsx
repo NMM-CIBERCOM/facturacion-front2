@@ -47,7 +47,7 @@ export const MonitorDisponibilidadPage: React.FC = () => {
       <form
         onSubmit={handleGenerar}
         className="w-full max-w-4xl dark:bg-gray-800 rounded-2xl p-8 mt-8"
-        style={{ backgroundColor: 'var(--color-primary)', border: '4px solid var(--color-primary)' }}
+        style={{ backgroundColor: 'var(--color-primary-dark)', border: '4px solid var(--color-primary)' }}
       >
         <h2 className="text-2xl text-white font-semibold text-center mb-6">Monitorear URL adicional</h2>
         <input

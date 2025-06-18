@@ -1,4 +1,3 @@
-
 import React, { useState, useContext } from 'react';
 import type { NavItem } from '../types';
 import { ChevronDownIcon } from './icons/ChevronDownIcon';
@@ -153,7 +152,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, isOpen, toggleSideba
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 h-16">
           <div className="flex items-center">
             {logoUrl ? (
-              <img src={logoUrl} alt={`${appName} Logo`} className="h-8 mr-3 object-contain" />
+              <img src={logoUrl} alt={`${appName} Logo`} className="h-12 mr-3 object-contain" />
             ) : (
               <span className="text-xl font-semibold text-primary dark:text-primary-dark">{appName}</span>
             )}

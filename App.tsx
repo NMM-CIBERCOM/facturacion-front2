@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -64,8 +63,6 @@ import { ConfiguracionTemasPage } from './components/ConfiguracionTemasPage';
 
 // Monitor Pages
 import { MonitorGraficasPage } from './components/MonitorGraficasPage';
-import { MonitorSemaforoServiciosPage } from './components/MonitorSemaforoServiciosPage';
-import { MonitorRecuperacionLogsPage } from './components/MonitorRecuperacionLogsPage';
 import { MonitorBitacoraPage } from './components/MonitorBitacoraPage'; // Añadir esta línea
 import { MonitorPermisosPage } from './components/MonitorPermisosPage';
 import { MonitorDisponibilidadPage } from './components/MonitorDisponibilidadPage';
@@ -280,10 +277,8 @@ const App: React.FC = () => {
     
     // Monitor
     if (activePage === 'Gráficas') return <MonitorGraficasPage />;
-    if (activePage === 'Semáforo de Servicios') return <MonitorSemaforoServiciosPage />;
-    if (activePage === 'Recuperación de Logs') return <MonitorRecuperacionLogsPage />;
     if (activePage === 'Bitácora') return <MonitorBitacoraPage />;
-    if (activePage === 'Permisos') return <MonitorPermisosPage />; // Add this line
+    if (activePage === 'Permisos') return <MonitorPermisosPage />;
     if (activePage === 'Disponibilidad') return <MonitorDisponibilidadPage />;
     if (activePage === 'Logs') return <MonitorLogsPage />;
     if (activePage === 'Decodificador') return <MonitorDecodificadorPage />;
