@@ -68,6 +68,10 @@ import { MonitorSemaforoServiciosPage } from './components/MonitorSemaforoServic
 import { MonitorRecuperacionLogsPage } from './components/MonitorRecuperacionLogsPage';
 import { MonitorBitacoraPage } from './components/MonitorBitacoraPage'; // Añadir esta línea
 import { MonitorPermisosPage } from './components/MonitorPermisosPage';
+import { MonitorDisponibilidadPage } from './components/MonitorDisponibilidadPage';
+import { MonitorLogsPage } from './components/MonitorLogsPage';
+import { MonitorDecodificadorPage } from './components/MonitorDecodificadorPage';
+
 
 export const ThemeContext = React.createContext<{
   theme: Theme;
@@ -280,7 +284,9 @@ const App: React.FC = () => {
     if (activePage === 'Recuperación de Logs') return <MonitorRecuperacionLogsPage />;
     if (activePage === 'Bitácora') return <MonitorBitacoraPage />;
     if (activePage === 'Permisos') return <MonitorPermisosPage />; // Add this line
-    
+    if (activePage === 'Disponibilidad') return <MonitorDisponibilidadPage />;
+    if (activePage === 'Logs') return <MonitorLogsPage />;
+    if (activePage === 'Decodificador') return <MonitorDecodificadorPage />;
     const navItemExists = NAV_ITEMS.flatMap(item => item.children ? [item, ...item.children] : [item]).some(nav => nav.label === activePage);
     if (navItemExists) {
       return (

@@ -100,8 +100,11 @@ export const NAV_ITEMS: NavItem[] = [
       { label: 'Gráficas', path: 'monitor-graficas', icon: ChartBarIcon },
       { label: 'Semáforo de Servicios', path: 'monitor-semaforo', icon: SignalIcon },
       { label: 'Recuperación de Logs', path: 'monitor-logs', icon: DocumentMagnifyingGlassIcon },
-      { label: 'Bitácora', path: 'monitor-bitacora', icon: ClipboardDocumentListIcon },
-      { label: 'Permisos', path: 'monitor-permisos', icon: FiSettings }, // Updated with path and icon
+      { label: 'Bitácora', path: 'monitor-bitacora', icon: ClipboardDocumentListIcon },   
+      { label: 'Disponibilidad', path: 'monitor-disponibilidad', icon: ChartBarIcon },
+      { label: 'Logs', path: 'monitor-logs', icon: DocumentMagnifyingGlassIcon },
+      { label: 'Decodificador', path: 'monitor-decodificador', icon: ChartBarIcon },
+      { label: 'Permisos', path: 'monitor-permisos', icon: FiSettings },
     ],
   },
   {
