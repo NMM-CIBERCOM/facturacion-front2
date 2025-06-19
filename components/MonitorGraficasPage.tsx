@@ -1,67 +1,54 @@
 import React, { useState } from 'react';
+import { Card } from './Card';
 
 export const MonitorGraficasPage: React.FC = () => {
   const [searchDate, setSearchDate] = useState('');
   const [refreshTime, setRefreshTime] = useState('5');
 
   return (
-    <div className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow space-y-6">
-      {/* Search Options */}
-      <div className="bg-white dark:bg-gray-800 border-2 border-primary dark:border-secondary p-4 rounded-lg">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <label className="text-sm font-medium text-primary dark:text-secondary">Fecha de Gráficas:</label>
+    <div className="space-y-6">
+      <Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+          <div>
+            <label className="text-sm font-medium text-gray-800 dark:text-gray-100">Fecha de Gráficas:</label>
             <input
               type="date"
               value={searchDate}
               onChange={(e) => setSearchDate(e.target.value)}
-              className="px-3 py-2 border border-primary dark:border-secondary rounded-md focus:ring-primary dark:focus:ring-secondary focus:border-primary dark:focus:border-secondary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="w-full p-2 border rounded mt-1"
             />
           </div>
-          <div className="flex items-center gap-4">
-            <label className="text-sm font-medium text-primary dark:text-secondary">Tiempo de refresco:</label>
+          <div>
+            <label className="text-sm font-medium text-gray-800 dark:text-gray-100">Tiempo de refresco:</label>
             <select
               value={refreshTime}
               onChange={(e) => setRefreshTime(e.target.value)}
-              className="px-3 py-2 border border-primary dark:border-secondary rounded-md focus:ring-primary dark:focus:ring-secondary focus:border-primary dark:focus:border-secondary bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="w-full p-2 border rounded mt-1"
             >
               <option value="5">5</option>
               <option value="10">10</option>
               <option value="15">15</option>
               <option value="30">30</option>
             </select>
-            <button className="px-4 py-2 bg-primary dark:bg-secondary text-white rounded-md hover:bg-primary-dark dark:hover:bg-secondary-dark">
-              Actualizar
-            </button>
+          </div>
+          <div className="md:col-span-2 flex justify-end mt-2">
+            <button className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark">Actualizar</button>
           </div>
         </div>
-      </div>
-
-      {/* Generated Bitacoras Graph */}
-      <div className="bg-white dark:bg-gray-800 border-2 border-primary dark:border-secondary p-4 rounded-lg">
-        <h2 className="text-lg font-semibold mb-4 text-primary dark:text-secondary">Gráfica de Bitácoras Generados</h2>
-        <div className="h-64 w-full bg-white dark:bg-gray-700 rounded-lg p-4 border border-primary dark:border-secondary">
-          {/* Here you would integrate your actual graph component */}
-        </div>
-      </div>
-
-      {/* Graphs Grid */}
-      <div className="grid grid-cols-2 gap-6">
-        {/* Cancelled Bitacoras Graph */}
-        <div className="bg-white dark:bg-gray-800 border-2 border-primary dark:border-secondary p-4 rounded-lg">
-          <h2 className="text-lg font-semibold mb-4 text-primary dark:text-secondary">Gráfica de Bitácoras Cancelados</h2>
-          <div className="h-48 w-full bg-white dark:bg-gray-700 rounded-lg p-4 border border-primary dark:border-secondary">
-            {/* Here you would integrate your actual graph component */}
-          </div>
-        </div>
-
-        {/* Substituted Bitacoras Graph */}
-        <div className="bg-white dark:bg-gray-800 border-2 border-primary dark:border-secondary p-4 rounded-lg">
-          <h2 className="text-lg font-semibold mb-4 text-primary dark:text-secondary">Gráfica de Bitácoras Sustituidos</h2>
-          <div className="h-48 w-full bg-white dark:bg-gray-700 rounded-lg p-4 border border-primary dark:border-secondary">
-            {/* Here you would integrate your actual graph component */}
-          </div>
-        </div>
+      </Card>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+          <h2 className="text-lg font-semibold text-primary dark:text-secondary mb-4">Gráfica de Bitácoras Generados</h2>
+          <div className="h-64 w-full bg-white dark:bg-gray-700 rounded-lg p-4 border border-primary dark:border-secondary"></div>
+        </Card>
+        <Card>
+          <h2 className="text-lg font-semibold text-primary dark:text-secondary mb-4">Gráfica de Bitácoras Cancelados</h2>
+          <div className="h-40 w-full bg-white dark:bg-gray-700 rounded-lg p-4 border border-primary dark:border-secondary"></div>
+        </Card>
+        <Card>
+          <h2 className="text-lg font-semibold text-primary dark:text-secondary mb-4">Gráfica de Bitácoras Sustituidos</h2>
+          <div className="h-40 w-full bg-white dark:bg-gray-700 rounded-lg p-4 border border-primary dark:border-secondary"></div>
+        </Card>
       </div>
     </div>
   );
