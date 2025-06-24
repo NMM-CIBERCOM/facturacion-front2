@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Card } from './Card';
 
 const METODOS_HTTP = [
   { value: 'GET', label: 'GET' },
@@ -45,103 +44,103 @@ export const MonitorDisponibilidadPage: React.FC = () => {
 
   return (
     <div className="flex justify-center items-start min-h-[60vh]">
-      <Card className="w-full max-w-4xl mt-8">
-        <h2 className="text-lg font-semibold text-primary dark:text-secondary mb-6 text-center">Monitorear URL adicional</h2>
-        <form onSubmit={handleGenerar}>
+      <form
+        onSubmit={handleGenerar}
+        className="w-full max-w-4xl dark:bg-gray-800 rounded-2xl p-8 mt-8"
+        style={{ backgroundColor: 'var(--color-primary-dark)', border: '4px solid var(--color-primary)' }}
+      >
+        <h2 className="text-2xl text-white font-semibold text-center mb-6">Monitorear URL adicional</h2>
+        <input
+          type="text"
+          placeholder="Titulo"
+          className="w-full mb-4 p-3 rounded bg-white"
+          value={titulo}
+          onChange={e => setTitulo(e.target.value)}
+        />
+        <div className="flex mb-4">
+          <select
+            className="rounded-l p-3 text-white font-bold"
+            style={{ backgroundColor: 'var(--color-primary)' }}
+            value={metodo}
+            onChange={e => setMetodo(e.target.value)}
+          >
+            {METODOS_HTTP.map(m => (
+              <option key={m.value} value={m.value}>{m.label}</option>
+            ))}
+          </select>
           <input
             type="text"
-            placeholder="Titulo"
-            className="w-full mb-4 p-3 rounded bg-white"
-            value={titulo}
-            onChange={e => setTitulo(e.target.value)}
+            placeholder="URL"
+            className="flex-1 rounded-r p-3 bg-white"
+            value={url}
+            onChange={e => setUrl(e.target.value)}
           />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div className="flex">
-              <select
-                className="rounded-l p-3 text-white font-bold"
-                style={{ backgroundColor: 'var(--color-primary)' }}
-                value={metodo}
-                onChange={e => setMetodo(e.target.value)}
-              >
-                {METODOS_HTTP.map(m => (
-                  <option key={m.value} value={m.value}>{m.label}</option>
-                ))}
-              </select>
-              <input
-                type="text"
-                placeholder="URL"
-                className="flex-1 rounded-r p-3 bg-white"
-                value={url}
-                onChange={e => setUrl(e.target.value)}
-              />
-            </div>
-            <div className="flex items-center">
-              <input
-                type="text"
-                placeholder="Header Key"
-                className="p-2 rounded-l bg-white border flex-1"
-                value={nuevoHeader.key}
-                onChange={e => setNuevoHeader({ ...nuevoHeader, key: e.target.value })}
-              />
-              <input
-                type="text"
-                placeholder="Header Value"
-                className="p-2 bg-white border-t border-b flex-1"
-                value={nuevoHeader.value}
-                onChange={e => setNuevoHeader({ ...nuevoHeader, value: e.target.value })}
-              />
-              <button
-                type="button"
-                className="text-white px-4 py-2 rounded-r ml-2"
-                style={{ backgroundColor: 'var(--color-primary)' }}
-                onClick={handleAddHeader}
-              >
-                Nuevo Header
-              </button>
-            </div>
+        </div>
+        <div className="flex items-center mb-4">
+          <input
+            type="text"
+            placeholder="Header Key"
+            className="p-2 rounded-l bg-white border"
+            value={nuevoHeader.key}
+            onChange={e => setNuevoHeader({ ...nuevoHeader, key: e.target.value })}
+          />
+          <input
+            type="text"
+            placeholder="Header Value"
+            className="p-2 bg-white border-t border-b"
+            value={nuevoHeader.value}
+            onChange={e => setNuevoHeader({ ...nuevoHeader, value: e.target.value })}
+          />
+          <button
+            type="button"
+            className="text-white px-4 py-2 rounded-r ml-2"
+            style={{ backgroundColor: 'var(--color-primary)' }}
+            onClick={handleAddHeader}
+          >
+            Nuevo Header
+          </button>
+        </div>
+        {headers.length > 0 && (
+          <div className="mb-4">
+            <h4 className="font-semibold mb-2">Headers añadidos:</h4>
+            <ul>
+              {headers.map((header, idx) => (
+                <li key={idx} className="flex items-center mb-1">
+                  <input
+                    type="text"
+                    value={header.key}
+                    onChange={e => handleHeaderChange(idx, 'key', e.target.value)}
+                    className="p-1 rounded bg-white border mr-2"
+                  />
+                  <span className="mx-1">:</span>
+                  <input
+                    type="text"
+                    value={header.value}
+                    onChange={e => handleHeaderChange(idx, 'value', e.target.value)}
+                    className="p-1 rounded bg-white border mr-2"
+                  />
+                  <button
+                    type="button"
+                    className="text-red-500 font-bold"
+                    onClick={() => handleRemoveHeader(idx)}
+                  >
+                    X
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
-          {headers.length > 0 && (
-            <div className="mb-4">
-              <h4 className="font-semibold mb-2">Headers añadidos:</h4>
-              <ul>
-                {headers.map((header, idx) => (
-                  <li key={idx} className="flex items-center mb-1">
-                    <input
-                      type="text"
-                      value={header.key}
-                      onChange={e => handleHeaderChange(idx, 'key', e.target.value)}
-                      className="p-1 rounded bg-white border mr-2"
-                    />
-                    <span className="mx-1">:</span>
-                    <input
-                      type="text"
-                      value={header.value}
-                      onChange={e => handleHeaderChange(idx, 'value', e.target.value)}
-                      className="p-1 rounded bg-white border mr-2"
-                    />
-                    <button
-                      type="button"
-                      className="text-red-500 font-bold"
-                      onClick={() => handleRemoveHeader(idx)}
-                    >
-                      X
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          <div className="flex flex-col items-center">
-            <button
-              type="submit"
-              className="text-white px-8 py-3 rounded mt-4"
-              style={{ backgroundColor: 'var(--color-primary)' }}
-            >
-              Generar
-            </button>
-          </div>
-        </form>
-      </Card>
+        )}
+        <div className="flex flex-col items-center">
+          <button
+            type="submit"
+            className="text-white px-8 py-3 rounded mt-4"
+            style={{ backgroundColor: 'var(--color-primary)' }}
+          >
+            Generar
+          </button>
+        </div>
+      </form>
     </div>
   );
 };
