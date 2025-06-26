@@ -30,7 +30,7 @@ export const MonitorDisponibilidadPage: React.FC = () => {
   return (
     // CAMBIO RESPONSIVO: Añadimos padding horizontal para que no se pegue a los bordes en móvil
     <div className="flex justify-center items-start min-h-[60vh] p-4">
-      <Card className="w-full max-w-4xl mt-8">
+      <Card className="w-full max-w-4x2 mt-8">
         <h2 className="text-lg font-semibold text-primary dark:text-secondary mb-6 text-center">Monitorear URL adicional</h2>
         <form onSubmit={handleGenerar} className="space-y-6">
           <input
