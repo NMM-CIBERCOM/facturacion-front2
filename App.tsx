@@ -68,7 +68,13 @@ import { MonitorPermisosPage } from './components/MonitorPermisosPage';
 import { MonitorDisponibilidadPage } from './components/MonitorDisponibilidadPage';
 import { MonitorLogsPage } from './components/MonitorLogsPage';
 import { MonitorDecodificadorPage } from './components/MonitorDecodificadorPage';
+import { ProfileSelectorPage } from './components/ProfileSelectorPage';
 
+const PROFILE_OPTIONS = [
+  "Jefe de Credito - Liverpool Centro",
+  "Administrador - SFERA PASEO QUERETARO",
+  "Operador de Credito SFERA - SFERA SATELITE",
+];
 
 export const ThemeContext = React.createContext<{
   theme: Theme;
@@ -106,6 +112,10 @@ const App: React.FC = () => {
   const [logoUrl, setLogoUrl] = useState<string>(() => {
     const storedLogoUrl = localStorage.getItem('logoUrl');
     return storedLogoUrl || '/images/Logo Cibercom.png';
+  });
+
+  const [profileSelected, setProfileSelected] = useState<string | null>(() => {
+    return localStorage.getItem('profileSelected');
   });
 
   useEffect(() => {
@@ -195,6 +205,7 @@ const App: React.FC = () => {
     if (usernameInput === DUMMY_CREDENTIALS.username && passwordInput === DUMMY_CREDENTIALS.password) {
       localStorage.setItem('isAuthenticated', 'true');
       setIsAuthenticated(true);
+      setProfileSelected(null);
       
       const dashboardItem = NAV_ITEMS.find(item => item.label === 'Dashboard');
       if (dashboardItem) {
@@ -215,16 +226,53 @@ const App: React.FC = () => {
 
   const handleLogout = useCallback(() => {
     localStorage.removeItem('isAuthenticated');
+    localStorage.removeItem('profileSelected');
     setIsAuthenticated(false);
+    setProfileSelected(null);
     setActivePage('Dashboard'); 
     setActivePageIcon(() => HomeIcon);
   }, []);
 
+  const handleProfileSelect = (profile: string) => {
+    setProfileSelected(profile);
+    localStorage.setItem('profileSelected', profile);
+  };
+
+  const getFilteredNavItems = () => {
+    if (profileSelected === "Administrador - SFERA PASEO QUERETARO") {
+      return NAV_ITEMS; // Muestra todo
+    }
+    // Para operadores y jefes de crédito, solo mostrar secciones clave
+    if (
+      profileSelected === "Operador de Credito SFERA - SFERA SATELITE"
+    ) {
+      return NAV_ITEMS.filter(item =>
+        ["Facturación", "Consultas", "Reportes Facturación Fiscal"].includes(item.label)
+      );
+    }
+    if (
+      profileSelected === "Jefe de Credito - Liverpool Centro"
+    ) {
+      return NAV_ITEMS.filter(item =>
+        ["Facturación", "Consultas", "Reportes Facturación Fiscal", "Administración"].includes(item.label)
+      );
+    }
+    // Por defecto, muestra todo
+    return NAV_ITEMS;
+  };
 
   if (!isAuthenticated) {
     return (
       <ThemeContext.Provider value={{ theme, toggleTheme, customColors, setCustomColors, logoUrl, setLogoUrl }}>
         <LoginPage onLogin={handleLogin} logoUrl={logoUrl} appName="Cibercom" />
+      </ThemeContext.Provider>
+    );
+  }
+
+  if (!profileSelected) {
+    return (
+      <ThemeContext.Provider value={{ theme, toggleTheme, customColors, setCustomColors, logoUrl, setLogoUrl }}>
+        <ProfileSelectorPage profiles={PROFILE_OPTIONS} onSelect={handleProfileSelect} />
       </ThemeContext.Provider>
     );
   }
@@ -298,7 +346,7 @@ const App: React.FC = () => {
     <ThemeContext.Provider value={{ theme, toggleTheme, customColors, setCustomColors, logoUrl, setLogoUrl }}>
       <div className="flex h-screen bg-gray-100 dark:bg-gray-900 transition-colors duration-300">
         <Sidebar
-          navItems={NAV_ITEMS}
+          navItems={getFilteredNavItems()}
           isOpen={isSidebarOpen}
           toggleSidebar={toggleSidebar}
           onNavItemClick={handleNavItemClick}
