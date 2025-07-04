@@ -23,4 +23,10 @@ export interface CustomColors {
   accent: string;
   accentDark: string;
 }
+
+
+export interface EmpresaInfo {
+  nombre: string;
+  rfc: string;
+}
     

@@ -26,6 +26,7 @@ import { FacturacionMonederosPage } from './components/FacturacionMonederosPage'
 import { FacturacionCapturaLibrePage } from './components/FacturacionCapturaLibrePage';
 import { FacturacionMotosPage } from './components/FacturacionMotosPage';
 import { FacturacionCancelacionMasivaPage } from './components/FacturacionCancelacionMasivaPage';
+import { FacturacionNominasPage } from './components/FacturacionNominasPage';
 
 
 // Consultas Pages
@@ -59,6 +60,7 @@ import { ReportesFiscalesRepsSustituidosPage } from './components/ReportesFiscal
 
 // Configuracion Pages
 import { ConfiguracionTemasPage } from './components/ConfiguracionTemasPage';
+import { ConfiguracionEmpresaPage } from './components/ConfiguracionEmpresaPage';
 
 
 // Monitor Pages
@@ -91,6 +93,19 @@ export const ThemeContext = React.createContext<{
   logoUrl: '/images/Logo Cibercom.png',
   setLogoUrl: () => {},
 });
+
+export const EmpresaContext = React.createContext<{
+  empresaInfo: EmpresaInfo;
+  setEmpresaInfo: React.Dispatch<React.SetStateAction<EmpresaInfo>>;
+}>({  
+  empresaInfo: {
+    nombre: 'Empresa Ejemplo S.A. de C.V.',
+    rfc: 'EEJ920629TE3'
+  },
+  setEmpresaInfo: () => {}
+});
+
+import { EmpresaProvider } from './context/EmpresaContext';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
@@ -279,8 +294,7 @@ const App: React.FC = () => {
 
   const renderPageContent = () => {
     // Dashboard
-    if (activePage === 'Dashboard') return <DashboardPage />;
-
+    if (activePage === 'Dashboard') return <DashboardPage setActivePage={setActivePage} />;
     // Facturación
     if (activePage === 'Artículos') return <InvoiceForm />;
     if (activePage === 'Intereses') return <FacturacionInteresesPage />;
@@ -290,6 +304,7 @@ const App: React.FC = () => {
     if (activePage === 'Captura Libre') return <FacturacionCapturaLibrePage />;
     if (activePage === 'Motos') return <FacturacionMotosPage />;
     if (activePage === 'Cancelación Masiva') return <FacturacionCancelacionMasivaPage />;
+    if (activePage === 'Nóminas') return <FacturacionNominasPage />;
 
     // Consultas
     if (activePage === 'Facturas') return <ConsultasFacturasPage />;
@@ -320,8 +335,9 @@ const App: React.FC = () => {
     if (activePage === 'Conciliación') return <ReportesConciliacionPage />;
     if (activePage === 'REPs Sustituidos (Fiscal)') return <ReportesFiscalesRepsSustituidosPage />;
 
-    // Configuración
+    // Configuracion
     if (activePage === 'Temas') return <ConfiguracionTemasPage />;
+    if (activePage === 'Empresa') return <ConfiguracionEmpresaPage />;
     
     // Monitor
     if (activePage === 'Gráficas') return <MonitorGraficasPage />;
@@ -344,37 +360,39 @@ const App: React.FC = () => {
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme, customColors, setCustomColors, logoUrl, setLogoUrl }}>
-      <div className="flex h-screen bg-gray-100 dark:bg-gray-900 transition-colors duration-300">
-        <Sidebar
-          navItems={getFilteredNavItems()}
-          isOpen={isSidebarOpen}
-          toggleSidebar={toggleSidebar}
-          onNavItemClick={handleNavItemClick}
-          logoUrl={logoUrl}
-          appName="Cibercom"
-        />
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <Header
-            user={currentUser}
+      <EmpresaProvider>
+        <div className="flex h-screen bg-gray-100 dark:bg-gray-900 transition-colors duration-300">
+          <Sidebar
+            navItems={getFilteredNavItems()}
+            isOpen={isSidebarOpen}
             toggleSidebar={toggleSidebar}
-            onLogout={handleLogout}
-            isSidebarOpen={isSidebarOpen}
-            isAuthenticated={isAuthenticated}
-            ThemeToggleButton={
-              <button
-                onClick={toggleTheme}
-                className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-                aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
-              >
-                {theme === 'light' ? <MoonIcon className="w-6 h-6" /> : <SunIcon className="w-6 h-6" />}
-              </button>
-            }
+            onNavItemClick={handleNavItemClick}
+            logoUrl={logoUrl}
+            appName="Cibercom"
           />
-          <MainContent pageTitle={activePage} PageIcon={activePageIcon}>
-            {renderPageContent()}
-          </MainContent>
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <Header
+              user={currentUser}
+              toggleSidebar={toggleSidebar}
+              onLogout={handleLogout}
+              isSidebarOpen={isSidebarOpen}
+              isAuthenticated={isAuthenticated}
+              ThemeToggleButton={
+                <button
+                  onClick={toggleTheme}
+                  className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                  aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+                >
+                  {theme === 'light' ? <MoonIcon className="w-6 h-6" /> : <SunIcon className="w-6 h-6" />}
+                </button>
+              }
+            />
+            <MainContent pageTitle={activePage} PageIcon={activePageIcon}>
+              {renderPageContent()}
+            </MainContent>
+          </div>
         </div>
-      </div>
+      </EmpresaProvider>
     </ThemeContext.Provider>
   );
 };

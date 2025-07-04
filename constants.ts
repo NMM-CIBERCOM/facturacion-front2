@@ -50,6 +50,7 @@ export const NAV_ITEMS: NavItem[] = [
       { label: 'Cancelación Masiva', path: 'facturacion-cancelacion', icon: StopIcon },
       { label: 'Motos', path: 'facturacion-motos', icon: TruckIcon },
       { label: 'Monederos', path: 'facturacion-monederos', icon: GiftIcon },
+      { label: 'Nóminas', path: 'facturacion-nominas', icon: FaUsers },
     ],
   },
   {
@@ -109,7 +110,8 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Configuración',
     icon: CogIcon,
     children: [
-      { label: 'Temas', path: 'configuracion-temas', icon: PaintBrushIcon }
+      { label: 'Temas', path: 'configuracion-temas', icon: PaintBrushIcon },
+      { label: 'Empresa', path: 'configuracion-empresa', icon: FaStore }
     ]
   }
 ];

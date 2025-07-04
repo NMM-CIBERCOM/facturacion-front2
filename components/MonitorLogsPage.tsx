@@ -69,7 +69,7 @@ export const MonitorLogsPage: React.FC = () => {
       <Card>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 items-end gap-x-6 gap-y-4">
           <SelectField label="Directorio:" name="directory" value={filters.directory} onChange={handleFilterChange} options={DIRECTORY_OPTIONS} />
-          <p className="text-sm text-gray-800 dark:text-gray-200 self-center pt-6">
+          <p className="text-sm text-primary dark:text-secondary self-center pt-6">
              <span className="font-semibold">Servidor:</span> Intranet_Apps_Server1
           </p>
           <SelectField label="Líneas a descargar:" name="lines" value={filters.lines} onChange={handleFilterChange} options={LINES_OPTIONS} />
@@ -81,7 +81,7 @@ export const MonitorLogsPage: React.FC = () => {
             options={ITEMS_PER_PAGE_OPTIONS} 
           />
         </div>
-        <div className="mt-6 flex justify-start">
+        <div className="mt-6 flex justify-end">
           <Button type="button" variant="primary">
             Mostrar Descargas
           </Button>
@@ -91,7 +91,7 @@ export const MonitorLogsPage: React.FC = () => {
       <Card>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead style={{ backgroundColor: 'var(--color-primary)' }}>
+            <thead className="bg-primary dark:bg-secondary">
               <tr>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Nombre</th>
                 <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-white uppercase tracking-wider">Descarga</th>

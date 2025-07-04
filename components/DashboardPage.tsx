@@ -2,7 +2,15 @@ import React from 'react';
 import { Card } from './Card';
 import { ChartBarIcon, DocumentTextIcon, CubeIcon, CogIcon } from './icons';
 
-export const DashboardPage: React.FC = () => {
+export interface DashboardPageProps {
+  setActivePage: (page: string) => void;
+}
+
+export const DashboardPage: React.FC<DashboardPageProps> = ({ setActivePage }) => {
+  const handleNuevaFacturaArticulos = () => {
+    setActivePage('Artículos');
+  };
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fadeIn">
       <Card title="Resumen General">
@@ -60,7 +68,12 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
           <div className="space-y-2 mt-2">
-            <button className="w-full text-left p-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors">Nueva Factura de Artículos</button>
+            <button
+              className="w-full text-left p-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+              onClick={handleNuevaFacturaArticulos}
+            >
+              Nueva Factura de Artículos
+            </button>
             <button className="w-full text-left p-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors">Buscar Cliente</button>
             <button className="w-full text-left p-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors">Ver Reporte Mensual</button>
           </div>

@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import { Card } from './Card';
 import { Select } from './common/Select';
+import { Button } from './Button';
 
 export const MonitorPermisosPage: React.FC = () => {
   const [selectedProfile, setSelectedProfile] = useState('');
@@ -40,19 +42,16 @@ export const MonitorPermisosPage: React.FC = () => {
       profile: selectedProfile,
       permissions: permissionValues
     });
-    // Here you would typically make an API call to update the permissions
+    // Aquí iría la llamada a la API
   };
 
   return (
-    <div className="p-4 bg-gray-50 dark:bg-gray-900 min-h-screen">
-      <div className="max-w-4xl mx-auto">
+    <div className="space-y-6">
+      <Card>
         <h1 className="text-2xl font-bold text-primary dark:text-secondary mb-6">Lista de Permisos</h1>
-        
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <form className="space-y-6">
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Perfil:
-            </label>
+            <label className="block text-sm font-semibold text-primary dark:text-secondary mb-2">Perfil:</label>
             <Select
               value={selectedProfile}
               onChange={(value) => setSelectedProfile(value)}
@@ -63,46 +62,38 @@ export const MonitorPermisosPage: React.FC = () => {
               className="w-64"
             />
           </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-lg">
-            <div className="grid grid-cols-1 gap-4">
-              <div className="bg-primary dark:bg-secondary text-white p-3 grid grid-cols-2 rounded-t-lg">
-                <div>Permiso</div>
-                <div className="text-right">Valor</div>
-              </div>
-              
-              {permissions.map((permission) => (
-                <div 
-                  key={permission.id}
-                  className="grid grid-cols-2 p-3 items-center border-b border-gray-200 dark:border-gray-700"
-                >
-                  <div className="text-gray-700 dark:text-gray-300">{permission.label}</div>
-                  <div className="text-right">
-                    <Select
-                      value={permissionValues[permission.id] || ''}
-                      onChange={(value) => handlePermissionChange(permission.id, value)}
-                      options={[
-                        { value: 'permitido', label: 'Permitido' },
-                        { value: 'denegado', label: 'Denegado' }
-                      ]}
-                      className="w-32 ml-auto"
-                    />
-                  </div>
-                </div>
-              ))}
+          <div className="rounded-lg overflow-hidden border border-gray-300 dark:border-gray-700">
+            <div className="bg-primary dark:bg-secondary text-white p-3 grid grid-cols-2 rounded-t-lg">
+              <div>Permiso</div>
+              <div className="text-right">Valor</div>
             </div>
+            {permissions.map((permission) => (
+              <div 
+                key={permission.id}
+                className="grid grid-cols-2 p-3 items-center border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+              >
+                <div className="text-primary dark:text-secondary">{permission.label}</div>
+                <div className="text-right">
+                  <Select
+                    value={permissionValues[permission.id] || ''}
+                    onChange={(value) => handlePermissionChange(permission.id, value)}
+                    options={[
+                      { value: 'permitido', label: 'Permitido' },
+                      { value: 'denegado', label: 'Denegado' }
+                    ]}
+                    className="w-32 ml-auto"
+                  />
+                </div>
+              </div>
+            ))}
           </div>
-
-          <div className="mt-6 flex justify-end">
-            <button 
-              onClick={handleUpdatePermissions}
-              className="px-6 py-2 bg-primary dark:bg-secondary text-white rounded hover:bg-primary-dark dark:hover:bg-secondary-dark transition-colors"
-            >
+          <div className="flex justify-end mt-6">
+            <Button type="button" variant="primary" onClick={handleUpdatePermissions}>
               Actualizar Permisos
-            </button>
+            </Button>
           </div>
-        </div>
-      </div>
+        </form>
+      </Card>
     </div>
   );
 };

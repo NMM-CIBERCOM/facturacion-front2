@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card } from './Card';
 import { SelectField } from './SelectField';
 import { Button } from './Button';
-import { TrashIcon } from './icons';
+import { TrashIcon, MagnifyingGlassIcon } from './icons';
 import { ORIGEN_OPTIONS_ADMIN, SECCIONES_FACTURABLES_OPTIONS } from '../constants';
+import { FormField } from './FormField';
 
 interface SeccionNoFacturable {
   id: string;
@@ -23,9 +24,31 @@ const dummySecciones: SeccionNoFacturable[] = [
   { id: '3', origen: 'web', noSeccionViajero: '207', nombreSeccionViajero: 'MOTOS' },
 ];
 
+const ITEMS_PER_PAGE = 10;
+
 export const AdminSeccionesPage: React.FC = () => {
   const [newSeccion, setNewSeccion] = useState(initialNewSeccionData);
   const [secciones, setSecciones] = useState<SeccionNoFacturable[]>(dummySecciones);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filtroOrigen, setFiltroOrigen] = useState('');
+
+  // Filtrado y búsqueda
+  const seccionesFiltradas = useMemo(() => {
+    return secciones.filter(seccion => {
+      const matchesSearch = (
+        seccion.nombreSeccionViajero.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        seccion.noSeccionViajero.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      const matchesOrigen = !filtroOrigen || seccion.origen === filtroOrigen;
+      return matchesSearch && matchesOrigen;
+    });
+  }, [secciones, searchTerm, filtroOrigen]);
+
+  // Paginación
+  const totalPages = Math.ceil(seccionesFiltradas.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const seccionesPaginadas = seccionesFiltradas.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -48,6 +71,16 @@ export const AdminSeccionesPage: React.FC = () => {
   const handleDeleteSeccion = (id: string) => {
     setSecciones(prev => prev.filter(s => s.id !== id));
     alert(`Sección con ID ${id} eliminada (simulado).`);
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setFiltroOrigen('');
+    setCurrentPage(1);
   };
 
   return (
@@ -80,9 +113,49 @@ export const AdminSeccionesPage: React.FC = () => {
       </Card>
 
       <Card>
+        <div className="mb-6 space-y-4">
+          <div className="flex flex-col md:flex-row gap-4 items-end">
+            <div className="flex-1">
+              <FormField
+                label="Buscar:"
+                type="text"
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder="Buscar por número o nombre de sección..."
+                leftIcon={<MagnifyingGlassIcon className="w-5 h-5 text-gray-400" />}
+              />
+            </div>
+            <div className="w-full md:w-48">
+              <SelectField
+                label="Filtrar por origen:"
+                value={filtroOrigen}
+                onChange={(e) => {
+                  setFiltroOrigen(e.target.value);
+                  setCurrentPage(1);
+                }}
+                options={[{ value: '', label: 'Todos los orígenes' }, ...ORIGEN_OPTIONS_ADMIN]}
+              />
+            </div>
+            {(searchTerm || filtroOrigen) && (
+              <Button
+                type="button"
+                variant="neutral"
+                onClick={clearFilters}
+                className="mb-2"
+              >
+                Limpiar filtros
+              </Button>
+            )}
+          </div>
+        </div>
+
         <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">
           Lista de secciones no facturables
         </h3>
+
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-700">
@@ -94,7 +167,7 @@ export const AdminSeccionesPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {secciones.map((s) => (
+              {seccionesPaginadas.map((s) => (
                 <tr key={s.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{ORIGEN_OPTIONS_ADMIN.find(o => o.value === s.origen)?.label || s.origen}</td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{s.noSeccionViajero}</td>
@@ -109,8 +182,44 @@ export const AdminSeccionesPage: React.FC = () => {
             </tbody>
           </table>
         </div>
-        {secciones.length === 0 && (
-            <p className="text-center py-4 text-gray-500 dark:text-gray-400">No hay secciones no facturables definidas.</p>
+
+        {seccionesFiltradas.length === 0 && (
+          <p className="text-center py-4 text-gray-500 dark:text-gray-400">
+            {searchTerm || filtroOrigen ? 'No se encontraron resultados para la búsqueda' : 'No hay secciones no facturables definidas.'}
+          </p>
+        )}
+
+        {seccionesFiltradas.length > 0 && (
+          <div className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-3">
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              Mostrando {startIndex + 1} a {Math.min(startIndex + ITEMS_PER_PAGE, seccionesFiltradas.length)} de {seccionesFiltradas.length} resultados
+            </p>
+            <div className="flex justify-center space-x-2">
+              <Button
+                variant="neutral"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                Anterior
+              </Button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <Button
+                  key={page}
+                  variant={currentPage === page ? 'primary' : 'neutral'}
+                  onClick={() => handlePageChange(page)}
+                >
+                  {page}
+                </Button>
+              ))}
+              <Button
+                variant="neutral"
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+              >
+                Siguiente
+              </Button>
+            </div>
+          </div>
         )}
       </Card>
     </div>

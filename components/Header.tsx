@@ -3,6 +3,7 @@ import type { User } from '../types';
 import { MenuIcon } from './icons/MenuIcon';
 import { UserCircleIcon } from './icons/UserCircleIcon';
 import { ArrowRightOnRectangleIcon } from './icons/ArrowRightOnRectangleIcon';
+import { useEmpresa } from '../context/EmpresaContext';
 
 interface HeaderProps {
   user: User;
@@ -21,6 +22,8 @@ export const Header: React.FC<HeaderProps> = ({
   isAuthenticated, 
   ThemeToggleButton,
 }) => {
+  const { empresaInfo } = useEmpresa();
+
   return (
     <header className="bg-white dark:bg-gray-800 shadow-md h-16 flex items-center justify-between px-4 md:px-6 sticky top-0 z-20 border-b border-gray-200 dark:border-gray-700">
       <div className="flex items-center">
@@ -33,9 +36,17 @@ export const Header: React.FC<HeaderProps> = ({
             <MenuIcon className="w-6 h-6" />
             </button>
         )}
-         <h1 className="text-lg font-semibold text-gray-700 dark:text-gray-200 hidden md:block">
-          Sistema de Facturación Cibercom
-        </h1>
+         <div className="flex items-center gap-6">
+           <h1 className="text-lg font-semibold text-gray-700 dark:text-gray-200">
+             Sistema de Facturación Cibercom
+           </h1>
+           <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400 border-l border-gray-200 dark:border-gray-700 pl-6">
+             <div>
+               <p className="text-sm font-medium">{empresaInfo.nombre}</p>
+               <p className="text-xs">RFC: {empresaInfo.rfc}</p>
+             </div>
+           </div>
+         </div>
       </div>
 
       <div className="flex items-center space-x-3 md:space-x-4">
