@@ -2,19 +2,23 @@ import React, { useState } from 'react';
 import { Card } from './Card';
 import { FormField } from './FormField';
 import { Button } from './Button';
-import { FileInputField } from './FileInputField';
+// Ya no necesitamos FileInputField para esta simulación, pero lo dejo por si lo usas en otro lado
+// import { FileInputField } from './FileInputField'; 
 
 interface UserSearchData {
   usuario: string;
 }
 
 const initialUserSearchData: UserSearchData = {
-  usuario: '',
+  usuario: 'j.perez',
 };
 
 export const AdminEmpleadosPage: React.FC = () => {
   const [userSearch, setUserSearch] = useState<UserSearchData>(initialUserSearchData);
-  const [massDeleteFile, setMassDeleteFile] = useState<File | null>(null);
+
+  // Mantenemos el archivo ficticio en el estado para que la lógica del formulario siga funcionando
+  const dummyFile = new File(['jperez\nmgomez\nasanchez'], 'usuarios_a_eliminar.csv', { type: 'text/csv' });
+  const [massDeleteFile, setMassDeleteFile] = useState<File | null>(dummyFile);
 
   const handleUserSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setUserSearch({ ...userSearch, [e.target.name]: e.target.value });
@@ -23,14 +27,13 @@ export const AdminEmpleadosPage: React.FC = () => {
   const handleConsultarUsuario = (e: React.FormEvent) => {
     e.preventDefault();
     alert(`Consultando usuario: ${userSearch.usuario} (simulado)`);
-    // Logic to display user data would go here
   };
 
   const handleAltaUsuario = () => {
     alert('Redirigiendo a formulario de Alta de Usuario (simulado)');
-    // Logic for new user registration form
   };
-
+  
+  // Aunque no usemos el input, dejamos la función por si se necesita
   const handleFileChange = (file: File | null) => {
     setMassDeleteFile(file);
   };
@@ -85,13 +88,26 @@ export const AdminEmpleadosPage: React.FC = () => {
           Ingresa los datos para eliminar permisos de usuario:
         </p>
         <form onSubmit={handleMassDeleteSubmit} className="space-y-4">
-          <FileInputField
-            label="Archivo de Eliminación Masiva:"
-            name="massDeleteFile"
-            onChange={handleFileChange}
-            accept=".txt, .csv"
-            helpText={fileHelpText}
-          />
+          {/* --- SECCIÓN MODIFICADA --- */}
+          {/* Se reemplazó el componente FileInputField por HTML simple para simular la selección de un archivo */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
+              Archivo de Eliminación Masiva:
+            </label>
+            <div className="flex items-center space-x-4">
+              <span className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md text-sm font-medium">
+                Elegir archivo
+              </span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                {massDeleteFile ? massDeleteFile.name : 'No se eligió ningún archivo'}
+              </span>
+            </div>
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              {fileHelpText}
+            </p>
+          </div>
+          {/* --- FIN DE LA SECCIÓN MODIFICADA --- */}
+          
           <div className="flex justify-start">
             <Button type="submit" variant="primary">
               Eliminación Masiva

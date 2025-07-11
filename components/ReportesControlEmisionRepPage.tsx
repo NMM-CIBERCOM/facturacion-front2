@@ -4,6 +4,7 @@ import { FormField } from './FormField';
 import { SelectField } from './SelectField';
 import { Button } from './Button';
 import { MES_OPTIONS, EMPRESA_OPTIONS_CONSULTAS } from '../constants';
+import { utils, writeFile } from 'xlsx';
 
 interface ControlEmisionRepFormData {
   mes: string;
@@ -19,6 +20,13 @@ const initialFormData: ControlEmisionRepFormData = {
 
 export const ReportesControlEmisionRepPage: React.FC = () => {
   const [formData, setFormData] = useState<ControlEmisionRepFormData>(initialFormData);
+  const [resultados, setResultados] = useState<any[]>([]);
+
+  const datosDummy = [
+    { folio: 'REP-001', mes: 'Junio', anio: '2024', empresa: 'Empresa A', total: 5 },
+    { folio: 'REP-002', mes: 'Junio', anio: '2024', empresa: 'Empresa B', total: 3 },
+    { folio: 'REP-003', mes: 'Junio', anio: '2024', empresa: 'Empresa C', total: 7 },
+  ];
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -27,8 +35,20 @@ export const ReportesControlEmisionRepPage: React.FC = () => {
 
   const handleBuscar = (e: React.FormEvent) => {
     e.preventDefault();
+    setResultados(datosDummy);
     console.log('Buscar Control de Emisión de REP:', formData);
-    alert('Búsqueda de Control de Emisión de REP simulada. Ver consola.');
+    // alert('Búsqueda de Control de Emisión de REP simulada. Ver consola.');
+  };
+
+  const handleExcel = () => {
+    if (resultados.length === 0) {
+      alert('No hay datos para exportar.');
+      return;
+    }
+    const ws = utils.json_to_sheet(resultados);
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, 'ControlEmisionREP');
+    writeFile(wb, 'control_emision_rep.xlsx');
   };
 
   return (
@@ -51,8 +71,37 @@ export const ReportesControlEmisionRepPage: React.FC = () => {
           </Button>
         </div>
       </Card>
-      <div className="mt-6 p-4 border border-dashed border-gray-300 dark:border-gray-600 rounded-md min-h-[200px] flex items-center justify-center text-gray-400 dark:text-gray-500">
-        Los resultados del reporte aparecerán aquí.
+      <div className="mt-6 p-4 border border-dashed border-gray-300 dark:border-gray-600 rounded-md min-h-[200px]">
+        {resultados.length === 0 ? (
+          <div className="flex items-center justify-center text-gray-400 dark:text-gray-500">
+            Los resultados del reporte aparecerán aquí.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm text-left">
+              <thead>
+                <tr>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Folio</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Mes</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Año</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Empresa</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Total REP</th>
+                </tr>
+              </thead>
+              <tbody>
+                {resultados.map((row, idx) => (
+                  <tr key={idx} className="border-t">
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.folio}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.mes}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.anio}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.empresa}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.total}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </form>
   );

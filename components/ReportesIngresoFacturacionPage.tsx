@@ -4,6 +4,7 @@ import { FormField } from './FormField';
 import { SelectField } from './SelectField';
 import { Button } from './Button';
 import { MES_OPTIONS, EMPRESA_OPTIONS_CONSULTAS, ALMACEN_OPTIONS } from '../constants';
+import { utils, writeFile } from 'xlsx';
 
 interface IngresoFacturacionFormData {
   mes: string;
@@ -21,6 +22,13 @@ const initialFormData: IngresoFacturacionFormData = {
 
 export const ReportesIngresoFacturacionPage: React.FC = () => {
   const [formData, setFormData] = useState<IngresoFacturacionFormData>(initialFormData);
+  const [resultados, setResultados] = useState<any[]>([]);
+
+  const datosDummy = [
+    { folio: 'IF-001', mes: 'Junio', almacen: 'Sucursal 1', fecha: '2024-06-01', empresa: 'Empresa A', monto: 12000.00 },
+    { folio: 'IF-002', mes: 'Junio', almacen: 'Sucursal 2', fecha: '2024-06-01', empresa: 'Empresa B', monto: 8500.50 },
+    { folio: 'IF-003', mes: 'Junio', almacen: 'Sucursal 3', fecha: '2024-06-01', empresa: 'Empresa C', monto: 4300.00 },
+  ];
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -29,13 +37,20 @@ export const ReportesIngresoFacturacionPage: React.FC = () => {
 
   const handleBuscar = (e: React.FormEvent) => {
     e.preventDefault();
+    setResultados(datosDummy);
     console.log('Buscar Desglose Facturación de Ingresos:', formData);
-    alert('Búsqueda de Desglose Facturación (Rep. 1) simulada. Ver consola.');
+    // alert('Búsqueda de Desglose Facturación (Rep. 1) simulada. Ver consola.');
   };
 
   const handleExcel = () => {
-    console.log('Exportar Desglose Facturación de Ingresos a Excel:', formData);
-    alert('Exportación a Excel (Rep. 1) simulada.');
+    if (resultados.length === 0) {
+      alert('No hay datos para exportar.');
+      return;
+    }
+    const ws = utils.json_to_sheet(resultados);
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, 'IngresoFacturacion');
+    writeFile(wb, 'ingreso_facturacion.xlsx');
   };
 
   return (
@@ -62,8 +77,39 @@ export const ReportesIngresoFacturacionPage: React.FC = () => {
           </Button>
         </div>
       </Card>
-      <div className="mt-6 p-4 border border-dashed border-gray-300 dark:border-gray-600 rounded-md min-h-[200px] flex items-center justify-center text-gray-400 dark:text-gray-500">
-        Los resultados del reporte aparecerán aquí.
+      <div className="mt-6 p-4 border border-dashed border-gray-300 dark:border-gray-600 rounded-md min-h-[200px]">
+        {resultados.length === 0 ? (
+          <div className="flex items-center justify-center text-gray-400 dark:text-gray-500">
+            Los resultados del reporte aparecerán aquí.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm text-left">
+              <thead>
+                <tr>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Folio</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Mes</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Almacén</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Fecha</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Empresa</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Monto</th>
+                </tr>
+              </thead>
+              <tbody>
+                {resultados.map((row, idx) => (
+                  <tr key={idx} className="border-t">
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.folio}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.mes}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.almacen}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.fecha}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.empresa}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">${row.monto.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </form>
   );

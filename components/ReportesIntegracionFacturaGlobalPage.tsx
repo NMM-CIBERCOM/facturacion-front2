@@ -5,6 +5,7 @@ import { SelectField } from './SelectField';
 import { CheckboxField } from './CheckboxField';
 import { Button } from './Button';
 import { TIENDA_OPTIONS_REPORTS, TIPO_FACTURA_GLOBAL_OPTIONS_REPORTS, EMPRESA_OPTIONS_CONSULTAS } from '../constants';
+import { utils, writeFile } from 'xlsx';
 
 interface IntegracionFacturaGlobalFormData {
   fecha: string;
@@ -26,6 +27,13 @@ const initialFormData: IntegracionFacturaGlobalFormData = {
 
 export const ReportesIntegracionFacturaGlobalPage: React.FC = () => {
   const [formData, setFormData] = useState<IntegracionFacturaGlobalFormData>(initialFormData);
+  const [resultados, setResultados] = useState<any[]>([]);
+
+  const datosDummy = [
+    { folio: 'IFG-001', fecha: '2024-06-01', tienda: 'Sucursal 1', tipoFactura: 'CON', empresa: 'Empresa A', monto: 5000.00 },
+    { folio: 'IFG-002', fecha: '2024-06-01', tienda: 'Sucursal 2', tipoFactura: 'DEV', empresa: 'Empresa B', monto: 3200.50 },
+    { folio: 'IFG-003', fecha: '2024-06-01', tienda: 'Sucursal 3', tipoFactura: 'CRE', empresa: 'Empresa C', monto: 2100.00 },
+  ];
 
   const handleCheckboxGroupChange = (
     groupName: keyof Pick<IntegracionFacturaGlobalFormData, 'tiendas' | 'tiposFacturaGlobal'>,
@@ -62,13 +70,20 @@ export const ReportesIntegracionFacturaGlobalPage: React.FC = () => {
 
   const handleBuscar = (e: React.FormEvent) => {
     e.preventDefault();
+    setResultados(datosDummy);
     console.log('Buscar Integración Factura Global (Rep. 2):', formData);
-    alert('Búsqueda (Rep. 2) simulada. Ver consola.');
+    // alert('Búsqueda (Rep. 2) simulada. Ver consola.');
   };
 
   const handleExcel = () => {
-    console.log('Exportar Integración Factura Global (Rep. 2) a Excel:', formData);
-    alert('Exportación a Excel (Rep. 2) simulada.');
+    if (resultados.length === 0) {
+      alert('No hay datos para exportar.');
+      return;
+    }
+    const ws = utils.json_to_sheet(resultados);
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, 'IntegracionFacturaGlobal');
+    writeFile(wb, 'integracion_factura_global.xlsx');
   };
 
   return (
@@ -128,8 +143,39 @@ export const ReportesIntegracionFacturaGlobalPage: React.FC = () => {
           </Button>
         </div>
       </Card>
-      <div className="mt-6 p-4 border border-dashed border-gray-300 dark:border-gray-600 rounded-md min-h-[200px] flex items-center justify-center text-gray-400 dark:text-gray-500">
-        Los resultados del reporte aparecerán aquí.
+      <div className="mt-6 p-4 border border-dashed border-gray-300 dark:border-gray-600 rounded-md min-h-[200px]">
+        {resultados.length === 0 ? (
+          <div className="flex items-center justify-center text-gray-400 dark:text-gray-500">
+            Los resultados del reporte aparecerán aquí.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm text-left">
+              <thead>
+                <tr>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Folio</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Fecha</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Tienda</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Tipo Factura</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Empresa</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Monto</th>
+                </tr>
+              </thead>
+              <tbody>
+                {resultados.map((row, idx) => (
+                  <tr key={idx} className="border-t">
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.folio}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.fecha}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.tienda}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.tipoFactura}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.empresa}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">${row.monto.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </form>
   );

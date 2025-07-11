@@ -25,8 +25,8 @@ const initialNewRuleData: Omit<ReglaPeriodoPerfil, 'id'> = {
 };
 
 const dummyReglas: ReglaPeriodoPerfil[] = [
-  { id: '1', tipoRegla: 'cancelacion', perfil: 'Jefe de Credito SFERA', menu: 'Facturación', fechaInicio: '2023-01-01', fechaFin: '2023-12-31' },
-  { id: '2', tipoRegla: 'emision', perfil: 'Operador de Credito', menu: 'Consultas', fechaInicio: '2024-01-01', fechaFin: '2024-06-30' },
+  { id: '1', tipoRegla: 'cancelacion', perfil: 'jefe_credito', menu: 'facturacion', fechaInicio: '2023-01-01', fechaFin: '2023-12-31' },
+  { id: '2', tipoRegla: 'emision', perfil: 'operador_credito', menu: 'consultas', fechaInicio: '2024-01-01', fechaFin: '2024-06-30' },
 ];
 
 export const AdminPeriodosPerfilPage: React.FC = () => {

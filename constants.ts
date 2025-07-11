@@ -150,21 +150,20 @@ export const USO_CFDI_OPTIONS = [
 ];
 
 export const TIENDA_OPTIONS = [
-    { value: 'T001', label: 'Tienda Principal (T001)' },
-    { value: 'T002', label: 'Sucursal Centro (T002)' },
-    { value: 'T798', label: 'Tienda 798 (T798)'},
-    { value: '0', label: '0 - VENTAS INSTITUCIONALES' },
-    { value: '1', label: '1 - LIVERPOOL CENTRO' },
-    { value: '2', label: '2 - LIVERPOOL INSURGENTES' },
-    { value: '3', label: '3 - LIVERPOOL POLANCO' },
-    { value: 'Todas', label: 'Todas las Tiendas' },
+    { value: 'S001', label: 'Sucursal 1 (S001)' },
+    { value: 'S002', label: 'Sucursal 2 (S002)' },
+    { value: 'S003', label: 'Sucursal 3 (S003)' },
+    { value: 'S004', label: 'Sucursal 4 (S004)' },
+    { value: 'S005', label: 'Sucursal 5 (S005)' },
+    { value: 'Todas', label: 'Todas las Sucursales' },
 ];
 
 export const TIENDA_OPTIONS_REPORTS = [
-    { value: '0', label: '0 - VENTAS INSTITUCIONALES' },
-    { value: '1', label: '1 - LIVERPOOL CENTRO' },
-    { value: '2', label: '2 - LIVERPOOL INSURGENTES' },
-    { value: '3', label: '3 - LIVERPOOL POLANCO' },
+    { value: 'S001', label: 'Sucursal 1 (S001)' },
+    { value: 'S002', label: 'Sucursal 2 (S002)' },
+    { value: 'S003', label: 'Sucursal 3 (S003)' },
+    { value: 'S004', label: 'Sucursal 4 (S004)' },
+    { value: 'S005', label: 'Sucursal 5 (S005)' },
 ];
 
 
@@ -279,8 +278,8 @@ export const REPORT_BUTTON_LIST = [
 ];
 
 export const PERFIL_OPTIONS = [
-    { value: 'jefe_credito', label: 'Jefe de Credito SFERA' },
-    { value: 'operador_credito', label: 'Operador de Credito' },
+    { value: 'jefe_credito', label: 'Jefe de Crédito' },
+    { value: 'operador_credito', label: 'Operador de Crédito' },
     { value: 'admin_sis', label: 'Administrador del Sistema' },
     { value: 'cajero', label: 'Cajero' },
 ];

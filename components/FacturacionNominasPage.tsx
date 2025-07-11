@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from './Card'; // O ajusta según tu estructura
 import { Button } from './Button';
 
@@ -17,6 +17,13 @@ interface NominaFormData {
   correo: string;
 }
 
+interface HistoryRecord {
+  id: number;
+  fecha: string;
+  idEmpleado: string;
+  estado: string;
+}
+
 const initialNominaFormData: NominaFormData = {
   rfcEmisor: '',
   rfcReceptor: '',
@@ -32,21 +39,70 @@ const initialNominaFormData: NominaFormData = {
   correo: '',
 };
 
+// --- DATOS DUMMY PARA LA DEMOSTRACIÓN ---
+
+// Datos del empleado que se cargarán en el formulario
+const dummyEmployeeData: NominaFormData = {
+  rfcEmisor: 'EJE900101M8A', // RFC de la empresa (tomado de la captura)
+  rfcReceptor: 'VECJ880315H1A',
+  nombre: 'JUAN CARLOS PEREZ GOMEZ',
+  curp: 'PEGC880315HDFRZA05',
+  periodoPago: '2024-06-01 al 2024-06-15',
+  fechaPago: '2024-06-30', // Fecha en formato YYYY-MM-DD para el input type="date"
+  percepciones: '10000.00',
+  deducciones: '1500.50',
+  total: '8499.50',
+  tipoNomina: 'O', // 'O' para Ordinaria
+  usoCfdi: 'CN01', // 'CN01' para Nómina
+  correo: 'juan.perez@example.com',
+};
+
+// Historial de facturas para este empleado
+const dummyHistoryData: HistoryRecord[] = [
+  { id: 1, fecha: '2024-05-30', idEmpleado: 'EMP123', estado: 'Timbrada' },
+  { id: 2, fecha: '2024-05-15', idEmpleado: 'EMP123', estado: 'Timbrada' },
+  { id: 3, fecha: '2024-04-30', idEmpleado: 'EMP123', estado: 'Cancelada' },
+];
+
+
 export const FacturacionNominasPage: React.FC = () => {
   const [searchDate, setSearchDate] = useState('');
   const [employeeId, setEmployeeId] = useState('');
   const [formData, setFormData] = useState<NominaFormData>(initialNominaFormData);
+  const [history, setHistory] = useState<HistoryRecord[]>([]);
+
+  // Para la demo, pre-llenamos el ID del empleado al cargar el componente
+  useEffect(() => {
+    setEmployeeId('EMP123');
+  }, []);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log('Buscando facturación con:', { searchDate, employeeId });
-    // Aquí iría tu lógica para buscar/historial
+
+    // Simulación: si el ID es el de nuestro empleado de prueba, llenamos los datos.
+    if (employeeId === 'EMP123') {
+      alert(`Empleado ${employeeId} encontrado. Cargando datos...`);
+      setFormData(dummyEmployeeData);
+      setHistory(dummyHistoryData);
+    } else {
+      alert(`Empleado con ID "${employeeId}" no encontrado.`);
+      setFormData(initialNominaFormData);
+      setHistory([]);
+    }
   };
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     alert('Factura de nómina generada (simulado). Revisa la consola.');
-    console.log('Datos de nómina:', formData);
+    console.log('Datos de nómina enviados:', formData);
+  };
+  
+  const handleClear = () => {
+    setSearchDate('');
+    setEmployeeId('');
+    setFormData(initialNominaFormData);
+    setHistory([]);
   };
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -60,15 +116,14 @@ export const FacturacionNominasPage: React.FC = () => {
       {/* Sección de filtros */}
       <Card>
         <h2 className="text-xl font-semibold mb-4 text-primary dark:text-secondary">Filtro de Nómina</h2>
-        <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
           <div className="flex flex-col space-y-1">
             <label className="font-medium text-primary dark:text-secondary">Fecha de Nómina:</label>
             <input
-              type="date"
+              type="date" // Cambiado a 'date' para consistencia
               value={searchDate}
               onChange={(e) => setSearchDate(e.target.value)}
               className="rounded-lg p-2 border border-gray-300 dark:bg-gray-700 dark:text-gray-100"
-              required
             />
           </div>
           <div className="flex flex-col space-y-1">
@@ -85,10 +140,7 @@ export const FacturacionNominasPage: React.FC = () => {
             <button
               type="button"
               className="px-4 py-2 border border-primary dark:border-secondary text-primary dark:text-secondary rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
-              onClick={() => {
-                setSearchDate('');
-                setEmployeeId('');
-              }}
+              onClick={handleClear}
             >
               Limpiar
             </button>
@@ -114,9 +166,9 @@ export const FacturacionNominasPage: React.FC = () => {
               { label: 'CURP', name: 'curp', type: 'text' },
               { label: 'Periodo de Pago', name: 'periodoPago', type: 'text', placeholder: 'Ej: 2024-06-01 al 2024-06-15' },
               { label: 'Fecha de Pago', name: 'fechaPago', type: 'date', required: true },
-              { label: 'Total', name: 'total', type: 'number', required: true },
-              { label: 'Deducciones', name: 'deducciones', type: 'number' },
               { label: 'Percepciones', name: 'percepciones', type: 'number' },
+              { label: 'Deducciones', name: 'deducciones', type: 'number' },
+              { label: 'Total', name: 'total', type: 'number', required: true },
             ].map(({ label, name, type, required, placeholder }) => (
               <div className="flex flex-col" key={name}>
                 <label className="mb-1 font-semibold text-black dark:text-white">{label}:</label>
@@ -128,6 +180,7 @@ export const FacturacionNominasPage: React.FC = () => {
                   required={required}
                   placeholder={placeholder}
                   className="rounded-lg p-2 border border-gray-300 dark:bg-gray-700 dark:text-gray-100"
+                  step="0.01" // Para permitir decimales en los campos numéricos
                 />
               </div>
             ))}
@@ -192,7 +245,30 @@ export const FacturacionNominasPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {/* Aquí podrías mapear los registros del historial */}
+              {history.length > 0 ? (
+                history.map((record) => (
+                  <tr key={record.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{record.fecha}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{record.idEmpleado}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        record.estado === 'Timbrada' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      }`}>
+                        {record.estado}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <a href="#" className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-200">Ver</a>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                    No hay historial para mostrar. Realice una búsqueda.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

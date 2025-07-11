@@ -130,7 +130,6 @@ export const FacturacionMonederosPage: React.FC = () => {
             <CheckboxField label="IEPS desglosado" name="iepsDesglosado" checked={formData.iepsDesglosado} onChange={handleChange} />
         </div>
       </Card>
-      
       {/* A general submit button might be needed if "Agregar" is not the final step */}
       {/* <div className="flex justify-end mt-6">
         <Button type="submit" variant="primary">

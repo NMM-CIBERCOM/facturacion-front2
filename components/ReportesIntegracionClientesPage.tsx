@@ -5,6 +5,7 @@ import { SelectField } from './SelectField';
 import { CheckboxField } from './CheckboxField';
 import { Button } from './Button';
 import { MES_OPTIONS, TIPO_FACTURA_GLOBAL_OPTIONS_REPORTS, TIPO_CFDI_OPTIONS_REPORTS, EMPRESA_OPTIONS_CONSULTAS, TIENDA_OPTIONS_REPORTS } from '../constants';
+import { utils, writeFile } from 'xlsx';
 
 interface IntegracionClientesFormData {
   mes: string;
@@ -38,6 +39,13 @@ const initialFormData: IntegracionClientesFormData = {
 
 export const ReportesIntegracionClientesPage: React.FC = () => {
   const [formData, setFormData] = useState<IntegracionClientesFormData>(initialFormData);
+  const [resultados, setResultados] = useState<any[]>([]);
+
+  const datosDummy = [
+    { folio: 'IC-001', fechaOperacion: '2024-06-01', fechaFacturacion: '2024-06-02', tienda: 'Sucursal 1', tipoFactura: 'CON', tipoCfdi: 'I', empresa: 'Empresa A', monto: 7000.00 },
+    { folio: 'IC-002', fechaOperacion: '2024-06-01', fechaFacturacion: '2024-06-02', tienda: 'Sucursal 2', tipoFactura: 'DEV', tipoCfdi: 'E', empresa: 'Empresa B', monto: 4200.50 },
+    { folio: 'IC-003', fechaOperacion: '2024-06-01', fechaFacturacion: '2024-06-02', tienda: 'Sucursal 3', tipoFactura: 'CRE', tipoCfdi: 'I', empresa: 'Empresa C', monto: 3100.00 },
+  ];
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -81,13 +89,20 @@ export const ReportesIntegracionClientesPage: React.FC = () => {
 
   const handleBuscar = (e: React.FormEvent) => {
     e.preventDefault();
+    setResultados(datosDummy);
     console.log('Buscar Integración Clientes (Rep. 3):', formData);
-    alert('Búsqueda (Rep. 3) simulada. Ver consola.');
+    // alert('Búsqueda (Rep. 3) simulada. Ver consola.');
   };
 
   const handleExcel = () => {
-    console.log('Exportar Integración Clientes (Rep. 3) a Excel:', formData);
-    alert('Exportación a Excel (Rep. 3) simulada.');
+    if (resultados.length === 0) {
+      alert('No hay datos para exportar.');
+      return;
+    }
+    const ws = utils.json_to_sheet(resultados);
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, 'IntegracionClientes');
+    writeFile(wb, 'integracion_clientes.xlsx');
   };
   
   const checkboxContainerClass = "border border-gray-300 dark:border-gray-600 rounded-md p-2 h-24 overflow-y-auto text-sm";
@@ -152,8 +167,43 @@ export const ReportesIntegracionClientesPage: React.FC = () => {
           </Button>
         </div>
       </Card>
-      <div className="mt-6 p-4 border border-dashed border-gray-300 dark:border-gray-600 rounded-md min-h-[200px] flex items-center justify-center text-gray-400 dark:text-gray-500">
-        Los resultados del reporte aparecerán aquí.
+      <div className="mt-6 p-4 border border-dashed border-gray-300 dark:border-gray-600 rounded-md min-h-[200px]">
+        {resultados.length === 0 ? (
+          <div className="flex items-center justify-center text-gray-400 dark:text-gray-500">
+            Los resultados del reporte aparecerán aquí.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm text-left">
+              <thead>
+                <tr>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Folio</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Fecha Operación</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Fecha Facturación</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Tienda</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Tipo Factura</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Tipo CFDI</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Empresa</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Monto</th>
+                </tr>
+              </thead>
+              <tbody>
+                {resultados.map((row, idx) => (
+                  <tr key={idx} className="border-t">
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.folio}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.fechaOperacion}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.fechaFacturacion}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.tienda}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.tipoFactura}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.tipoCfdi}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.empresa}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">${row.monto.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </form>
   );

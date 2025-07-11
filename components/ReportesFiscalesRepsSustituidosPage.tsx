@@ -6,6 +6,7 @@ import { CheckboxField } from './CheckboxField';
 import { Button } from './Button';
 import { TextareaField } from './TextareaField';
 import { MES_OPTIONS, EMPRESA_OPTIONS_CONSULTAS, TIENDA_OPTIONS_REPORTS, TIENDA_OPTIONS } from '../constants';
+import { utils, writeFile } from 'xlsx';
 
 interface FiscalRepsSustituidosFormData {
   mes: string;
@@ -33,6 +34,13 @@ const initialFormData: FiscalRepsSustituidosFormData = {
 
 export const ReportesFiscalesRepsSustituidosPage: React.FC = () => {
   const [formData, setFormData] = useState<FiscalRepsSustituidosFormData>(initialFormData);
+  const [resultados, setResultados] = useState<any[]>([]);
+
+  const datosDummy = [
+    { folio: 'FRS-001', mes: 'Junio', anio: '2024', empresa: 'Empresa A', fechaOperacion: '2024-06-01', fechaFacturacion: '2024-06-02', tienda: 'Sucursal 1', uuid: 'UUID-001', monto: 6000.00 },
+    { folio: 'FRS-002', mes: 'Junio', anio: '2024', empresa: 'Empresa B', fechaOperacion: '2024-06-01', fechaFacturacion: '2024-06-02', tienda: 'Sucursal 2', uuid: 'UUID-002', monto: 3500.50 },
+    { folio: 'FRS-003', mes: 'Junio', anio: '2024', empresa: 'Empresa C', fechaOperacion: '2024-06-01', fechaFacturacion: '2024-06-02', tienda: 'Sucursal 3', uuid: 'UUID-003', monto: 2100.00 },
+  ];
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -68,13 +76,20 @@ export const ReportesFiscalesRepsSustituidosPage: React.FC = () => {
 
   const handleBuscar = (e: React.FormEvent) => {
     e.preventDefault();
+    setResultados(datosDummy);
     console.log('Buscar REPs Sustituidos (Fiscal):', formData);
-    alert('Búsqueda de REPs Sustituidos (Fiscal) simulada. Ver consola.');
+    // alert('Búsqueda de REPs Sustituidos (Fiscal) simulada. Ver consola.');
   };
 
   const handleExcel = () => {
-    console.log('Exportar REPs Sustituidos (Fiscal) a Excel:', formData);
-    alert('Exportación a Excel de REPs Sustituidos (Fiscal) simulada.');
+    if (resultados.length === 0) {
+      alert('No hay datos para exportar.');
+      return;
+    }
+    const ws = utils.json_to_sheet(resultados);
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, 'FiscalesRepsSustituidos');
+    writeFile(wb, 'fiscales_reps_sustituidos.xlsx');
   };
   
   const checkboxContainerClass = "border border-gray-300 dark:border-gray-600 rounded-md p-2 h-32 overflow-y-auto text-sm";
@@ -136,8 +151,45 @@ export const ReportesFiscalesRepsSustituidosPage: React.FC = () => {
         </div>
       </Card>
 
-      <div className="mt-6 p-4 border border-dashed border-gray-300 dark:border-gray-600 rounded-md min-h-[200px] flex items-center justify-center text-gray-400 dark:text-gray-500">
-        Los resultados del reporte de REPs Sustituidos (Fiscal) aparecerán aquí.
+      <div className="mt-6 p-4 border border-dashed border-gray-300 dark:border-gray-600 rounded-md min-h-[200px]">
+        {resultados.length === 0 ? (
+          <div className="flex items-center justify-center text-gray-400 dark:text-gray-500">
+            Los resultados del reporte de REPs Sustituidos (Fiscal) aparecerán aquí.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm text-left">
+              <thead>
+                <tr>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Folio</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Mes</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Año</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Empresa</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Fecha Operación</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Fecha Facturación</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Tienda</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">UUID</th>
+                  <th className="px-2 py-1 text-gray-700 dark:text-gray-100">Monto</th>
+                </tr>
+              </thead>
+              <tbody>
+                {resultados.map((row, idx) => (
+                  <tr key={idx} className="border-t">
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.folio}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.mes}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.anio}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.empresa}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.fechaOperacion}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.fechaFacturacion}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.tienda}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">{row.uuid}</td>
+                    <td className="px-2 py-1 text-gray-700 dark:text-gray-100">${row.monto.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </form>
   );

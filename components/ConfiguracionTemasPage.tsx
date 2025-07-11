@@ -44,14 +44,15 @@ const ColorInputRow: React.FC<{
 export const ConfiguracionTemasPage: React.FC = () => {
   const { customColors, setCustomColors, logoUrl, setLogoUrl } = useContext(ThemeContext);
   const [localColors, setLocalColors] = useState<CustomColors>(customColors);
-  const [localLogoUrl, setLocalLogoUrl] = useState<string>(logoUrl);
+  const [logoPreview, setLogoPreview] = useState<string>(logoUrl);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
 
   useEffect(() => {
     setLocalColors(customColors);
   }, [customColors]);
 
   useEffect(() => {
-    setLocalLogoUrl(logoUrl);
+    setLogoPreview(logoUrl);
   }, [logoUrl]);
 
   const handleColorChange = (colorName: keyof CustomColors, value: string) => {
@@ -60,9 +61,27 @@ export const ConfiguracionTemasPage: React.FC = () => {
     }
   };
 
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setLogoFile(file);
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const base64 = ev.target?.result as string;
+        setLogoPreview(base64);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleApplySettings = () => {
     setCustomColors(localColors);
-    setLogoUrl(localLogoUrl);
+    if (logoFile && logoPreview) {
+      setLogoUrl(logoPreview);
+      localStorage.setItem('logoUrl', logoPreview);
+    } else if (!logoFile) {
+      setLogoUrl(logoPreview);
+    }
     alert('Configuración de tema aplicada.');
   };
   
@@ -70,8 +89,9 @@ export const ConfiguracionTemasPage: React.FC = () => {
     const DEFAULT_LOGO_URL = '/images/Logo Cibercom.png';
     setLocalColors(DEFAULT_COLORS);
     setCustomColors(DEFAULT_COLORS);  
-    setLocalLogoUrl(DEFAULT_LOGO_URL);
+    setLogoPreview(DEFAULT_LOGO_URL);
     setLogoUrl(DEFAULT_LOGO_URL); 
+    setLogoFile(null);
     alert('Configuración de tema restaurada a los valores predeterminados.');
   };
 
@@ -123,30 +143,28 @@ export const ConfiguracionTemasPage: React.FC = () => {
       </Card>
 
       <Card title="Personalización del Logo">
-        <label htmlFor="logoUrl" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">URL del Logo:</label>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Logo de la Empresa:</label>
         <input
-          type="url"
-          id="logoUrl"
-          value={localLogoUrl}
-          onChange={(e) => setLocalLogoUrl(e.target.value)}
-          placeholder="/images/Logo Cibercom.png"
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-secondary sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+          type="file"
+          accept="image/*"
+          onChange={handleLogoChange}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary dark:focus:ring-secondary sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 mb-2"
         />
-        {localLogoUrl && 
-            <div className="mt-3 p-2 border dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 inline-block">
-                <img 
-                    src={localLogoUrl} 
-                    alt="Previsualización del Logo" 
-                    className="h-10 max-w-xs object-contain" 
-                    onError={(e) => {
-                        const target = e.currentTarget as HTMLImageElement;
-                        target.style.display='none';
-                        const errorText = target.nextElementSibling as HTMLElement;
-                        if (errorText) errorText.style.display = 'block';
-                    }}
-                />
-                <p style={{display: 'none'}} className="text-xs text-red-500">No se pudo cargar la imagen.</p>
-            </div>
+        {logoPreview &&
+          <div className="mt-3 p-2 border dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 inline-block">
+            <img 
+              src={logoPreview} 
+              alt="Previsualización del Logo" 
+              className="h-10 max-w-xs object-contain" 
+              onError={(e) => {
+                const target = e.currentTarget as HTMLImageElement;
+                target.style.display='none';
+                const errorText = target.nextElementSibling as HTMLElement;
+                if (errorText) errorText.style.display = 'block';
+              }}
+            />
+            <p style={{display: 'none'}} className="text-xs text-red-500">No se pudo cargar la imagen.</p>
+          </div>
         }
       </Card>
       

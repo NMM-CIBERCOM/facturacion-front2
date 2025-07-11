@@ -20,9 +20,9 @@ const ITEMS_PER_PAGE = 10;
 
 // Dummy data for kiosk list
 const dummyKioscos: Kiosco[] = [
-  { id: 'K001', tienda: '12', terminal: '1234', codigoPostal: '5501', ubicacion: 'M DEPA2' },
-  { id: 'K002', tienda: '14', terminal: '3', codigoPostal: '28064', ubicacion: 'TUXTLA' },
-  { id: 'K003', tienda: '72', terminal: '3', codigoPostal: '07141', ubicacion: 'Prueba de Kiosco' },
+  { id: 'K001', tienda: 'S001', terminal: '1001', codigoPostal: '55001', ubicacion: 'Zona Norte' },
+  { id: 'K002', tienda: 'S002', terminal: '1002', codigoPostal: '55002', ubicacion: 'Zona Centro' },
+  { id: 'K003', tienda: 'S003', terminal: '1003', codigoPostal: '55003', ubicacion: 'Zona Sur' },
 ];
 
 const initialKioscoData: Omit<Kiosco, 'id'> = {

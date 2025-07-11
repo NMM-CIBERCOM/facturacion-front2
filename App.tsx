@@ -73,9 +73,9 @@ import { MonitorDecodificadorPage } from './components/MonitorDecodificadorPage'
 import { ProfileSelectorPage } from './components/ProfileSelectorPage';
 
 const PROFILE_OPTIONS = [
-  "Jefe de Credito - Liverpool Centro",
-  "Administrador - SFERA PASEO QUERETARO",
-  "Operador de Credito SFERA - SFERA SATELITE",
+  "Administrador",
+  "Jefe de Credito",
+  "Operador de Credito",
 ];
 
 export const ThemeContext = React.createContext<{
@@ -254,19 +254,19 @@ const App: React.FC = () => {
   };
 
   const getFilteredNavItems = () => {
-    if (profileSelected === "Administrador - SFERA PASEO QUERETARO") {
+    if (profileSelected === "Administrador") {
       return NAV_ITEMS; // Muestra todo
     }
     // Para operadores y jefes de crédito, solo mostrar secciones clave
     if (
-      profileSelected === "Operador de Credito SFERA - SFERA SATELITE"
+      profileSelected === "Operador de Credito"
     ) {
       return NAV_ITEMS.filter(item =>
         ["Facturación", "Consultas", "Reportes Facturación Fiscal"].includes(item.label)
       );
     }
     if (
-      profileSelected === "Jefe de Credito - Liverpool Centro"
+      profileSelected === "Jefe de Credito"
     ) {
       return NAV_ITEMS.filter(item =>
         ["Facturación", "Consultas", "Reportes Facturación Fiscal", "Administración"].includes(item.label)
