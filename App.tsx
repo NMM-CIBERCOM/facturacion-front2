@@ -3,7 +3,6 @@ import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { MainContent } from './components/MainContent';
 import { InvoiceForm } from './components/InvoiceForm'; // Facturacion Articulos
-// import { SettingsModal } from './components/SettingsModal'; // Removed
 import { LoginPage } from './components/LoginPage';
 import { NAV_ITEMS, DEFAULT_USER, DEFAULT_COLORS, DUMMY_CREDENTIALS } from './constants';
 import type { Theme, CustomColors, User } from './types';
@@ -11,8 +10,7 @@ import type { Theme, CustomColors, User } from './types';
 // Icons
 import { SunIcon } from './components/icons/SunIcon';
 import { MoonIcon } from './components/icons/MoonIcon';
-// import { CogIcon } from './components/icons/CogIcon'; // No longer used for modal in header
-import { CubeIcon } from './components/icons/CubeIcon';
+import CubeIcon from './components/icons/CubeIcon';
 import { HomeIcon } from './components/icons/HomeIcon';
 
 // Page Components
@@ -27,7 +25,6 @@ import { FacturacionCapturaLibrePage } from './components/FacturacionCapturaLibr
 import { FacturacionMotosPage } from './components/FacturacionMotosPage';
 import { FacturacionCancelacionMasivaPage } from './components/FacturacionCancelacionMasivaPage';
 import { FacturacionNominasPage } from './components/FacturacionNominasPage';
-
 
 // Consultas Pages
 import { ConsultasFacturasPage } from './components/ConsultasFacturasPage';
@@ -62,10 +59,9 @@ import { ReportesFiscalesRepsSustituidosPage } from './components/ReportesFiscal
 import { ConfiguracionTemasPage } from './components/ConfiguracionTemasPage';
 import { ConfiguracionEmpresaPage } from './components/ConfiguracionEmpresaPage';
 
-
 // Monitor Pages
 import { MonitorGraficasPage } from './components/MonitorGraficasPage';
-import { MonitorBitacoraPage } from './components/MonitorBitacoraPage'; // Añadir esta línea
+import { MonitorBitacoraPage } from './components/MonitorBitacoraPage';
 import { MonitorPermisosPage } from './components/MonitorPermisosPage';
 import { MonitorDisponibilidadPage } from './components/MonitorDisponibilidadPage';
 import { MonitorLogsPage } from './components/MonitorLogsPage';
@@ -77,6 +73,12 @@ const PROFILE_OPTIONS = [
   "Jefe de Credito",
   "Operador de Credito",
 ];
+
+// Define la interfaz EmpresaInfo para corregir error TS
+interface EmpresaInfo {
+  nombre: string;
+  rfc: string;
+}
 
 export const ThemeContext = React.createContext<{
   theme: Theme;
@@ -97,15 +99,16 @@ export const ThemeContext = React.createContext<{
 export const EmpresaContext = React.createContext<{
   empresaInfo: EmpresaInfo;
   setEmpresaInfo: React.Dispatch<React.SetStateAction<EmpresaInfo>>;
-}>({  
+}>({
   empresaInfo: {
     nombre: 'Empresa Ejemplo S.A. de C.V.',
-    rfc: 'EEJ920629TE3'
+    rfc: 'EEJ920629TE3',
   },
-  setEmpresaInfo: () => {}
+  setEmpresaInfo: () => {},
 });
 
 import { EmpresaProvider } from './context/EmpresaContext';
+import ErrorBoundary from './components/ErrorBoundary';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
@@ -113,9 +116,9 @@ const App: React.FC = () => {
   });
   const [theme, setTheme] = useState<Theme>('light');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  // const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false); // Removed
-  const [currentUser, setCurrentUser] = useState<User>(DEFAULT_USER);
-  
+  // Quitamos setCurrentUser para evitar warning porque no se usa
+  const [currentUser] = useState<User>(DEFAULT_USER);
+
   const [activePage, setActivePage] = useState<string>('Dashboard');
   const [activePageIcon, setActivePageIcon] = useState<React.FC<React.SVGProps<SVGSVGElement>>>(() => HomeIcon);
 
@@ -167,16 +170,15 @@ const App: React.FC = () => {
     localStorage.setItem('logoUrl', logoUrl);
   }, [logoUrl]);
 
-   useEffect(() => {
+  useEffect(() => {
     if (isAuthenticated) {
-        const dashboardItem = NAV_ITEMS.find(item => item.label === 'Dashboard');
-        if (dashboardItem) {
-            setActivePage(dashboardItem.label);
-            setActivePageIcon(() => dashboardItem.icon as React.FC<React.SVGProps<SVGSVGElement>>);
-        }
+      const dashboardItem = NAV_ITEMS.find(item => item.label === 'Dashboard');
+      if (dashboardItem) {
+        setActivePage(dashboardItem.label);
+        setActivePageIcon(() => dashboardItem.icon as React.FC<React.SVGProps<SVGSVGElement>>);
+      }
     }
   }, [isAuthenticated]);
-
 
   const toggleTheme = useCallback(() => {
     setTheme((prevTheme) => (prevTheme === 'light' ? 'dark' : 'light'));
@@ -186,49 +188,51 @@ const App: React.FC = () => {
     setIsSidebarOpen((prev) => !prev);
   }, []);
 
-  // const openSettingsModal = useCallback(() => { // Removed
-  //   setIsSettingsModalOpen(true);
-  // }, []);
-
-  // const closeSettingsModal = useCallback(() => { // Removed
-  //   setIsSettingsModalOpen(false);
-  // }, []);
-
-  const handleNavItemClick = useCallback((label: string, icon?: React.FC<React.SVGProps<SVGSVGElement>>) => {
+  const handleNavItemClick = useCallback(
+  (label: string, icon?: React.FC<React.SVGProps<SVGSVGElement>>) => {
     setActivePage(label);
+
     if (icon && typeof icon === 'function') {
       setActivePageIcon(() => icon);
     } else {
-      const item = NAV_ITEMS.flatMap(i => i.children ? [i, ...i.children] : [i]).find(i => i.label === label);
-      if (item && item.icon) {
-        setActivePageIcon(() => item.icon);
+      const allItems = NAV_ITEMS.flatMap(i =>
+        i.children ? [i, ...i.children] : [i]
+      );
+      const found = allItems.find(i => i.label === label);
+
+      if (found && typeof found.icon === 'function') {
+        setActivePageIcon(() => found.icon);
       } else {
-        const topLevelItem = NAV_ITEMS.find(i => i.label === label);
-        if (topLevelItem && topLevelItem.icon) {
-           setActivePageIcon(() => topLevelItem.icon);
+        const topLevel = NAV_ITEMS.find(i => i.label === label);
+        if (topLevel && typeof topLevel.icon === 'function') {
+          setActivePageIcon(() => topLevel.icon);
         } else {
-           setActivePageIcon(() => CubeIcon); 
+          setActivePageIcon(() => CubeIcon); // fallback seguro
         }
       }
     }
+
     if (window.innerWidth < 768) {
       setIsSidebarOpen(false);
     }
-  }, []);
-  
+  },
+  []
+);
+
+
   const handleLogin = useCallback((usernameInput: string, passwordInput: string): boolean => {
     if (usernameInput === DUMMY_CREDENTIALS.username && passwordInput === DUMMY_CREDENTIALS.password) {
       localStorage.setItem('isAuthenticated', 'true');
       setIsAuthenticated(true);
       setProfileSelected(null);
-      
+
       const dashboardItem = NAV_ITEMS.find(item => item.label === 'Dashboard');
       if (dashboardItem) {
-          setActivePage(dashboardItem.label);
-          setActivePageIcon(() => dashboardItem.icon as React.FC<React.SVGProps<SVGSVGElement>>);
-      } else { 
-          setActivePage('Dashboard');
-          setActivePageIcon(() => HomeIcon);
+        setActivePage(dashboardItem.label);
+        setActivePageIcon(() => dashboardItem.icon as React.FC<React.SVGProps<SVGSVGElement>>);
+      } else {
+        setActivePage('Dashboard');
+        setActivePageIcon(() => HomeIcon);
       }
 
       if (window.innerWidth >= 768) {
@@ -244,7 +248,7 @@ const App: React.FC = () => {
     localStorage.removeItem('profileSelected');
     setIsAuthenticated(false);
     setProfileSelected(null);
-    setActivePage('Dashboard'); 
+    setActivePage('Dashboard');
     setActivePageIcon(() => HomeIcon);
   }, []);
 
@@ -258,16 +262,12 @@ const App: React.FC = () => {
       return NAV_ITEMS; // Muestra todo
     }
     // Para operadores y jefes de crédito, solo mostrar secciones clave
-    if (
-      profileSelected === "Operador de Credito"
-    ) {
+    if (profileSelected === "Operador de Credito") {
       return NAV_ITEMS.filter(item =>
         ["Facturación", "Consultas", "Reportes Facturación Fiscal"].includes(item.label)
       );
     }
-    if (
-      profileSelected === "Jefe de Credito"
-    ) {
+    if (profileSelected === "Jefe de Credito") {
       return NAV_ITEMS.filter(item =>
         ["Facturación", "Consultas", "Reportes Facturación Fiscal", "Administración"].includes(item.label)
       );
@@ -312,7 +312,7 @@ const App: React.FC = () => {
     if (activePage === 'Boletas') return <ConsultasBoletasPage />;
     if (activePage === 'Reportes') return <ConsultasReportesPage />;
     if (activePage === 'REPs Sustituidos') return <ConsultasRepsSustituidosPage />;
-    
+
     // Administración
     if (activePage === 'Empleados') return <AdminEmpleadosPage />;
     if (activePage === 'Tiendas') return <AdminTiendasPage />;
@@ -338,7 +338,7 @@ const App: React.FC = () => {
     // Configuracion
     if (activePage === 'Temas') return <ConfiguracionTemasPage />;
     if (activePage === 'Empresa') return <ConfiguracionEmpresaPage />;
-    
+
     // Monitor
     if (activePage === 'Gráficas') return <MonitorGraficasPage />;
     if (activePage === 'Bitácora') return <MonitorBitacoraPage />;
@@ -346,6 +346,7 @@ const App: React.FC = () => {
     if (activePage === 'Disponibilidad') return <MonitorDisponibilidadPage />;
     if (activePage === 'Logs') return <MonitorLogsPage />;
     if (activePage === 'Decodificador') return <MonitorDecodificadorPage />;
+
     const navItemExists = NAV_ITEMS.flatMap(item => item.children ? [item, ...item.children] : [item]).some(nav => nav.label === activePage);
     if (navItemExists) {
       return (
@@ -354,46 +355,50 @@ const App: React.FC = () => {
         </div>
       );
     }
-    
-    return <DashboardPage />; 
+
+    return <DashboardPage setActivePage={setActivePage} />;
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, customColors, setCustomColors, logoUrl, setLogoUrl }}>
-      <EmpresaProvider>
-        <div className="flex h-screen bg-gray-100 dark:bg-gray-900 transition-colors duration-300">
-          <Sidebar
-            navItems={getFilteredNavItems()}
-            isOpen={isSidebarOpen}
-            toggleSidebar={toggleSidebar}
-            onNavItemClick={handleNavItemClick}
-            logoUrl={logoUrl}
-            appName="Cibercom"
-          />
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <Header
-              user={currentUser}
+    <ErrorBoundary>
+      <ThemeContext.Provider value={{ theme, toggleTheme, customColors, setCustomColors, logoUrl, setLogoUrl }}>
+        <EmpresaProvider>
+          <div className="flex h-screen bg-gray-100 dark:bg-gray-900 transition-colors duration-300">
+            <Sidebar
+              navItems={getFilteredNavItems()}
+              isOpen={isSidebarOpen}
               toggleSidebar={toggleSidebar}
-              onLogout={handleLogout}
-              isSidebarOpen={isSidebarOpen}
-              isAuthenticated={isAuthenticated}
-              ThemeToggleButton={
-                <button
-                  onClick={toggleTheme}
-                  className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-                  aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
-                >
-                  {theme === 'light' ? <MoonIcon className="w-6 h-6" /> : <SunIcon className="w-6 h-6" />}
-                </button>
-              }
+              onNavItemClick={handleNavItemClick}
+              logoUrl={logoUrl}
+              appName="Cibercom"
             />
-            <MainContent pageTitle={activePage} PageIcon={activePageIcon}>
-              {renderPageContent()}
-            </MainContent>
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <Header
+                user={currentUser}
+                toggleSidebar={toggleSidebar}
+                onLogout={handleLogout}
+                isSidebarOpen={isSidebarOpen}
+                isAuthenticated={isAuthenticated}
+                ThemeToggleButton={
+                  <button
+                    onClick={toggleTheme}
+                    className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                    aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+                  >
+                    {theme === 'light' ? <MoonIcon className="w-6 h-6" /> : <SunIcon className="w-6 h-6" />}
+                  </button>
+                }
+              />
+              <ErrorBoundary>
+                <MainContent pageTitle={activePage} PageIcon={activePageIcon}>
+                  {renderPageContent()}
+                </MainContent>
+              </ErrorBoundary>
+            </div>
           </div>
-        </div>
-      </EmpresaProvider>
-    </ThemeContext.Provider>
+        </EmpresaProvider>
+      </ThemeContext.Provider>
+    </ErrorBoundary>
   );
 };
 

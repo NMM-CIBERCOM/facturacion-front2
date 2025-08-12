@@ -1,6 +1,8 @@
 import type { NavItem, User, CustomColors } from './types';
 import { HomeIcon } from './components/icons/HomeIcon'; // Import HomeIcon
-import { CubeIcon } from './components/icons/CubeIcon';
+import CubeIcon from './components/icons/CubeIcon';
+
+
 import { DocumentTextIcon } from './components/icons/DocumentTextIcon';
 import { MagnifyingGlassIcon } from './components/icons/MagnifyingGlassIcon';
 import { WrenchScrewdriverIcon } from './components/icons/WrenchScrewdriverIcon';

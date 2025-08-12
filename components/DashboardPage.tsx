@@ -1,31 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Card } from './Card';
-import { ChartBarIcon, DocumentTextIcon, CubeIcon, CogIcon } from './icons';
-
-// Componente para gráfico de barras simple
-const GraficoBarrasSimple: React.FC<{ datos: number[], etiquetas: string[], color: string }> = ({ datos, etiquetas, color }) => {
-  const alturaMaxima = Math.max(...datos);
-  
-  return (
-    <div className="flex items-end justify-between h-full w-full">
-      {datos.map((valor, index) => {
-        const alturaRelativa = (valor / alturaMaxima) * 100;
-        return (
-          <div key={index} className="flex flex-col items-center" style={{ width: `${100 / datos.length}%` }}>
-            <div 
-              className={`w-3/4 ${color}`} 
-              style={{ height: `${alturaRelativa}%` }}
-              title={`${etiquetas[index]}: ${valor}`}
-            ></div>
-            <span className="text-xs mt-1 text-gray-600 dark:text-gray-300 truncate w-full text-center">
-              {etiquetas[index]}
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
+import { ChartBarIcon, DocumentTextIcon, CogIcon } from './icons';
 
 // Componente para gráfico de barras con colores múltiples
 const GraficoBarrasMulticolor: React.FC = () => {
@@ -42,53 +17,53 @@ const GraficoBarrasMulticolor: React.FC = () => {
 
   const categorias = ['facturas', 'boletas', 'notas'];
   const colores = ['#3B82F6', '#10B981', '#F59E0B']; // Azul, Verde, Amarillo
-  
+
   const alturaMaxima = Math.max(...datos.flatMap(d => [d.facturas, d.boletas, d.notas]));
-  
+
   return (
     <div className="w-full">
       <div className="flex items-center justify-center mb-4 space-x-6">
         {categorias.map((categoria, idx) => (
           <div key={idx} className="flex items-center">
-            <div 
-              className="w-4 h-4 mr-2 rounded-sm" 
+            <div
+              className="w-4 h-4 mr-2 rounded-sm"
               style={{ backgroundColor: colores[idx] }}
             ></div>
             <span className="text-sm capitalize text-gray-700 dark:text-gray-300">{categoria}</span>
           </div>
         ))}
       </div>
-      
+
       <div className="flex items-end justify-between h-64 w-full">
         {datos.map((dato, index) => (
           <div key={index} className="flex flex-col items-center" style={{ width: `${100 / datos.length}%` }}>
             <div className="relative w-full flex flex-col items-center justify-end h-56">
               {/* Barra para facturas */}
-              <div 
+              <div
                 className="w-5/6 rounded-t-sm transition-all duration-300 hover:opacity-90"
-                style={{ 
+                style={{
                   height: `${(dato.facturas / alturaMaxima) * 100}%`,
                   backgroundColor: colores[0],
                   zIndex: 3
                 }}
                 title={`Facturas: ${dato.facturas}`}
               ></div>
-              
+
               {/* Barra para boletas */}
-              <div 
+              <div
                 className="w-5/6 absolute bottom-0 rounded-t-sm transition-all duration-300 hover:opacity-90"
-                style={{ 
+                style={{
                   height: `${(dato.boletas / alturaMaxima) * 100}%`,
                   backgroundColor: colores[1],
                   zIndex: 2
                 }}
                 title={`Boletas: ${dato.boletas}`}
               ></div>
-              
+
               {/* Barra para notas */}
-              <div 
+              <div
                 className="w-5/6 absolute bottom-0 rounded-t-sm transition-all duration-300 hover:opacity-90"
-                style={{ 
+                style={{
                   height: `${(dato.notas / alturaMaxima) * 100}%`,
                   backgroundColor: colores[2],
                   zIndex: 1
@@ -123,14 +98,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setActivePage }) =
             <div className="flex items-center mb-3">
               <ChartBarIcon className="w-8 h-8 mr-3 text-primary dark:text-secondary" />
               <div>
-                  <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Estadísticas Rápidas</h4>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Visualiza el rendimiento clave.</p>
+                <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Estadísticas Rápidas</h4>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Visualiza el rendimiento clave.</p>
               </div>
             </div>
             <p className="text-gray-600 dark:text-gray-300 mt-2">
               Aquí se mostrarán gráficos interactivos y datos consolidados sobre la facturación, ventas y actividad general del sistema.
             </p>
-             <div className="mt-4">
+            <div className="mt-4">
               <dl>
                 <div className="flex justify-between py-1">
                   <dt className="text-sm text-gray-500 dark:text-gray-400">Facturas Hoy:</dt>
@@ -149,9 +124,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setActivePage }) =
           <div className="p-4">
             <div className="flex items-center mb-3">
               <DocumentTextIcon className="w-8 h-8 mr-3 text-primary dark:text-secondary" />
-               <div>
-                  <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Últimas Facturas</h4>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Generadas recientemente.</p>
+              <div>
+                <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Últimas Facturas</h4>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Generadas recientemente.</p>
               </div>
             </div>
             <ul className="space-y-2 mt-2">
@@ -159,17 +134,17 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setActivePage }) =
               <li className="text-sm text-gray-600 dark:text-gray-300 p-2 bg-gray-50 dark:bg-gray-700 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">Factura #12346 - Cliente B - $1320.50</li>
               <li className="text-sm text-gray-600 dark:text-gray-300 p-2 bg-gray-50 dark:bg-gray-700 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">Factura #12347 - Cliente C - $75.20</li>
             </ul>
-             <button className="mt-4 text-sm text-primary dark:text-secondary-dark hover:underline">Ver todas las facturas</button>
+            <button className="mt-4 text-sm text-primary dark:text-secondary-dark hover:underline">Ver todas las facturas</button>
           </div>
         </Card>
 
         <Card title="Acciones Rápidas">
-           <div className="p-4">
-             <div className="flex items-center mb-3">
+          <div className="p-4">
+            <div className="flex items-center mb-3">
               <CogIcon className="w-8 h-8 mr-3 text-primary dark:text-secondary" />
               <div>
-                  <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Accesos Directos</h4>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Tareas comunes.</p>
+                <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Accesos Directos</h4>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Tareas comunes.</p>
               </div>
             </div>
             <div className="space-y-2 mt-2">
@@ -185,7 +160,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setActivePage }) =
           </div>
         </Card>
       </div>
-      
+
       {/* Gráfico grande en la parte inferior */}
       <Card title="Estadísticas de Facturación por Mes">
         <div className="p-6">
@@ -197,7 +172,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setActivePage }) =
           </div>
         </div>
       </Card>
-      
+
       <style>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(10px); }

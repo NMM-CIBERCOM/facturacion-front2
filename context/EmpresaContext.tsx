@@ -1,4 +1,5 @@
-import React, { createContext, useState, useContext } from 'react';
+// src/context/EmpresaContext.tsx
+import React, { createContext, useState, useContext, ReactNode } from 'react';
 
 interface EmpresaInfo {
   nombre: string;
@@ -7,29 +8,27 @@ interface EmpresaInfo {
 
 interface EmpresaContextType {
   empresaInfo: EmpresaInfo;
-  setEmpresaInfo: (info: EmpresaInfo) => void;
+  setEmpresaInfo: React.Dispatch<React.SetStateAction<EmpresaInfo>>;
 }
 
 const defaultEmpresaInfo: EmpresaInfo = {
   nombre: 'Empresa Ejemplo S.A. de C.V.',
-  rfc: 'EEJ920629TE3'
+  rfc: 'EEJ920629TE3',
 };
 
-export const EmpresaContext = createContext<EmpresaContextType>({} as EmpresaContextType);
+export const EmpresaContext = createContext<EmpresaContextType>({
+  empresaInfo: defaultEmpresaInfo,
+  setEmpresaInfo: () => {},
+});
 
-export const EmpresaProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const EmpresaProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [empresaInfo, setEmpresaInfo] = useState<EmpresaInfo>(() => {
     const stored = localStorage.getItem('empresaInfo');
     return stored ? JSON.parse(stored) : defaultEmpresaInfo;
   });
 
-  const updateEmpresaInfo = (info: EmpresaInfo) => {
-    setEmpresaInfo(info);
-    localStorage.setItem('empresaInfo', JSON.stringify(info));
-  };
-
   return (
-    <EmpresaContext.Provider value={{ empresaInfo, setEmpresaInfo: updateEmpresaInfo }}>
+    <EmpresaContext.Provider value={{ empresaInfo, setEmpresaInfo }}>
       {children}
     </EmpresaContext.Provider>
   );
