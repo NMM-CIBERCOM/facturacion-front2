@@ -27,92 +27,30 @@ interface ConsultaFacturasFormData {
 }
 
 interface Factura {
-  id: number;
   uuid: string;
+  rfcEmisor: string;
+  rfcReceptor: string;
   serie: string;
   folio: string;
   fechaEmision: string;
-  rfcReceptor: string;
-  nombreReceptor: string;
-  total: number;
-  estatus: string;
+  importe: number;
+  estatusFacturacion: string;
+  estatusSat: string;
   tienda: string;
   almacen: string;
   usuario: string;
+  permiteCancelacion: boolean;
+  motivoNoCancelacion?: string;
 }
 
-const facturasMuestra: Factura[] = [
-  {
-    id: 1,
-    uuid: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-    serie: 'A',
-    folio: '1001',
-    fechaEmision: '2023-10-15',
-    rfcReceptor: 'XAXX010101000',
-    nombreReceptor: 'Juan Pérez López',
-    total: 1250.50,
-    estatus: 'Vigente',
-    tienda: 'T001',
-    almacen: 'CDMX',
-    usuario: 'usuario1'
-  },
-  {
-    id: 2,
-    uuid: 'b2c3d4e5-f6a7-8901-bcde-f23456789012',
-    serie: 'A',
-    folio: '1002',
-    fechaEmision: '2023-10-16',
-    rfcReceptor: 'XAXX010101000',
-    nombreReceptor: 'Juan Pérez López',
-    total: 3450.75,
-    estatus: 'Vigente',
-    tienda: 'T001',
-    almacen: 'CDMX',
-    usuario: 'usuario1'
-  },
-  {
-    id: 3,
-    uuid: 'c3d4e5f6-a7b8-9012-cdef-345678901234',
-    serie: 'B',
-    folio: '2001',
-    fechaEmision: '2023-10-17',
-    rfcReceptor: 'ABCD123456XYZ',
-    nombreReceptor: 'María Rodríguez Sánchez',
-    total: 5678.90,
-    estatus: 'Vigente',
-    tienda: 'T002',
-    almacen: 'GDL',
-    usuario: 'usuario2'
-  },
-  {
-    id: 4,
-    uuid: 'd4e5f6a7-b8c9-0123-defg-456789012345',
-    serie: 'B',
-    folio: '2002',
-    fechaEmision: '2023-10-18',
-    rfcReceptor: 'ABCD123456XYZ',
-    nombreReceptor: 'María Rodríguez Sánchez',
-    total: 1234.56,
-    estatus: 'Cancelada',
-    tienda: 'T002',
-    almacen: 'GDL',
-    usuario: 'usuario2'
-  },
-  {
-    id: 5,
-    uuid: 'e5f6a7b8-c9d0-1234-efgh-567890123456',
-    serie: 'C',
-    folio: '3001',
-    fechaEmision: '2023-10-19',
-    rfcReceptor: 'EFGH987654ABC',
-    nombreReceptor: 'Empresa Ejemplo SA de CV',
-    total: 9876.54,
-    estatus: 'Vigente',
-    tienda: 'T003',
-    almacen: 'MTY',
-    usuario: 'usuario3'
-  }
-];
+interface ConsultaFacturaResponse {
+  exitoso: boolean;
+  mensaje: string;
+  timestamp: string;
+  facturas: Factura[];
+  totalFacturas: number;
+  error?: string;
+}
 
 const initialFormData: ConsultaFacturasFormData = {
   rfcReceptor: '',
@@ -139,124 +77,181 @@ export const ConsultasFacturasPage: React.FC = () => {
   const [formData, setFormData] = useState<ConsultaFacturasFormData>(initialFormData);
   const [resultados, setResultados] = useState<Factura[]>([]);
   const [mostrarResultados, setMostrarResultados] = useState(false);
+  const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [perfilUsuario] = useState<string>('OPERADOR');
+
+  // Estado del modal de cancelación
+  const [cancelModal, setCancelModal] = useState<{ open: boolean; uuid: string | null; motivo: string; loading: boolean; error?: string }>(
+    { open: false, uuid: null, motivo: '02', loading: false }
+  );
+
+  const openCancelModal = (factura: Factura) => {
+    setCancelModal({ open: true, uuid: factura.uuid, motivo: '02', loading: false });
+  };
+
+  const closeCancelModal = () => {
+    setCancelModal({ open: false, uuid: null, motivo: '02', loading: false });
+  };
+
+  const consultarEstatusPac = async (uuid: string): Promise<string | null> => {
+    try {
+      const resp = await fetch(`http://localhost:8085/api/pac/status/${uuid}`);
+      if (!resp.ok) return null;
+      const data = await resp.json();
+      return data?.status || null;
+    } catch {
+      return null;
+    }
+  };
+
+  const iniciarPollingPac = (uuid: string) => {
+    const interval = setInterval(async () => {
+      const status = await consultarEstatusPac(uuid);
+      if (!status || status === 'EN_PROCESO') return;
+      // Resuelto
+      setResultados(prev => prev.map(f => {
+        if (f.uuid !== uuid) return f;
+        if (status === 'CANCELADA') {
+          return { ...f, estatusFacturacion: 'Cancelada', estatusSat: 'Cancelada', permiteCancelacion: false };
+        }
+        // RECHAZADA u otro
+        return { ...f, estatusFacturacion: f.estatusFacturacion, estatusSat: f.estatusSat, permiteCancelacion: true };
+      }));
+      clearInterval(interval);
+    }, 3000);
+  };
+
+  const submitCancel = async () => {
+    if (!cancelModal.uuid) return;
+    try {
+      setCancelModal(prev => ({ ...prev, loading: true, error: undefined }));
+      const payload = {
+        uuid: cancelModal.uuid,
+        motivo: cancelModal.motivo,
+        usuario: formData.usuario || 'operador',
+        perfilUsuario,
+      };
+      const resp = await fetch('http://localhost:8080/api/consulta-facturas/cancelar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await resp.json();
+      if (resp.ok && data.exitoso) {
+        // Consultar estado en PAC para decidir si es inmediata o en proceso
+        const uuid = cancelModal.uuid;
+        const status = await consultarEstatusPac(uuid);
+        if (status === 'CANCELADA') {
+          setResultados(prev => prev.map(f =>
+            f.uuid === uuid
+              ? { ...f, estatusFacturacion: 'Cancelada', estatusSat: 'Cancelada', permiteCancelacion: false }
+              : f
+          ));
+          closeCancelModal();
+        } else {
+          // EN_PROCESO o desconocido: marcar en proceso y comenzar polling
+          setResultados(prev => prev.map(f =>
+            f.uuid === uuid
+              ? { ...f, estatusFacturacion: 'En proceso', estatusSat: 'En proceso', permiteCancelacion: false }
+              : f
+          ));
+          closeCancelModal();
+          iniciarPollingPac(uuid);
+        }
+      } else {
+        setCancelModal(prev => ({ ...prev, error: data.mensaje || 'No se pudo cancelar', loading: false }));
+      }
+    } catch (e) {
+      console.error('Error al cancelar:', e);
+      setCancelModal(prev => ({ ...prev, error: 'Error de conexión al cancelar', loading: false }));
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    if (error) setError(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log('Buscando Facturas:', formData);
-    
-    // Filtrar facturas según los criterios de búsqueda
-    let resultadosFiltrados = [...facturasMuestra];
-    
-    // Aplicar filtros basados en los campos del formulario que tengan valor
-    if (formData.rfcReceptor) {
-      resultadosFiltrados = resultadosFiltrados.filter(factura => 
-        factura.rfcReceptor.toLowerCase().includes(formData.rfcReceptor.toLowerCase())
-      );
+  const validarFormulario = (): { valido: boolean; mensaje?: string } => {
+    const tieneCampo = 
+      formData.rfcReceptor.trim() ||
+      formData.nombreCliente.trim() ||
+      formData.apellidoPaterno.trim() ||
+      formData.razonSocial.trim() ||
+      (formData.almacen && formData.almacen !== 'todos') ||
+      formData.usuario.trim() ||
+      formData.serie.trim() ||
+      (formData.fechaInicio && formData.fechaFin);
+
+    if (!tieneCampo) {
+      return { valido: false, mensaje: "Es necesario seleccionar RFC receptor o Nombre y Apellido Paterno o Razón Social o Almacén o Usuario o Serie" };
     }
-    
-    if (formData.nombreCliente || formData.apellidoPaterno || formData.apellidoMaterno) {
-      const nombreCompleto = `${formData.nombreCliente} ${formData.apellidoPaterno} ${formData.apellidoMaterno}`.trim().toLowerCase();
-      if (nombreCompleto) {
-        resultadosFiltrados = resultadosFiltrados.filter(factura => 
-          factura.nombreReceptor.toLowerCase().includes(nombreCompleto)
-        );
-      }
-    }
-    
-    if (formData.razonSocial) {
-      resultadosFiltrados = resultadosFiltrados.filter(factura => 
-        factura.nombreReceptor.toLowerCase().includes(formData.razonSocial.toLowerCase())
-      );
-    }
-    
-    if (formData.almacen && formData.almacen !== 'todos') {
-      resultadosFiltrados = resultadosFiltrados.filter(factura => 
-        factura.almacen === formData.almacen
-      );
-    }
-    
-    if (formData.usuario) {
-      resultadosFiltrados = resultadosFiltrados.filter(factura => 
-        factura.usuario.toLowerCase().includes(formData.usuario.toLowerCase())
-      );
-    }
-    
-    if (formData.serie) {
-      resultadosFiltrados = resultadosFiltrados.filter(factura => 
-        factura.serie.toLowerCase() === formData.serie.toLowerCase()
-      );
-    }
-    
-    if (formData.folio) {
-      resultadosFiltrados = resultadosFiltrados.filter(factura => 
-        factura.folio === formData.folio
-      );
-    }
-    
-    if (formData.uuid) {
-      resultadosFiltrados = resultadosFiltrados.filter(factura => 
-        factura.uuid.toLowerCase().includes(formData.uuid.toLowerCase())
-      );
-    }
-    
+
     if (formData.fechaInicio && formData.fechaFin) {
-      resultadosFiltrados = resultadosFiltrados.filter(factura => 
-        factura.fechaEmision >= formData.fechaInicio && factura.fechaEmision <= formData.fechaFin
-      );
-    } else if (formData.fechaInicio) {
-      resultadosFiltrados = resultadosFiltrados.filter(factura => 
-        factura.fechaEmision >= formData.fechaInicio
-      );
-    } else if (formData.fechaFin) {
-      resultadosFiltrados = resultadosFiltrados.filter(factura => 
-        factura.fechaEmision <= formData.fechaFin
-      );
+      const fechaInicio = new Date(formData.fechaInicio);
+      const fechaFin = new Date(formData.fechaFin);
+      const dias = Math.ceil((fechaFin.getTime() - fechaInicio.getTime()) / (1000 * 60 * 60 * 24));
+      if (dias < 0) return { valido: false, mensaje: "La fecha de inicio no puede ser posterior a la fecha fin" };
+      if (dias > 365) return { valido: false, mensaje: "El rango máximo permitido es de 365 días. Reintente" };
     }
-    
-    if (formData.tienda && formData.tienda !== 'todas') {
-      resultadosFiltrados = resultadosFiltrados.filter(factura => 
-        factura.tienda === formData.tienda
-      );
-    }
-    
-    // Casos especiales para demostración
-    // Si se busca específicamente el RFC XAXX010101000
-    if (formData.rfcReceptor === 'XAXX010101000') {
-      resultadosFiltrados = facturasMuestra.filter(f => f.rfcReceptor === 'XAXX010101000');
-    }
-    
-    // Si se busca específicamente la serie A
-    if (formData.serie === 'A') {
-      resultadosFiltrados = facturasMuestra.filter(f => f.serie === 'A');
-    }
-    
-    // Si se busca específicamente la tienda T001
-    if (formData.tienda === 'T001') {
-      resultadosFiltrados = facturasMuestra.filter(f => f.tienda === 'T001');
-    }
-    
-    setResultados(resultadosFiltrados);
-    setMostrarResultados(true);
+
+    return { valido: true };
   };
 
-  const formatearMoneda = (valor: number) => {
-    return new Intl.NumberFormat('es-MX', {
-      style: 'currency',
-      currency: 'MXN'
-    }).format(valor);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const validacion = validarFormulario();
+    if (!validacion.valido) { setError(validacion.mensaje || 'Error de validación'); return; }
+
+    setCargando(true);
+    setError(null);
+
+    try {
+      const requestData = {
+        ...formData,
+        perfilUsuario: perfilUsuario,
+        fechaInicio: formData.fechaInicio && formData.fechaInicio.trim() ? new Date(formData.fechaInicio).toISOString().split('T')[0] : null,
+        fechaFin: formData.fechaFin && formData.fechaFin.trim() ? new Date(formData.fechaFin).toISOString().split('T')[0] : null,
+        fechaTienda: formData.fechaTienda && formData.fechaTienda.trim() ? new Date(formData.fechaTienda).toISOString().split('T')[0] : null
+      };
+
+      const response = await fetch('http://localhost:8080/api/consulta-facturas/buscar', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestData)
+      });
+
+      const data: ConsultaFacturaResponse = await response.json();
+      if (data.exitoso) {
+        setResultados(data.facturas || []);
+        setMostrarResultados(true);
+        setError(null);
+      } else {
+        setError(data.mensaje || 'Error en la consulta');
+        setResultados([]);
+        setMostrarResultados(false);
+      }
+    } catch (err) {
+      console.error('Error al consultar facturas:', err);
+      setError('Error de conexión con el servidor');
+      setResultados([]);
+      setMostrarResultados(false);
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  const formatearMoneda = (valor: number) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(valor);
+
+  const formatearFecha = (fecha: string) => {
+    try { return new Date(fecha).toLocaleDateString('es-MX'); } catch { return fecha; }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <Card>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">
-          --Ingresa los datos para consulta (por grupo):--
-        </h3>
+        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">--Ingresa los datos para consulta (por grupo):--</h3>
+        {error && (<div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">{error}</div>)}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
           <FormField label="RFC Receptor:" name="rfcReceptor" value={formData.rfcReceptor} onChange={handleChange} />
           <FormField label="Nombre del Cliente:" name="nombreCliente" value={formData.nombreCliente} onChange={handleChange} />
@@ -272,36 +267,27 @@ export const ConsultasFacturasPage: React.FC = () => {
           <FormField label="Fecha Fin:" name="fechaFin" type="date" value={formData.fechaFin} onChange={handleChange} />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-x-6 gap-y-2 mt-4 items-end">
-            <SelectField label="Tienda:" name="tienda" value={formData.tienda} onChange={handleChange} options={TIENDA_OPTIONS} className="lg:col-span-1"/>
-            <FormField label="TE:" name="te" value={formData.te} onChange={handleChange} className="lg:col-span-1"/>
-            <FormField label="TR:" name="tr" value={formData.tr} onChange={handleChange} className="lg:col-span-1"/>
-            <FormField label="Fecha:" name="fechaTienda" type="date" value={formData.fechaTienda} onChange={handleChange} className="lg:col-span-1"/>
-            <FormField label="Código de facturación:" name="codigoFacturacion" value={formData.codigoFacturacion} onChange={handleChange} className="lg:col-span-1"/>
+          <SelectField label="Tienda:" name="tienda" value={formData.tienda} onChange={handleChange} options={TIENDA_OPTIONS} className="lg:col-span-1"/>
+          <FormField label="TE:" name="te" value={formData.te} onChange={handleChange} className="lg:col-span-1"/>
+          <FormField label="TR:" name="tr" value={formData.tr} onChange={handleChange} className="lg:col-span-1"/>
+          <FormField label="Fecha:" name="fechaTienda" type="date" value={formData.fechaTienda} onChange={handleChange} className="lg:col-span-1"/>
+          <FormField label="Código de facturación:" name="codigoFacturacion" value={formData.codigoFacturacion} onChange={handleChange} className="lg:col-span-1"/>
         </div>
-         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2 mt-4">
-            <SelectField label="Motivo Sustitución:" name="motivoSustitucion" value={formData.motivoSustitucion} onChange={handleChange} options={MOTIVO_SUSTITUCION_OPTIONS} />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2 mt-4">
+          <SelectField label="Motivo Sustitución:" name="motivoSustitucion" value={formData.motivoSustitucion} onChange={handleChange} options={MOTIVO_SUSTITUCION_OPTIONS} />
         </div>
         <div className="mt-6 flex justify-start">
-          <Button type="submit" variant="primary">
-            Buscar
-          </Button>
+          <Button type="submit" variant="primary" disabled={cargando}>{cargando ? 'Buscando...' : 'Buscar'}</Button>
         </div>
       </Card>
 
       {!mostrarResultados ? (
-        <div className="mt-6 p-4 border border-dashed border-gray-300 dark:border-gray-600 rounded-md min-h-[200px] flex items-center justify-center text-gray-400 dark:text-gray-500">
-          Los resultados de la búsqueda de facturas aparecerán aquí.
-        </div>
+        <div className="mt-6 p-4 border border-dashed border-gray-300 dark:border-gray-600 rounded-md min-h-[200px] flex items-center justify-center text-gray-400 dark:text-gray-500">Los resultados de la búsqueda de facturas aparecerán aquí.</div>
       ) : (
         <Card className="mt-6">
-          <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">
-            Resultados de la búsqueda
-          </h3>
-          
+          <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">Resultados de la búsqueda</h3>
           {resultados.length === 0 ? (
-            <div className="p-4 text-center text-gray-500 dark:text-gray-400">
-              No se encontraron facturas que coincidan con los criterios de búsqueda.
-            </div>
+            <div className="p-4 text-center text-gray-500 dark:text-gray-400">No se encontraron facturas que coincidan con los criterios de búsqueda.</div>
           ) : (
             <>
               <div className="overflow-x-auto">
@@ -309,54 +295,91 @@ export const ConsultasFacturasPage: React.FC = () => {
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">UUID</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">RFC Emisor</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">RFC Receptor</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Serie</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Folio</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Fecha Emisión</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">RFC Receptor</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Nombre Receptor</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Total</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Estatus</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Importe</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Estatus Facturación</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Estatus SAT</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Tienda</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Almacén</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {resultados.map((factura) => (
-                      <tr key={factura.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200 truncate max-w-xs" title={factura.uuid}>
-                          {factura.uuid}
-                        </td>
+                    {resultados.map((factura, index) => (
+                      <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200 truncate max-w-xs" title={factura.uuid}>{factura.uuid}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{factura.rfcEmisor}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{factura.rfcReceptor}</td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{factura.serie}</td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{factura.folio}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{factura.fechaEmision}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{factura.rfcReceptor}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200 truncate max-w-xs" title={factura.nombreReceptor}>
-                          {factura.nombreReceptor}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{formatearMoneda(factura.total)}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{formatearFecha(factura.fechaEmision)}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{formatearMoneda(factura.importe)}</td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">
                           <span className={`px-2 py-1 rounded-full text-xs ${
-                            factura.estatus === 'Vigente' 
+                            factura.estatusFacturacion === 'Vigente' || factura.estatusFacturacion === 'Activa' || factura.estatusFacturacion === 'Emitida'
                               ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
                               : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                          }`}>
-                            {factura.estatus}
-                          </span>
+                          }`}>{factura.estatusFacturacion}</span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">
+                          <span className={`px-2 py-1 rounded-full text-xs ${
+                            factura.estatusSat === 'Vigente' || factura.estatusSat === 'Activa' || factura.estatusSat === 'Emitida'
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
+                              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                          }`}>{factura.estatusSat}</span>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{factura.tienda}</td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{factura.almacen}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">
+                          {factura.permiteCancelacion ? (
+                            <Button variant="secondary" size="sm" onClick={() => openCancelModal(factura)}>Cancelar</Button>
+                          ) : (
+                            <span className="text-xs text-gray-500 cursor-help" title={factura.motivoNoCancelacion || 'No permite cancelación'}>No cancelable</span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              <div className="mt-4 text-sm text-gray-600 dark:text-gray-400">
-                Mostrando {resultados.length} facturas
-              </div>
+              <div className="mt-4 text-sm text-gray-600 dark:text-gray-400">Mostrando {resultados.length} facturas</div>
             </>
           )}
         </Card>
       )}
+
+      {cancelModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={closeCancelModal} />
+          <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md p-6">
+            <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Cancelar factura</h4>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Motivo de cancelación</label>
+                <select
+                  className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-900 dark:text-gray-100"
+                  value={cancelModal.motivo}
+                  onChange={(e) => setCancelModal(prev => ({ ...prev, motivo: e.target.value }))}
+                >
+                  <option value="01">01 - Comprobante emitido con errores con relación</option>
+                  <option value="02">02 - Comprobante emitido con errores sin relación</option>
+                  <option value="03">03 - No se llevó a cabo la operación</option>
+                  <option value="04">04 - Operación nominativa relacionada en factura global</option>
+                </select>
+              </div>
+              {cancelModal.error && (<div className="text-sm text-red-600 dark:text-red-400">{cancelModal.error}</div>)}
+            </div>
+            <div className="mt-6 flex justify-end space-x-3">
+              <Button variant="neutral" onClick={closeCancelModal} disabled={cancelModal.loading}>Cerrar</Button>
+              <Button variant="secondary" onClick={submitCancel} disabled={cancelModal.loading}>{cancelModal.loading ? 'Cancelando...' : 'Confirmar cancelación'}</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
-};
+}

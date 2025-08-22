@@ -4,18 +4,33 @@ import { ThemeContext } from '../App';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger' | 'neutral';
+  size?: 'sm' | 'md' | 'lg';
   children: React.ReactNode;
 }
 
 export const Button: React.FC<ButtonProps> = ({
   children,
   variant = 'primary',
+  size = 'md',
   className = '',
   ...props
 }) => {
   const { theme } = useContext(ThemeContext);
 
-  let baseStyle = 'px-4 py-2 rounded-md font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed';
+  let baseStyle = 'rounded-md font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed';
+  
+  // Estilos de tamaño
+  switch (size) {
+    case 'sm':
+      baseStyle += ' px-2 py-1 text-xs';
+      break;
+    case 'md':
+      baseStyle += ' px-4 py-2 text-sm';
+      break;
+    case 'lg':
+      baseStyle += ' px-6 py-3 text-base';
+      break;
+  }
   
   const lightModePrimary = 'bg-primary text-white hover:bg-primary-dark focus:ring-primary';
   const darkModePrimary = 'dark:bg-primary dark:text-white dark:hover:bg-primary-dark dark:focus:ring-primary';

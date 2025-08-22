@@ -22,3 +22,4 @@ export * from './PlusCircleIcon';
 export * from './PencilSquareIcon';
 export * from './TrashIcon';
 export * from './PaintBrushIcon'; // Export new icon
+export * from './ArrowDownTrayIcon'; // Export download icon
