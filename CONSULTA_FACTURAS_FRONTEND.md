@@ -388,3 +388,4 @@ console.error('Error al consultar facturas:', err);
 4. **Empty Results**: Verificar parámetros de búsqueda
 
 El componente está diseñado para ser robusto, fácil de usar y mantener, siguiendo las mejores prácticas de React y TypeScript.
+
