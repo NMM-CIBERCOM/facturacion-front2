@@ -135,7 +135,7 @@ export const InvoiceForm: React.FC = () => {
     console.log('📥 Iniciando carga de facturas...');
     setCargandoFacturas(true);
     try {
-      // No se envían parámetros - consulta todas las facturas
+      // Consulta todas las facturas usando el endpoint GET
       const response = await fetch(`http://localhost:8080/api/factura/consultar-por-empresa`);
       const data = await response.json();
 
@@ -229,15 +229,52 @@ export const InvoiceForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://localhost:8080/api/factura/procesar-frontend', {
+      // Transformar los datos del frontend al formato que espera el backend
+      const facturaRequest = {
+        // Datos del emisor (empresa)
+        nombreEmisor: empresaInfo?.nombre || "EMPRESA EJEMPLO S.A. DE C.V.",
+        rfcEmisor: empresaInfo?.rfc || "EEJ920629TE3",
+        codigoPostalEmisor: "12345", // Código postal de la empresa
+        regimenFiscalEmisor: "601", // Régimen fiscal de la empresa
+        
+        // Datos del receptor (cliente)
+        nombreReceptor: `${formData.nombre} ${formData.paterno} ${formData.materno}`.trim(),
+        rfcReceptor: formData.rfc,
+        codigoPostalReceptor: "54321", // Código postal del cliente
+        regimenFiscalReceptor: formData.regimenFiscal,
+        
+        // Conceptos (crear un concepto básico basado en los datos del formulario)
+        conceptos: [
+          {
+            descripcion: `Servicio de facturación - ${formData.codigoFacturacion}`,
+            cantidad: 1.0,
+            unidad: "SERVICIO",
+            precioUnitario: 100.00, // Precio base
+            importe: 100.00
+          }
+        ],
+        
+        // Datos de pago
+        metodoPago: "PUE",
+        formaPago: "01",
+        usoCFDI: formData.usoCfdi
+      };
+
+      console.log('📤 Enviando datos al backend:', facturaRequest);
+
+      const response = await fetch('http://localhost:8080/api/factura/generar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(facturaRequest),
       });
 
-      if (!response.ok) throw new Error('Error al enviar los datos');
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Error HTTP ${response.status}: ${errorText}`);
+      }
+      
       const data = await response.json();
-      console.log('Respuesta del servidor:', data);
+      console.log('📥 Respuesta del servidor:', data);
       
       if (data.exitoso) {
         alert(`✅ ${data.mensaje}\nUUID: ${data.uuid}\nFactura guardada en base de datos`);
@@ -248,8 +285,8 @@ export const InvoiceForm: React.FC = () => {
         alert(`❌ ${data.mensaje}\nErrores: ${data.errores || data.error}`);
       }
     } catch (error) {
-      console.error('Error en el envío:', error);
-      alert('Hubo un error al enviar el formulario');
+      console.error('❌ Error en el envío:', error);
+      alert(`Hubo un error al enviar el formulario: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     }
   };
 

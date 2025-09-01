@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from './Card';
 import { FormField } from './FormField';
 import { SelectField } from './SelectField';
@@ -80,6 +80,17 @@ export const ConsultasFacturasPage: React.FC = () => {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [perfilUsuario] = useState<string>('OPERADOR');
+  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
+  const [actualizando, setActualizando] = useState(false);
+  
+  // Limpiar el intervalo cuando el componente se desmonte
+  useEffect(() => {
+    return () => {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
+    };
+  }, [refreshInterval]);
 
   // Estado del modal de cancelación
   const [cancelModal, setCancelModal] = useState<{ open: boolean; uuid: string | null; motivo: string; loading: boolean; error?: string }>(
@@ -92,6 +103,57 @@ export const ConsultasFacturasPage: React.FC = () => {
 
   const closeCancelModal = () => {
     setCancelModal({ open: false, uuid: null, motivo: '02', loading: false });
+    // Iniciar el refresh automático después de cerrar el modal
+    startAutoRefresh();
+  };
+  
+  // Función para refrescar los datos de facturas
+  const refreshFacturas = async () => {
+    if (!mostrarResultados || !formData) return;
+    
+    setActualizando(true);
+    try {
+      const requestData = {
+        ...formData,
+        perfilUsuario: perfilUsuario,
+        fechaInicio: formData.fechaInicio && formData.fechaInicio.trim() ? new Date(formData.fechaInicio).toISOString().split('T')[0] : null,
+        fechaFin: formData.fechaFin && formData.fechaFin.trim() ? new Date(formData.fechaFin).toISOString().split('T')[0] : null,
+        fechaTienda: formData.fechaTienda && formData.fechaTienda.trim() ? new Date(formData.fechaTienda).toISOString().split('T')[0] : null
+      };
+
+      const response = await fetch('http://localhost:8080/api/consulta-facturas/buscar', {
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify(requestData)
+      });
+
+      const data: ConsultaFacturaResponse = await response.json();
+      if (data.exitoso) {
+        setResultados(data.facturas || []);
+      }
+    } catch (err) {
+      console.error('Error al refrescar facturas:', err);
+    } finally {
+      setActualizando(false);
+    }
+  };
+  
+  // Iniciar el intervalo de actualización automática
+  const startAutoRefresh = () => {
+    // Limpiar cualquier intervalo existente
+    if (refreshInterval) {
+      clearInterval(refreshInterval);
+    }
+    
+    // Crear un nuevo intervalo que refresca cada 5 segundos
+    const interval = setInterval(refreshFacturas, 5000);
+    setRefreshInterval(interval);
+    
+    // Detener el intervalo después de 30 segundos (6 actualizaciones)
+    setTimeout(() => {
+      clearInterval(interval);
+      setRefreshInterval(null);
+    }, 30000);
   };
 
   const consultarEstatusPac = async (uuid: string): Promise<string | null> => {
@@ -346,7 +408,15 @@ export const ConsultasFacturasPage: React.FC = () => {
                   </tbody>
                 </table>
               </div>
-              <div className="mt-4 text-sm text-gray-600 dark:text-gray-400">Mostrando {resultados.length} facturas</div>
+              <div className="mt-4 flex justify-between items-center">
+                <div className="text-sm text-gray-600 dark:text-gray-400">Mostrando {resultados.length} facturas</div>
+                {actualizando && (
+                  <div className="flex items-center text-sm text-blue-600 dark:text-blue-400">
+                    <div className="mr-2 h-4 w-4 rounded-full border-2 border-blue-600 border-t-transparent animate-spin"></div>
+                    Actualizando datos...
+                  </div>
+                )}
+              </div>
             </>
           )}
         </Card>
