@@ -4,6 +4,8 @@ import { FormField } from './FormField';
 import { SelectField } from './SelectField';
 import { Button } from './Button';
 import { ALMACEN_OPTIONS, MOTIVO_SUSTITUCION_OPTIONS, TIENDA_OPTIONS } from '../constants';
+import { facturaService } from '../services/facturaService';
+import { ArrowDownTrayIcon } from './icons/ArrowDownTrayIcon';
 
 interface ConsultaFacturasFormData {
   rfcReceptor: string;
@@ -82,6 +84,9 @@ export const ConsultasFacturasPage: React.FC = () => {
   const [perfilUsuario] = useState<string>('OPERADOR');
   const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
   const [actualizando, setActualizando] = useState(false);
+  const [facturasSeleccionadas, setFacturasSeleccionadas] = useState<Set<string>>(new Set());
+  const [descargandoPDF, setDescargandoPDF] = useState<string | null>(null);
+  const [descargandoZIP, setDescargandoZIP] = useState(false);
   
   // Limpiar el intervalo cuando el componente se desmonte
   useEffect(() => {
@@ -96,6 +101,68 @@ export const ConsultasFacturasPage: React.FC = () => {
   const [cancelModal, setCancelModal] = useState<{ open: boolean; uuid: string | null; motivo: string; loading: boolean; error?: string }>(
     { open: false, uuid: null, motivo: '02', loading: false }
   );
+
+  // Funciones para manejar selección de facturas
+  const toggleSeleccionFactura = (uuid: string) => {
+    const nuevasSeleccionadas = new Set(facturasSeleccionadas);
+    if (nuevasSeleccionadas.has(uuid)) {
+      nuevasSeleccionadas.delete(uuid);
+    } else {
+      nuevasSeleccionadas.add(uuid);
+    }
+    setFacturasSeleccionadas(nuevasSeleccionadas);
+  };
+
+  const seleccionarTodasFacturas = () => {
+    if (facturasSeleccionadas.size === resultados.length) {
+      setFacturasSeleccionadas(new Set());
+    } else {
+      setFacturasSeleccionadas(new Set(resultados.map(f => f.uuid)));
+    }
+  };
+
+  // Funciones para descargas
+  const descargarPDFFactura = async (uuid: string) => {
+    try {
+      setDescargandoPDF(uuid);
+      await facturaService.generarYDescargarPDF(uuid);
+    } catch (error) {
+      console.error('Error descargando PDF:', error);
+      alert(`Error al descargar PDF: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    } finally {
+      setDescargandoPDF(null);
+    }
+  };
+
+  const descargarZIPFactura = async (uuid: string) => {
+    try {
+      setDescargandoPDF(uuid);
+      await facturaService.generarYDescargarZIP(uuid);
+    } catch (error) {
+      console.error('Error descargando ZIP:', error);
+      alert(`Error al descargar ZIP: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    } finally {
+      setDescargandoPDF(null);
+    }
+  };
+
+  const descargarZIPSeleccionadas = async () => {
+    if (facturasSeleccionadas.size === 0) {
+      alert('Por favor selecciona al menos una factura');
+      return;
+    }
+
+    try {
+      setDescargandoZIP(true);
+      const uuidsSeleccionados = Array.from(facturasSeleccionadas);
+      await facturaService.generarYDescargarZIPMultiple(uuidsSeleccionados);
+    } catch (error) {
+      console.error('Error descargando ZIP múltiple:', error);
+      alert(`Error al descargar ZIP: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    } finally {
+      setDescargandoZIP(false);
+    }
+  };
 
   const openCancelModal = (factura: Factura) => {
     setCancelModal({ open: true, uuid: factura.uuid, motivo: '02', loading: false });
@@ -352,10 +419,40 @@ export const ConsultasFacturasPage: React.FC = () => {
             <div className="p-4 text-center text-gray-500 dark:text-gray-400">No se encontraron facturas que coincidan con los criterios de búsqueda.</div>
           ) : (
             <>
+              <div className="mb-4 flex justify-between items-center">
+                <div className="flex items-center space-x-4">
+                  <Button 
+                    variant="primary" 
+                    onClick={descargarZIPSeleccionadas}
+                    disabled={facturasSeleccionadas.size === 0 || descargandoZIP}
+                    className="flex items-center space-x-2"
+                  >
+                    {descargandoZIP ? (
+                      <div className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                    ) : (
+                      <ArrowDownTrayIcon className="h-4 w-4" />
+                    )}
+                    <span>{descargandoZIP ? 'Generando...' : `Descargar ZIP (${facturasSeleccionadas.size})`}</span>
+                  </Button>
+                  {facturasSeleccionadas.size > 0 && (
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      {facturasSeleccionadas.size} factura(s) seleccionada(s)
+                    </span>
+                  )}
+                </div>
+              </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                        <input
+                          type="checkbox"
+                          checked={resultados.length > 0 && facturasSeleccionadas.size === resultados.length}
+                          onChange={seleccionarTodasFacturas}
+                          className="rounded border-gray-300 text-primary focus:ring-primary"
+                        />
+                      </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">UUID</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">RFC Emisor</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">RFC Receptor</th>
@@ -372,7 +469,17 @@ export const ConsultasFacturasPage: React.FC = () => {
                   </thead>
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {resultados.map((factura, index) => (
-                      <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                      <tr key={index} className={`hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
+                        facturasSeleccionadas.has(factura.uuid) ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                      }`}>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <input
+                            type="checkbox"
+                            checked={facturasSeleccionadas.has(factura.uuid)}
+                            onChange={() => toggleSeleccionFactura(factura.uuid)}
+                            className="rounded border-gray-300 text-primary focus:ring-primary"
+                          />
+                        </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200 truncate max-w-xs" title={factura.uuid}>{factura.uuid}</td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{factura.rfcEmisor}</td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{factura.rfcReceptor}</td>
@@ -397,11 +504,42 @@ export const ConsultasFacturasPage: React.FC = () => {
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{factura.tienda}</td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{factura.almacen}</td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">
-                          {factura.permiteCancelacion ? (
-                            <Button variant="secondary" size="sm" onClick={() => openCancelModal(factura)}>Cancelar</Button>
-                          ) : (
-                            <span className="text-xs text-gray-500 cursor-help" title={factura.motivoNoCancelacion || 'No permite cancelación'}>No cancelable</span>
-                          )}
+                          <div className="flex items-center space-x-2">
+                            {/* Botón PDF */}
+                            <button
+                              onClick={() => descargarPDFFactura(factura.uuid)}
+                              disabled={descargandoPDF === factura.uuid}
+                              className="p-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 disabled:opacity-50"
+                              title="Descargar PDF"
+                            >
+                              {descargandoPDF === factura.uuid ? (
+                                <div className="h-4 w-4 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />
+                              ) : (
+                                <ArrowDownTrayIcon className="h-4 w-4" />
+                              )}
+                            </button>
+                            
+                            {/* Botón ZIP */}
+                            <button
+                              onClick={() => descargarZIPFactura(factura.uuid)}
+                              disabled={descargandoPDF === factura.uuid}
+                              className="p-1 text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 disabled:opacity-50"
+                              title="Descargar ZIP (XML + PDF)"
+                            >
+                              {descargandoPDF === factura.uuid ? (
+                                <div className="h-4 w-4 rounded-full border-2 border-green-600 border-t-transparent animate-spin" />
+                              ) : (
+                                <ArrowDownTrayIcon className="h-4 w-4" />
+                              )}
+                            </button>
+                            
+                            {/* Botón Cancelar */}
+                            {factura.permiteCancelacion ? (
+                              <Button variant="secondary" size="sm" onClick={() => openCancelModal(factura)}>Cancelar</Button>
+                            ) : (
+                              <span className="text-xs text-gray-500 cursor-help" title={factura.motivoNoCancelacion || 'No permite cancelación'}>No cancelable</span>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
