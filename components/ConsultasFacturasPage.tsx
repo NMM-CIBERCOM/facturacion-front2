@@ -87,6 +87,7 @@ export const ConsultasFacturasPage: React.FC = () => {
   const [facturasSeleccionadas, setFacturasSeleccionadas] = useState<Set<string>>(new Set());
   const [descargandoPDF, setDescargandoPDF] = useState<string | null>(null);
   const [descargandoZIP, setDescargandoZIP] = useState(false);
+  const [descargandoXML, setDescargandoXML] = useState<string | null>(null);
   
   // Limpiar el intervalo cuando el componente se desmonte
   useEffect(() => {
@@ -143,6 +144,18 @@ export const ConsultasFacturasPage: React.FC = () => {
       alert(`Error al descargar ZIP: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     } finally {
       setDescargandoPDF(null);
+    }
+  };
+
+  const descargarXMLFactura = async (uuid: string) => {
+    try {
+      setDescargandoXML(uuid);
+      await facturaService.generarYDescargarXML(uuid);
+    } catch (error) {
+      console.error('Error descargando XML:', error);
+      alert(`Error al descargar XML: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    } finally {
+      setDescargandoXML(null);
     }
   };
 
@@ -528,6 +541,20 @@ export const ConsultasFacturasPage: React.FC = () => {
                             >
                               {descargandoPDF === factura.uuid ? (
                                 <div className="h-4 w-4 rounded-full border-2 border-green-600 border-t-transparent animate-spin" />
+                              ) : (
+                                <ArrowDownTrayIcon className="h-4 w-4" />
+                              )}
+                            </button>
+                            
+                            {/* Botón XML */}
+                            <button
+                              onClick={() => descargarXMLFactura(factura.uuid)}
+                              disabled={descargandoXML === factura.uuid}
+                              className="p-1 text-orange-600 hover:text-orange-800 dark:text-orange-400 dark:hover:text-orange-300 disabled:opacity-50"
+                              title="Descargar XML"
+                            >
+                              {descargandoXML === factura.uuid ? (
+                                <div className="h-4 w-4 rounded-full border-2 border-orange-600 border-t-transparent animate-spin" />
                               ) : (
                                 <ArrowDownTrayIcon className="h-4 w-4" />
                               )}

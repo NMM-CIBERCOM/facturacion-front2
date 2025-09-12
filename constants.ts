@@ -106,6 +106,8 @@ export const NAV_ITEMS: NavItem[] = [
       { label: 'Logs', path: 'monitor-logs', icon: DocumentMagnifyingGlassIcon },
       { label: 'Decodificador', path: 'monitor-decodificador', icon: WrenchScrewdriverIcon },
       { label: 'Permisos', path: 'monitor-permisos', icon: FiSettings },
+      { label: 'Test PDF', path: 'test-pdf', icon: DocumentTextIcon },
+      { label: 'Test iText PDF', path: 'test-itext-pdf', icon: DocumentTextIcon },
     ],
   },
   {
@@ -119,12 +121,12 @@ export const NAV_ITEMS: NavItem[] = [
 ];
 
 export const DEFAULT_COLORS: CustomColors = {
-  primary: '#1d4ed8', 
-  primaryDark: '#1e40af', 
-  secondary: '#3b82f6', 
-  secondaryDark: '#2563eb', 
-  accent: '#06b6d4', 
-  accentDark: '#0891b2', 
+  primary: '#2E86AB', 
+  primaryDark: '#1E4A5F', 
+  secondary: '#1E4A5F', 
+  secondaryDark: '#0F2A3A', 
+  accent: '#0F2A3A', 
+  accentDark: '#2C5F7C', 
 };
 
 export const PAIS_OPTIONS = [

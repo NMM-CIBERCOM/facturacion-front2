@@ -86,7 +86,7 @@ export const ConfiguracionTemasPage: React.FC = () => {
   };
   
   const handleResetToDefaults = () => {
-    const DEFAULT_LOGO_URL = '/images/Logo Cibercom.png';
+    const DEFAULT_LOGO_URL = '/images/cibercom-logo.svg';
     setLocalColors(DEFAULT_COLORS);
     setCustomColors(DEFAULT_COLORS);  
     setLogoPreview(DEFAULT_LOGO_URL);

@@ -34,6 +34,7 @@ export interface ConceptoFactura {
 
 export interface LogoConfig {
   logoUrl: string;
+  logoBase64?: string;
   customColors: CustomColors;
 }
 
@@ -73,7 +74,7 @@ export class PDFService {
    * Genera el HTML de la factura con estilos
    */
   private generarHTMLFactura(facturaData: FacturaData, logoConfig: LogoConfig): string {
-    const { customColors, logoUrl } = logoConfig;
+    const { customColors, logoUrl, logoBase64 } = logoConfig;
     
     return `
       <!DOCTYPE html>
@@ -266,7 +267,7 @@ export class PDFService {
           <!-- Header -->
           <div class="header">
             <div class="logo-section">
-              <img src="${logoUrl}" alt="Logo" class="logo" />
+                  <img src="${logoBase64 ? `data:image/svg+xml;base64,${logoBase64}` : logoUrl}" alt="Logo" class="logo" />
             </div>
             <div class="factura-info">
               <div class="factura-titulo">FACTURA</div>

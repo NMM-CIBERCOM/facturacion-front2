@@ -67,6 +67,8 @@ import { MonitorDisponibilidadPage } from './components/MonitorDisponibilidadPag
 import { MonitorLogsPage } from './components/MonitorLogsPage';
 import { MonitorDecodificadorPage } from './components/MonitorDecodificadorPage';
 import { ProfileSelectorPage } from './components/ProfileSelectorPage';
+import TestPdfPage from './components/TestPdfPage';
+import ITextPdfTest from './components/ITextPdfTest';
 
 const PROFILE_OPTIONS = [
   "Administrador",
@@ -92,7 +94,7 @@ export const ThemeContext = React.createContext<{
   toggleTheme: () => {},
   customColors: DEFAULT_COLORS,
   setCustomColors: () => {},
-  logoUrl: '/images/Logo Cibercom.png',
+  logoUrl: '/images/cibercom-logo.svg',
   setLogoUrl: () => {},
 });
 
@@ -129,7 +131,7 @@ const App: React.FC = () => {
 
   const [logoUrl, setLogoUrl] = useState<string>(() => {
     const storedLogoUrl = localStorage.getItem('logoUrl');
-    return storedLogoUrl || '/images/Logo Cibercom.png';
+    return storedLogoUrl || '/images/cibercom-logo.svg';
   });
 
   const [profileSelected, setProfileSelected] = useState<string | null>(() => {
@@ -346,6 +348,10 @@ const App: React.FC = () => {
     if (activePage === 'Disponibilidad') return <MonitorDisponibilidadPage />;
     if (activePage === 'Logs') return <MonitorLogsPage />;
     if (activePage === 'Decodificador') return <MonitorDecodificadorPage />;
+
+    // Pruebas
+    if (activePage === 'Test PDF') return <TestPdfPage />;
+    if (activePage === 'Test iText PDF') return <ITextPdfTest />;
 
     const navItemExists = NAV_ITEMS.flatMap(item => item.children ? [item, ...item.children] : [item]).some(nav => nav.label === activePage);
     if (navItemExists) {

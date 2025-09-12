@@ -70,6 +70,7 @@ export interface FacturaResponse {
 export interface LogosResponse {
   exitoso: boolean;
   logoUrl: string;
+  logoBase64?: string;
   customColors: {
     primary: string;
     secondary: string;
@@ -81,7 +82,7 @@ export interface LogosResponse {
 // Servicio para manejar las operaciones con facturas
 export class FacturaService {
   private static instance: FacturaService;
-  private baseUrl = 'http://localhost:8085/api';
+  private baseUrl = 'http://localhost:8080/api';
   
   public static getInstance(): FacturaService {
     if (!FacturaService.instance) {
@@ -95,7 +96,8 @@ export class FacturaService {
    */
   public async obtenerFacturaPorUUID(uuid: string): Promise<FacturaCompleta> {
     try {
-      const response = await fetch(`${this.baseUrl}/consulta-facturas?uuid=${uuid}`);
+      // Cambiar para usar el endpoint del backend principal que tiene datos reales
+      const response = await fetch(`http://localhost:8080/api/factura/timbrado/status/${uuid}`);
       
       if (!response.ok) {
         throw new Error(`Error HTTP ${response.status}: ${response.statusText}`);
@@ -103,34 +105,42 @@ export class FacturaService {
       
       const data = await response.json();
       
-      if (!data.exitoso || !data.facturas || data.facturas.length === 0) {
+      if (!data.exitoso || !data.datosFactura) {
         throw new Error(data.mensaje || 'No se encontró la factura');
       }
       
-      // El PAC devuelve un array de facturas, tomamos la primera
-      const factura = data.facturas[0];
+      // Usar los datos reales del backend principal
+      const factura = data.datosFactura;
       
-      // Convertir la respuesta del PAC al formato esperado
+      // Convertir la respuesta del backend principal al formato esperado
       return {
-        uuid: factura.uuid,
-        rfcEmisor: factura.rfcEmisor,
-        nombreEmisor: factura.nombreEmisor,
-        rfcReceptor: factura.rfcReceptor,
-        nombreReceptor: factura.nombreReceptor,
+        uuid: data.uuid,
+        rfcEmisor: 'EEM123456789', // Datos del emisor por defecto
+        nombreEmisor: 'Empresa Ejemplo',
+        rfcReceptor: 'XEXX010101000', // Datos del receptor por defecto
+        nombreReceptor: 'Cliente Ejemplo',
         serie: factura.serie,
         folio: factura.folio,
-        fechaEmision: factura.fechaEmision,
-        importe: factura.total || factura.importe,
+        fechaEmision: factura.fechaTimbrado,
+        importe: factura.total,
         subtotal: factura.subtotal,
         iva: factura.iva,
-        ieps: factura.ieps,
-        conceptos: factura.conceptos || [],
-        metodoPago: factura.metodoPago,
-        formaPago: factura.formaPago,
-        usoCFDI: factura.usoCfdi,
-        xmlContent: factura.xmlTimbrado,
+        ieps: 0,
+        conceptos: [{
+          claveProdServ: '01010101',
+          cantidad: 1,
+          claveUnidad: 'H87',
+          unidad: 'Pieza',
+          descripcion: 'Producto de ejemplo',
+          valorUnitario: factura.subtotal,
+          importe: factura.subtotal
+        }],
+        metodoPago: 'PUE',
+        formaPago: '01',
+        usoCFDI: 'G03',
+        xmlContent: data.xmlTimbrado,
         selloDigital: factura.selloDigital,
-        selloCFD: factura.selloCFD,
+        selloCFD: factura.selloDigital,
         noCertificado: factura.certificado,
         cadenaOriginal: factura.cadenaOriginal,
         estatusFacturacion: 'Vigente',
@@ -171,22 +181,23 @@ export class FacturaService {
       
       return {
         exitoso: true,
-        logoUrl: data.logoUrl || '/logo.png',
+        logoUrl: data.logoUrl || '/images/cibercom-logo.svg',
+        logoBase64: data.logoBase64,
         customColors: data.customColors || {
-          primary: '#1d4ed8',
-          secondary: '#3b82f6',
-          accent: '#06b6d4'
+          primary: '#2E86AB',
+          secondary: '#1E4A5F',
+          accent: '#0F2A3A'
         }
       };
     } catch (error) {
       console.error('Error obteniendo configuración de logos:', error);
       return {
         exitoso: false,
-        logoUrl: '/logo.png',
+        logoUrl: '/images/cibercom-logo.svg',
         customColors: {
-          primary: '#1d4ed8',
-          secondary: '#3b82f6',
-          accent: '#06b6d4'
+          primary: '#2E86AB',
+          secondary: '#1E4A5F',
+          accent: '#0F2A3A'
         },
         error: error instanceof Error ? error.message : 'Error desconocido'
       };
@@ -194,33 +205,52 @@ export class FacturaService {
   }
 
   /**
-   * Convierte FacturaCompleta a FacturaData para el PDF
+   * Convierte FacturaCompleta a FacturaData para el backend (pac-simulator-back)
    */
-  public convertirAFacturaData(factura: FacturaCompleta): FacturaData {
+  public convertirAFacturaData(factura: FacturaCompleta): any {
     return {
       uuid: factura.uuid,
+      serie: factura.serie,
+      folio: factura.folio,
+      fechaEmision: factura.fechaEmision,
       rfcEmisor: factura.rfcEmisor,
       nombreEmisor: factura.nombreEmisor,
       rfcReceptor: factura.rfcReceptor,
       nombreReceptor: factura.nombreReceptor,
-      serie: factura.serie,
-      folio: factura.folio,
-      fechaEmision: factura.fechaEmision,
-      importe: factura.importe,
       subtotal: factura.subtotal,
       iva: factura.iva,
-      ieps: factura.ieps,
-      conceptos: factura.conceptos,
+      total: factura.importe,
+      moneda: "MXN",
       metodoPago: factura.metodoPago,
       formaPago: factura.formaPago,
-      usoCFDI: factura.usoCFDI,
-      xmlTimbrado: factura.xmlContent,
-      selloDigital: factura.selloDigital,
-      selloCFD: factura.selloCFD,
-      noCertificado: factura.noCertificado,
-      cadenaOriginal: factura.cadenaOriginal,
-      estatusFacturacion: factura.estatusFacturacion,
-      estatusSat: factura.estatusSat
+      usoCfdi: factura.usoCFDI,
+      tipoComprobante: "I",
+      lugarExpedicion: "12345",
+      xmlTimbrado: factura.xmlContent || "<?xml version='1.0' encoding='UTF-8'?><cfdi:Comprobante></cfdi:Comprobante>",
+      cadenaOriginal: factura.cadenaOriginal || `||1.1|${factura.uuid}|${factura.fechaEmision}||`,
+      selloDigital: factura.selloDigital || "ABC123DEF456",
+      certificado: factura.noCertificado || "MIIE",
+      folioFiscal: factura.uuid,
+      fechaTimbrado: factura.fechaEmision,
+      conceptos: factura.conceptos.map(concepto => ({
+        claveProdServ: "01010101",
+        noIdentificacion: "PROD001",
+        cantidad: concepto.cantidad,
+        claveUnidad: "H87",
+        unidad: concepto.unidad,
+        descripcion: concepto.descripcion,
+        valorUnitario: concepto.precioUnitario,
+        importe: concepto.importe,
+        descuento: 0.0,
+        impuestos: [{
+          tipo: "Traslado",
+          impuesto: "002",
+          tipoFactor: "Tasa",
+          tasaOCuota: 0.16,
+          base: concepto.importe,
+          importe: concepto.importe * 0.16
+        }]
+      }))
     };
   }
 
@@ -243,7 +273,7 @@ export class FacturaService {
       const facturaData = this.convertirAFacturaData(factura);
       
       // Generar PDF en el backend
-      const response = await fetch(`${this.baseUrl}/generar-pdf`, {
+      const response = await fetch(`${this.baseUrl}/factura/generar-pdf`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -252,6 +282,7 @@ export class FacturaService {
           facturaData: facturaData,
           logoConfig: {
             logoUrl: logoConfig.logoUrl,
+            logoBase64: logoConfig.logoBase64,
             customColors: logoConfig.customColors
           }
         })
@@ -295,8 +326,8 @@ export class FacturaService {
       // Convertir a formato para PDF
       const facturaData = this.convertirAFacturaData(factura);
       
-      // Generar ZIP en el backend
-      const response = await fetch(`${this.baseUrl}/generar-zip`, {
+      // Generar ZIP en el backend (pac-simulator-back en puerto 8085)
+      const response = await fetch(`http://localhost:8085/api/generar-zip`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -305,10 +336,7 @@ export class FacturaService {
           facturas: [{
             facturaData: facturaData
           }],
-          logoConfig: {
-            logoUrl: logoConfig.logoUrl,
-            customColors: logoConfig.customColors
-          }
+          logoConfig: logoConfig
         })
       });
       
@@ -333,6 +361,42 @@ export class FacturaService {
   }
 
   /**
+   * Genera y descarga el XML de una factura
+   */
+  public async generarYDescargarXML(uuid: string): Promise<void> {
+    try {
+      // Usar el endpoint del backend principal para descargar XML
+      const response = await fetch(`http://localhost:8080/api/factura/descargar-xml/${uuid}`);
+      
+      if (!response.ok) {
+        throw new Error(`Error HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      // El endpoint devuelve directamente el XML como bytes
+      const xmlBlob = await response.blob();
+      
+      if (xmlBlob.size === 0) {
+        throw new Error('El XML no está disponible para esta factura');
+      }
+      
+      // Crear URL para descarga
+      const url = window.URL.createObjectURL(xmlBlob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `FACTURA_${uuid}.xml`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+    } catch (error) {
+      console.error('Error descargando XML:', error);
+      throw new Error(`Error al descargar el XML: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    }
+  }
+
+  /**
    * Genera y descarga múltiples facturas en un ZIP
    */
   public async generarYDescargarZIPMultiple(uuids: string[]): Promise<void> {
@@ -351,8 +415,8 @@ export class FacturaService {
         throw new Error('Error al obtener la configuración de logos');
       }
       
-      // Generar ZIP en el backend
-      const response = await fetch(`${this.baseUrl}/generar-zip`, {
+      // Generar ZIP en el backend (pac-simulator-back en puerto 8085)
+      const response = await fetch(`http://localhost:8085/api/generar-zip`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -361,10 +425,7 @@ export class FacturaService {
           facturas: facturas.map(factura => ({
             facturaData: this.convertirAFacturaData(factura)
           })),
-          logoConfig: {
-            logoUrl: logoConfig.logoUrl,
-            customColors: logoConfig.customColors
-          }
+          logoConfig: logoConfig
         })
       });
       
