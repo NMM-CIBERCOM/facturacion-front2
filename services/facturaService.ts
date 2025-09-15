@@ -450,5 +450,4 @@ export class FacturaService {
   }
 }
 
-// Exportar instancia singleton
 export const facturaService = FacturaService.getInstance();

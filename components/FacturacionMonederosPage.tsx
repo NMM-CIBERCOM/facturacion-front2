@@ -90,10 +90,6 @@ export const FacturacionMonederosPage: React.FC = () => {
     e.preventDefault();
     console.log('Facturar Monederos:', formData);
     alert('Facturando Monederos (simulado). Ver consola para datos.');
-    // Usually, there would be a save/submit button, for now, "Agregar" acts as main action trigger for demo.
-    // If this form needs a final "Facturar" or "Guardar" button, it should be added.
-    // Based on the image, "Agregar" is the primary action button for the "Consultar Boleta" section.
-    // The overall form might implicitly save or be part of a larger workflow.
   };
 
   return (

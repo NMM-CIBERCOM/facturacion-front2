@@ -179,18 +179,14 @@ export const ConsultasSkuPage: React.FC = () => {
       );
     }
     
-    // Casos especiales para demostración
-    // Si se busca específicamente el SKU COMP-001
     if (formData.sku === 'COMP-001') {
       resultadosFiltrados = skusMuestra.filter(s => s.sku === 'COMP-001');
     }
     
-    // Si se busca específicamente el sector S001
     if (formData.sector === 'S001') {
       resultadosFiltrados = skusMuestra.filter(s => s.sector === 'S001');
     }
     
-    // Si se busca específicamente la empresa CIBERCOM
     if (formData.empresa === 'CIBERCOM') {
       resultadosFiltrados = skusMuestra.filter(s => s.empresa === 'CIBERCOM');
     }

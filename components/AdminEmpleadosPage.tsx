@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { Card } from './Card';
 import { FormField } from './FormField';
 import { Button } from './Button';
-// Ya no necesitamos FileInputField para esta simulación, pero lo dejo por si lo usas en otro lado
-// import { FileInputField } from './FileInputField'; 
 
 interface UserSearchData {
   usuario: string;
@@ -16,7 +14,6 @@ const initialUserSearchData: UserSearchData = {
 export const AdminEmpleadosPage: React.FC = () => {
   const [userSearch, setUserSearch] = useState<UserSearchData>(initialUserSearchData);
 
-  // Mantenemos el archivo ficticio en el estado para que la lógica del formulario siga funcionando
   const dummyFile = new File(['jperez\nmgomez\nasanchez'], 'usuarios_a_eliminar.csv', { type: 'text/csv' });
   const [massDeleteFile, setMassDeleteFile] = useState<File | null>(dummyFile);
 
@@ -33,7 +30,6 @@ export const AdminEmpleadosPage: React.FC = () => {
     alert('Redirigiendo a formulario de Alta de Usuario (simulado)');
   };
   
-  // Aunque no usemos el input, dejamos la función por si se necesita
   const handleFileChange = (file: File | null) => {
     setMassDeleteFile(file);
   };
@@ -88,8 +84,6 @@ export const AdminEmpleadosPage: React.FC = () => {
           Ingresa los datos para eliminar permisos de usuario:
         </p>
         <form onSubmit={handleMassDeleteSubmit} className="space-y-4">
-          {/* --- SECCIÓN MODIFICADA --- */}
-          {/* Se reemplazó el componente FileInputField por HTML simple para simular la selección de un archivo */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
               Archivo de Eliminación Masiva:
@@ -106,7 +100,6 @@ export const AdminEmpleadosPage: React.FC = () => {
               {fileHelpText}
             </p>
           </div>
-          {/* --- FIN DE LA SECCIÓN MODIFICADA --- */}
           
           <div className="flex justify-start">
             <Button type="submit" variant="primary">

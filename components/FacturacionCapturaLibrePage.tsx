@@ -52,22 +52,14 @@ interface CapturaLibreFormData {
   domicilioFiscal: string;
   regimenFiscal: string;
   usoCfdi: string;
-  // Boleta
   tiendaBoleta: string;
   terminalBoleta: string;
   numeroBoleta: string;
-  // Justificacion
   justificacion: string;
-  // Tipo Documento
   tipoDocumento: string;
   uuid: string;
-  // Emisor
   emisor: string;
-  // Fecha Emision
-  fechaEmision: string;
-  // Concepto (single for now, extend to array for multiple)
-  concepto: Concepto;
-  // Totales
+  fechaEmision: string;  concepto: Concepto;
   medioPago: string;
   formaPago: string;
   descuentoTotal: string;
@@ -77,7 +69,6 @@ interface CapturaLibreFormData {
   total: string;
   ivaDesglosado: boolean;
   iepsDesglosado: boolean;
-  // Comentarios
   comentarios: string;
 }
 

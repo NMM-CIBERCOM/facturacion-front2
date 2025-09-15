@@ -76,7 +76,6 @@ const PROFILE_OPTIONS = [
   "Operador de Credito",
 ];
 
-// Define la interfaz EmpresaInfo para corregir error TS
 interface EmpresaInfo {
   nombre: string;
   rfc: string;

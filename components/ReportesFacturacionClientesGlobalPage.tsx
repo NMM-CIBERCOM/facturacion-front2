@@ -15,9 +15,7 @@ interface FacturacionClientesGlobalFormData {
   tiposFacturaGlobal: string[];
   todasTiposFacturaGlobal: boolean;
   fechaOperacion: string;
-  // prioridadFechaOperacion: string; (visual only)
   fechaFacturacion: string;
-  // prioridadFechaFacturacion: string; (visual only)
   tiendas: string[];
   todasTiendas: boolean;
 }
@@ -48,7 +46,6 @@ export const ReportesFacturacionClientesGlobalPage: React.FC = () => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
      if (type === 'checkbox' && name !== 'porOperacion' && !name.startsWith('todas')) {
-        // Grouped checkbox logic handled separately
     } else if (type === 'checkbox') {
         const { checked } = e.target as HTMLInputElement;
         setFormData(prev => ({ ...prev, [name]: checked }));
@@ -89,7 +86,6 @@ export const ReportesFacturacionClientesGlobalPage: React.FC = () => {
     e.preventDefault();
     setResultados(datosDummy);
     console.log('Buscar Facturación Clientes Posterior a Global (Rep. 4 y 5):', formData);
-    // alert('Búsqueda (Rep. 4 y 5) simulada. Ver consola.');
   };
 
   const handleExcel = () => {

@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 *.md
 *.ps1
+*.pdf
+*.xml
+*.zip

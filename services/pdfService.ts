@@ -1,6 +1,5 @@
 import { CustomColors } from '../types';
 
-// Interfaz para los datos de la factura
 export interface FacturaData {
   uuid: string;
   rfcEmisor: string;
@@ -38,7 +37,6 @@ export interface LogoConfig {
   customColors: CustomColors;
 }
 
-// Servicio para generar PDF de facturas
 export class PDFService {
   private static instance: PDFService;
   

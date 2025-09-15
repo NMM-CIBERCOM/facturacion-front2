@@ -18,7 +18,6 @@ interface IntegracionSustitucionCfdiFormData {
   tiposCfdi: string[];
   todosTiposCfdi: boolean;
   uuid: string; // For single UUID or list in textarea
-  // prioridadUuid: string; (visual only)
   fechaOperacion: string;
   fechaFacturacion: string;
   tiendas: string[];

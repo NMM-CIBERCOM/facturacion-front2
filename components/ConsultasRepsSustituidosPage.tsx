@@ -195,18 +195,14 @@ export const ConsultasRepsSustituidosPage: React.FC = () => {
       }
     }
     
-    // Casos especiales para demostración
-    // Si se busca específicamente la empresa E001
     if (formData.empresa === 'E001') {
       resultadosFiltrados = repsSustituidosMuestra.filter(r => r.empresa === 'E001');
     }
     
-    // Si se busca específicamente la tienda T001
     if (formData.tienda === 'T001') {
       resultadosFiltrados = repsSustituidosMuestra.filter(r => r.tienda === 'T001');
     }
     
-    // Si se marca la opción "por Operacion"
     if (formData.porOperacion) {
       resultadosFiltrados = repsSustituidosMuestra.filter(r => r.motivoSustitucion === '01');
     }

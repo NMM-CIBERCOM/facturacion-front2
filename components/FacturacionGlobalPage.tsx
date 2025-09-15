@@ -36,9 +36,7 @@ const Modal: React.FC<{ open: boolean; title: string; children: React.ReactNode;
   );
 };
 
-// --- INTERFACES Y DATOS DE EJEMPLO ---
 
-// Interfaz para los datos del formulario
 interface FacturaGlobalFormData {
   fecha: string;
   tienda: string;
@@ -46,7 +44,6 @@ interface FacturaGlobalFormData {
   estatus: string;
 }
 
-// Interfaz para cada fila de resultado
 interface FacturaResult {
   id: number;
   folio: string;
@@ -67,13 +64,12 @@ const DUMMY_RESULTS: FacturaResult[] = [
 ];
 
 const initialFacturaGlobalFormData: FacturaGlobalFormData = {
-  fecha: '2025-07-07', // Fecha que coincide con la imagen
-  tienda: 'T001',      // Valor que correspondería a "Tienda Principal (T001)"
-  tipoFactura: '',     // Valor para "--Todas--"
-  estatus: '',         // Valor para "--Todas--"
+  fecha: '2025-07-07',
+  tienda: 'T001',      
+  tipoFactura: '',     
+  estatus: '',         
 };
 
-// --- COMPONENTE DE LA TABLA DE RESULTADOS (NUEVO) ---
 
 interface SearchResultsTableProps {
   results: FacturaResult[];
@@ -158,13 +154,10 @@ export const FacturacionGlobalPage: React.FC = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Función de búsqueda actualizada para mostrar datos de ejemplo
   const handleBuscar = (e: React.FormEvent) => {
     e.preventDefault();
     console.log('Buscar Factura Global:', formData);
-    // Simulación de una llamada a API: establecemos los datos de ejemplo
     setSearchResults(DUMMY_RESULTS); 
-    // alert('Búsqueda simulada. Mostrando resultados de ejemplo.'); // Puedes quitar esta alerta
   };
 
   const handleExcel = () => {
