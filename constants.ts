@@ -16,7 +16,7 @@ import { CogIcon } from './components/icons/CogIcon';
 import { PaintBrushIcon } from './components/icons/PaintBrushIcon';
 import { 
   FaUser, FaStore, FaCalendarAlt, FaLaptop, FaExclamationTriangle, FaLayerGroup, 
-  FaChartBar, FaFileAlt, FaUsers, FaExchangeAlt, FaClipboardCheck, FaSyncAlt, FaFileSignature, FaHistory
+  FaChartBar, FaFileAlt, FaUsers, FaExchangeAlt, FaClipboardCheck, FaSyncAlt, FaFileSignature, FaHistory, FaEnvelope
 } from 'react-icons/fa';
 import { FiFileText, FiUsers, FiRepeat, FiSettings } from 'react-icons/fi';
 import { ChartPieIcon } from './components/icons/ChartPieIcon';
@@ -115,7 +115,8 @@ export const NAV_ITEMS: NavItem[] = [
     icon: CogIcon,
     children: [
       { label: 'Temas', path: 'configuracion-temas', icon: PaintBrushIcon },
-      { label: 'Empresa', path: 'configuracion-empresa', icon: FaStore }
+      { label: 'Empresa', path: 'configuracion-empresa', icon: FaStore },
+      { label: 'Mensajes de Correo', path: 'configuracion-correo', icon: FaEnvelope }
     ]
   }
 ];

@@ -6,6 +6,7 @@ import { CheckboxField } from './CheckboxField';
 import { Button } from './Button';
 import { DatosFiscalesSection } from './DatosFiscalesSection';
 import { TextareaField } from './TextareaField';
+import { correoService } from '../services/correoService';
 import { 
     PAIS_OPTIONS, 
     REGIMEN_FISCAL_OPTIONS, 
@@ -161,9 +162,33 @@ export const FacturacionMotosPage: React.FC = () => {
     console.log('Facturar Motos:', formData);
     alert('Facturando Motos (simulado). Ver consola.');
   };
-  const handleEnviarCorreo = () => {
-    console.log('Enviar por Correo (Motos):', formData);
-    alert('Enviando por correo (Motos - simulado).');
+  const handleEnviarCorreo = async () => {
+    if (!formData.correoElectronico || !formData.correoElectronico.trim()) {
+      alert('Por favor ingresa un correo electrónico válido antes de enviar.');
+      return;
+    }
+
+    if (!correoService.validarEmail(formData.correoElectronico)) {
+      alert('El formato del correo electrónico no es válido.');
+      return;
+    }
+
+    // En una implementación real, aquí necesitarías el UUID de la factura
+    // Por ahora, mostramos un mensaje informativo
+    const confirmar = confirm(
+      `¿Deseas enviar la factura de motos por correo a: ${formData.correoElectronico}?\n\n` +
+      'Nota: Primero debes generar la factura para poder enviarla por correo.'
+    );
+
+    if (confirmar) {
+      console.log('Enviar por Correo (Motos):', formData);
+      alert(
+        'Para enviar facturas por correo:\n\n' +
+        '1. Primero genera la factura\n' +
+        '2. Luego usa el botón "Enviar Correo" en la tabla de facturas\n' +
+        '3. O el sistema enviará automáticamente si proporcionas un correo al generar la factura'
+      );
+    }
   };
 
   return (

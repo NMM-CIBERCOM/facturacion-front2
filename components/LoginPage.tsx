@@ -5,7 +5,7 @@ import { Button } from './Button';
 import { FormField } from './FormField';
 
 interface LoginPageProps {
-  onLogin: (username: string, password: string) => boolean;
+  onLogin: (username: string, password: string) => Promise<boolean>;
   logoUrl?: string;
   appName?: string;
 }
@@ -14,13 +14,23 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, logoUrl, appName 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const { theme } = useContext(ThemeContext);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!onLogin(username, password)) {
-      setError('Usuario o contraseña incorrectos.');
+    setIsLoading(true);
+    
+    try {
+      const success = await onLogin(username, password);
+      if (!success) {
+        setError('Usuario o contraseña incorrectos.');
+      }
+    } catch (error) {
+      setError('Error de conexión con el servidor.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -62,8 +72,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, logoUrl, appName 
               </p>
             )}
             
-            <Button type="submit" variant="primary" className="w-full !py-3 text-base">
-              Ingresar
+            <Button 
+              type="submit" 
+              variant="primary" 
+              className="w-full !py-3 text-base" 
+              disabled={isLoading}
+            >
+              {isLoading ? 'Ingresando...' : 'Ingresar'}
             </Button>
           </form>
         </div>

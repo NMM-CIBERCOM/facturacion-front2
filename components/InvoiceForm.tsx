@@ -5,7 +5,11 @@ import { SelectField } from './SelectField';
 import { CheckboxField } from './CheckboxField';
 import { Button } from './Button';
 import { ArrowDownTrayIcon } from './icons/ArrowDownTrayIcon';
+import { EnviarCorreoModal } from './EnviarCorreoModal';
 import { useEmpresa } from '../context/EmpresaContext';
+import { correoService } from '../services/correoService';
+import { configuracionCorreoService } from '../services/configuracionCorreoService';
+import { facturaService } from '../services/facturaService';
 import {
   PAIS_OPTIONS,
   REGIMEN_FISCAL_OPTIONS,
@@ -86,6 +90,17 @@ export const InvoiceForm: React.FC = () => {
   const [mostrarTabla, setMostrarTabla] = useState(false);
   const [paginaActual, setPaginaActual] = useState(1);
   const [elementosPorPagina] = useState(5);
+  const [modalCorreo, setModalCorreo] = useState<{
+    isOpen: boolean;
+    facturaUuid: string;
+    facturaInfo: string;
+    correoInicial: string;
+  }>({
+    isOpen: false,
+    facturaUuid: '',
+    facturaInfo: '',
+    correoInicial: ''
+  });
   const { empresaInfo } = useEmpresa();
 
   // Función para formatear fechas con milisegundos
@@ -278,6 +293,44 @@ export const InvoiceForm: React.FC = () => {
       
       if (data.exitoso) {
         alert(`✅ ${data.mensaje}\nUUID: ${data.uuid}\nFactura guardada en base de datos`);
+        
+        // Envío automático de correo con PDF adjunto si se proporcionó un correo electrónico
+        if (formData.correoElectronico && formData.correoElectronico.trim()) {
+          try {
+            console.log('📧 Enviando correo automáticamente (directo) a:', formData.correoElectronico);
+            
+            // Obtener datos de la factura para construir variables (serie, folio)
+            let serieFactura = '';
+            let folioFactura = '';
+            try {
+              const facturaCompleta = await facturaService.obtenerFacturaPorUUID(data.uuid);
+              serieFactura = facturaCompleta.serie || '';
+              folioFactura = facturaCompleta.folio || '';
+            } catch (e) {
+              console.warn('⚠️ No fue posible obtener serie/folio por UUID, se continuará con valores por defecto:', e);
+            }
+
+            // Envío con PDF adjunto
+            const correoResponse = await correoService.enviarCorreoConPdfAdjunto({
+              uuidFactura: data.uuid,
+              correoReceptor: formData.correoElectronico,
+              asunto: `Factura ${serieFactura || 'A'}${folioFactura || '1'} - ${empresaInfo?.nombre || 'Empresa'}`,
+              mensaje: `Estimado cliente,\n\nAdjunto encontrará su factura con folio fiscal ${data.uuid}.\n\nGracias por su preferencia.`,
+            });
+            
+            if (correoResponse.success) {
+              console.log('✅ Correo enviado con PDF adjunto');
+              alert(`✅ Factura generada y correo con PDF adjunto enviado exitosamente a: ${formData.correoElectronico}`);
+            } else {
+              console.warn('⚠️ Error al enviar correo con PDF adjunto:', correoResponse.message);
+              alert(`✅ Factura generada exitosamente.\n⚠️ Error al enviar correo con PDF adjunto: ${correoResponse.message}`);
+            }
+          } catch (correoError) {
+            console.error('❌ Error al enviar correo con PDF adjunto:', correoError);
+            alert(`✅ Factura generada exitosamente.\n⚠️ Error al enviar correo con PDF adjunto. Puedes enviarlo manualmente desde la tabla de facturas.`);
+          }
+        }
+        
         // Recargar facturas después de guardar una nueva
         console.log('🔄 Recargando facturas después de guardar nueva factura');
         cargarFacturas();
@@ -344,6 +397,25 @@ export const InvoiceForm: React.FC = () => {
       console.error('❌ Error al descargar XML:', error);
       alert('Error al descargar el XML. Intenta nuevamente.');
     }
+  };
+
+  // Funciones para el modal de correo
+  const abrirModalCorreo = (factura: Factura) => {
+    setModalCorreo({
+      isOpen: true,
+      facturaUuid: factura.uuid,
+      facturaInfo: factura.codigoFacturacion,
+      correoInicial: formData.correoElectronico || ''
+    });
+  };
+
+  const cerrarModalCorreo = () => {
+    setModalCorreo({
+      isOpen: false,
+      facturaUuid: '',
+      facturaInfo: '',
+      correoInicial: ''
+    });
   };
 
   // Funciones de paginación
@@ -518,6 +590,9 @@ export const InvoiceForm: React.FC = () => {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Descargar XML
                   </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Enviar Correo
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
@@ -565,6 +640,18 @@ export const InvoiceForm: React.FC = () => {
                         className="text-xs px-2 py-1"
                       >
                         <ArrowDownTrayIcon className="h-4 w-4 mr-1" /> Descargar XML
+                      </Button>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <Button
+                        onClick={() => abrirModalCorreo(factura)}
+                        variant="primary"
+                        className="text-xs px-2 py-1"
+                      >
+                        <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        Enviar Correo
                       </Button>
                     </td>
                   </tr>
@@ -654,6 +741,15 @@ export const InvoiceForm: React.FC = () => {
           </div>
         )}
       </Card>
+
+      {/* Modal de Envío de Correo */}
+      <EnviarCorreoModal
+        isOpen={modalCorreo.isOpen}
+        onClose={cerrarModalCorreo}
+        facturaUuid={modalCorreo.facturaUuid}
+        facturaInfo={modalCorreo.facturaInfo}
+        correoInicial={modalCorreo.correoInicial}
+      />
     </div>
   );
 };

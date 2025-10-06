@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import type { User } from '../types';
 import { MenuIcon } from './icons/MenuIcon';
 import { UserCircleIcon } from './icons/UserCircleIcon';
@@ -23,6 +23,29 @@ export const Header: React.FC<HeaderProps> = ({
   ThemeToggleButton,
 }) => {
   const { empresaInfo } = useEmpresa();
+  const [currentUser, setCurrentUser] = useState<{name: string, perfil: string} | null>(null);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      const nombreEmpleado = localStorage.getItem('nombreEmpleado');
+      const perfilData = localStorage.getItem('perfil');
+      
+      if (nombreEmpleado && perfilData) {
+        try {
+          const perfil = JSON.parse(perfilData);
+          setCurrentUser({
+            name: nombreEmpleado,
+            perfil: perfil.nombrePerfil
+          });
+        } catch (error) {
+          console.error('Error parsing perfil data:', error);
+          setCurrentUser({ name: nombreEmpleado, perfil: 'Sin perfil' });
+        }
+      }
+    } else {
+      setCurrentUser(null);
+    }
+  }, [isAuthenticated]);
 
   return (
     <header className="bg-white dark:bg-gray-800 shadow-md h-16 flex items-center justify-between px-4 md:px-6 sticky top-0 z-20 border-b border-gray-200 dark:border-gray-700">
@@ -55,14 +78,14 @@ export const Header: React.FC<HeaderProps> = ({
         
         {isAuthenticated && ( 
           <div className="relative group">
-            <button className="flex items-center p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300" aria-haspopup="true" aria-expanded="false" aria-label={`User menu for ${user.name}`}>
+            <button className="flex items-center p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300" aria-haspopup="true" aria-expanded="false" aria-label={`User menu for ${currentUser?.name || user.name}`}>
               <UserCircleIcon className="w-7 h-7" />
-              <span className="hidden md:inline ml-2 text-sm">{user.name.split(' ')[0]}</span>
+              <span className="hidden md:inline ml-2 text-sm">{currentUser?.name.split(' ')[0] || user.name.split(' ')[0]}</span>
             </button>
             <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-md shadow-lg py-2 z-50 hidden group-hover:block ring-1 ring-black ring-opacity-5 dark:ring-gray-700" role="menu" aria-orientation="vertical" aria-labelledby="user-menu-button">
               <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
-                <p className="text-sm font-medium text-gray-900 dark:text-white truncate" id="user-name-full">{user.name}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Tienda: {user.storeId}</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white truncate" id="user-name-full">{currentUser?.name || user.name}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Perfil: {currentUser?.perfil || 'Sin perfil'}</p>
               </div>
               <button
                 onClick={onLogout}

@@ -58,6 +58,7 @@ import { ReportesFiscalesRepsSustituidosPage } from './components/ReportesFiscal
 // Configuracion Pages
 import { ConfiguracionTemasPage } from './components/ConfiguracionTemasPage';
 import { ConfiguracionEmpresaPage } from './components/ConfiguracionEmpresaPage';
+import { ConfiguracionCorreoPage } from './components/ConfiguracionCorreoPage';
 
 // Monitor Pages
 import { MonitorGraficasPage } from './components/MonitorGraficasPage';
@@ -221,32 +222,59 @@ const App: React.FC = () => {
 );
 
 
-  const handleLogin = useCallback((usernameInput: string, passwordInput: string): boolean => {
-    if (usernameInput === DUMMY_CREDENTIALS.username && passwordInput === DUMMY_CREDENTIALS.password) {
-      localStorage.setItem('isAuthenticated', 'true');
-      setIsAuthenticated(true);
-      setProfileSelected(null);
+  const handleLogin = useCallback(async (usernameInput: string, passwordInput: string): Promise<boolean> => {
+    try {
+      const response = await fetch('http://localhost:8080/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          usuario: usernameInput,
+          password: passwordInput
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.usuario) {
+        localStorage.setItem('isAuthenticated', 'true');
+        localStorage.setItem('username', data.usuario.noUsuario);
+        localStorage.setItem('nombreEmpleado', data.usuario.nombreEmpleado);
+        localStorage.setItem('perfil', JSON.stringify(data.usuario.perfil));
+        
+        setIsAuthenticated(true);
+        setProfileSelected(data.usuario.perfil.nombrePerfil);
 
-      const dashboardItem = NAV_ITEMS.find(item => item.label === 'Dashboard');
-      if (dashboardItem) {
-        setActivePage(dashboardItem.label);
-        setActivePageIcon(() => dashboardItem.icon as React.FC<React.SVGProps<SVGSVGElement>>);
+        const dashboardItem = NAV_ITEMS.find(item => item.label === 'Dashboard');
+        if (dashboardItem) {
+          setActivePage(dashboardItem.label);
+          setActivePageIcon(() => dashboardItem.icon as React.FC<React.SVGProps<SVGSVGElement>>);
+        } else {
+          setActivePage('Dashboard');
+          setActivePageIcon(() => HomeIcon);
+        }
+
+        if (window.innerWidth >= 768) {
+          setIsSidebarOpen(true);
+        }
+        return true;
       } else {
-        setActivePage('Dashboard');
-        setActivePageIcon(() => HomeIcon);
+        console.error('Login failed:', data.message);
+        return false;
       }
-
-      if (window.innerWidth >= 768) {
-        setIsSidebarOpen(true);
-      }
-      return true;
+    } catch (error) {
+      console.error('Error durante el login:', error);
+      return false;
     }
-    return false;
   }, []);
 
   const handleLogout = useCallback(() => {
     localStorage.removeItem('isAuthenticated');
     localStorage.removeItem('profileSelected');
+    localStorage.removeItem('username');
+    localStorage.removeItem('nombreEmpleado');
+    localStorage.removeItem('perfil');
     setIsAuthenticated(false);
     setProfileSelected(null);
     setActivePage('Dashboard');
@@ -339,6 +367,7 @@ const App: React.FC = () => {
     // Configuracion
     if (activePage === 'Temas') return <ConfiguracionTemasPage />;
     if (activePage === 'Empresa') return <ConfiguracionEmpresaPage />;
+    if (activePage === 'Mensajes de Correo') return <ConfiguracionCorreoPage />;
 
     // Monitor
     if (activePage === 'Gráficas') return <MonitorGraficasPage />;
