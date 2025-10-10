@@ -1,272 +1,631 @@
-import React, { useState, useMemo } from 'react';
-import { Card } from './Card';
+import React, { useState, useEffect } from 'react';
+import { tiendaService, Tienda, FiltrosTienda, EstadisticasTiendas } from '../services/tiendaService';
 import { Button } from './Button';
-import { PlusCircleIcon, PencilSquareIcon, MagnifyingGlassIcon } from './icons';
-
-const dummyStores = [
-  { id: '001', empresa: 'EMP-A', nombre: 'Sucursal 1', formato: 'GEN', domicilio: 'Calle 1', no: '100', colonia: 'Colonia Centro', delegacion: 'Delegación 1', cp: '01000', entidad: 'Ciudad A', pais: 'México', zonaEstatus: '1', tieneQmenor: 'NA', numFolioSerie: '0', folioInferior: 'GEN1', folioSuperior: 'GENA1', rangoInferior: '0', rangoSuperior: '100000', vigencia: '2022-01-01', numAdicionales: '1', contador: '100', dirServidorSec: '192.168.1.1', zonaHoraria: 'Centro', modificar: true },
-  { id: '002', empresa: 'EMP-B', nombre: 'Sucursal 2', formato: 'GEN', domicilio: 'Calle 2', no: '200', colonia: 'Colonia Norte', delegacion: 'Delegación 2', cp: '02000', entidad: 'Ciudad B', pais: 'México', zonaEstatus: '1', tieneQmenor: 'FACTURAS', numFolioSerie: '0', folioInferior: 'GEN2', folioSuperior: 'GENB2', rangoInferior: '0', rangoSuperior: '200000', vigencia: '2022-02-01', numAdicionales: '0', contador: '200', dirServidorSec: '192.168.1.2', zonaHoraria: 'Centro', modificar: true },
-  { id: '003', empresa: 'EMP-C', nombre: 'Sucursal 3', formato: 'GEN', domicilio: 'Calle 3', no: '300', colonia: 'Colonia Sur', delegacion: 'Delegación 3', cp: '03000', entidad: 'Ciudad C', pais: 'México', zonaEstatus: '1', tieneQmenor: 'FACTURAS', numFolioSerie: '0', folioInferior: 'GEN3', folioSuperior: 'GENC3', rangoInferior: '0', rangoSuperior: '300000', vigencia: '2022-03-01', numAdicionales: '2', contador: '300', dirServidorSec: '192.168.1.3', zonaHoraria: 'Centro', modificar: true },
-];
-
-const displayColumns = [
-    { key: 'id', label: 'Id' },
-    { key: 'empresa', label: 'Emp.' },
-    { key: 'nombre', label: 'Nombre' },
-    { key: 'formato', label: 'Formato' },
-    { key: 'domicilio', label: 'Domicilio' },
-    { key: 'cp', label: 'CP' },
-    { key: 'entidad', label: 'Entidad' },
-    { key: 'folioSuperior', label: 'Folio Serie' },
-];
-
-const ITEMS_PER_PAGE = 10;
+import { Card } from './Card';
+import { FormField } from './FormField';
+import { SelectField } from './SelectField';
+import { TextareaField } from './TextareaField';
 
 export const AdminTiendasPage: React.FC = () => {
-  const [currentPage, setCurrentPage] = useState(1);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterEmpresa, setFilterEmpresa] = useState('');
-  const [filterFormato, setFilterFormato] = useState('');
+  const [tiendas, setTiendas] = useState<Tienda[]>([]);
+  const [estadisticas, setEstadisticas] = useState<EstadisticasTiendas | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  
+  // Estados para el modal
+  const [showModal, setShowModal] = useState(false);
+  const [editingTienda, setEditingTienda] = useState<Tienda | null>(null);
+  const [modalMode, setModalMode] = useState<'create' | 'edit' | 'view'>('create');
+  
+  // Estados para filtros
+  const [filtros, setFiltros] = useState<FiltrosTienda>({});
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // Estado del formulario
+  const [formData, setFormData] = useState<Tienda>({
+    codigoTienda: '',
+    nombreTienda: '',
+    direccion: '',
+    ciudad: '',
+    estado: '',
+    codigoPostal: '',
+    telefono: '',
+    email: '',
+    gerente: '',
+    region: '',
+    zona: '',
+    tipoTienda: 'Sucursal',
+    estadoTienda: 'ACTIVO',
+    fechaApertura: '',
+    observaciones: ''
+  });
 
-  // Obtener empresas y formatos únicos para los filtros
-  const uniqueEmpresas = useMemo(() => [
-    ...new Set(dummyStores.map(store => store.empresa))
-  ], []);
+  // Cargar datos iniciales
+  useEffect(() => {
+    cargarTiendas();
+    cargarEstadisticas();
+  }, []);
 
-  const uniqueFormatos = useMemo(() => [
-    ...new Set(dummyStores.map(store => store.formato))
-  ], []);
+  const cargarTiendas = async () => {
+    setLoading(true);
+    try {
+      const response = await tiendaService.listarTiendas(filtros);
+      if (response.success && Array.isArray(response.data)) {
+        setTiendas(response.data);
+        setError(null);
+      } else {
+        setError(response.message || 'Error al cargar las tiendas');
+      }
+    } catch (err) {
+      setError('Error de conexión al cargar las tiendas');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // Filtrar tiendas
-  const filteredStores = useMemo(() => {
-    return dummyStores.filter(store => {
-      const matchesSearch = searchTerm === '' || 
-        Object.values(store).some(value => 
-          String(value).toLowerCase().includes(searchTerm.toLowerCase())
-        );
-      const matchesEmpresa = filterEmpresa === '' || store.empresa === filterEmpresa;
-      const matchesFormato = filterFormato === '' || store.formato === filterFormato;
-      
-      return matchesSearch && matchesEmpresa && matchesFormato;
+  const cargarEstadisticas = async () => {
+    try {
+      const response = await tiendaService.obtenerEstadisticas();
+      if (response.success && response.data) {
+        setEstadisticas(response.data);
+      }
+    } catch (err) {
+      console.error('Error al cargar estadísticas:', err);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      let response;
+      if (modalMode === 'edit' && editingTienda?.idTienda) {
+        response = await tiendaService.actualizarTienda(editingTienda.idTienda, {
+          ...formData,
+          usuarioModificacion: 'admin'
+        });
+      } else {
+        response = await tiendaService.crearTienda({
+          ...formData,
+          usuarioCreacion: 'admin'
+        });
+      }
+
+      if (response.success) {
+        setSuccess(response.message);
+        setShowModal(false);
+        resetForm();
+        cargarTiendas();
+        cargarEstadisticas();
+      } else {
+        setError(response.message || 'Error al procesar la solicitud');
+      }
+    } catch (err) {
+      setError('Error de conexión al procesar la solicitud');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (tienda: Tienda) => {
+    setEditingTienda(tienda);
+    setFormData({
+      ...tienda,
+      fechaApertura: tienda.fechaApertura ? tienda.fechaApertura.split('T')[0] : ''
     });
-  }, [searchTerm, filterEmpresa, filterFormato]);
-
-  // Calcular el total de páginas con las tiendas filtradas
-  const totalPages = Math.ceil(filteredStores.length / ITEMS_PER_PAGE);
-
-  // Restablecer la página actual cuando cambian los filtros
-  React.useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, filterEmpresa, filterFormato]);
-
-  // Obtener las tiendas para la página actual
-  const getCurrentPageStores = () => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
-    return filteredStores.slice(startIndex, endIndex);
+    setModalMode('edit');
+    setShowModal(true);
   };
 
-  const handleAddStore = () => {
-    alert('Abrir formulario para agregar nueva tienda (simulado).');
+  const handleView = (tienda: Tienda) => {
+    setEditingTienda(tienda);
+    setFormData({
+      ...tienda,
+      fechaApertura: tienda.fechaApertura ? tienda.fechaApertura.split('T')[0] : ''
+    });
+    setModalMode('view');
+    setShowModal(true);
   };
 
-  const handleModifyStore = (storeId: string) => {
-    alert(`Modificar tienda con ID: ${storeId} (simulado).`);
-  };
-
-  // Manejadores de paginación
-  const handlePreviousPage = () => {
-    setCurrentPage(prev => Math.max(prev - 1, 1));
-  };
-
-  const handleNextPage = () => {
-    setCurrentPage(prev => Math.min(prev + 1, totalPages));
-  };
-
-  const handlePageChange = (pageNumber: number) => {
-    setCurrentPage(pageNumber);
-  };
-
-  // Generar array de números de página para mostrar
-  const getPageNumbers = () => {
-    const pageNumbers = [];
-    const maxVisiblePages = 5;
-    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-
-    if (endPage - startPage + 1 < maxVisiblePages) {
-      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+  const handleDelete = async (tienda: Tienda) => {
+    if (!tienda.idTienda) return;
+    
+    if (window.confirm(`¿Está seguro de que desea eliminar la tienda "${tienda.nombreTienda}"?`)) {
+      setLoading(true);
+      try {
+        const response = await tiendaService.eliminarTienda(tienda.idTienda, 'admin');
+        if (response.success) {
+          setSuccess(response.message);
+          cargarTiendas();
+          cargarEstadisticas();
+        } else {
+          setError(response.message || 'Error al eliminar la tienda');
+        }
+      } catch (err) {
+        setError('Error de conexión al eliminar la tienda');
+      } finally {
+        setLoading(false);
+      }
     }
+  };
 
-    for (let i = startPage; i <= endPage; i++) {
-      pageNumbers.push(i);
+  const resetForm = () => {
+    setFormData({
+      codigoTienda: '',
+      nombreTienda: '',
+      direccion: '',
+      ciudad: '',
+      estado: '',
+      codigoPostal: '',
+      telefono: '',
+      email: '',
+      gerente: '',
+      region: '',
+      zona: '',
+      tipoTienda: 'Sucursal',
+      estadoTienda: 'ACTIVO',
+      fechaApertura: '',
+      observaciones: ''
+    });
+    setEditingTienda(null);
+    setModalMode('create');
+  };
+
+  const handleFilterChange = (field: keyof FiltrosTienda, value: string) => {
+    setFiltros(prev => ({
+      ...prev,
+      [field]: value || undefined
+    }));
+  };
+
+  const aplicarFiltros = () => {
+    cargarTiendas();
+  };
+
+  const limpiarFiltros = () => {
+    setFiltros({});
+    setTimeout(() => cargarTiendas(), 100);
+  };
+
+  const getEstadoBadgeClass = (estado: string) => {
+    switch (estado) {
+      case 'ACTIVO':
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+      case 'INACTIVO':
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+      case 'SUSPENDIDO':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
     }
-
-    return pageNumbers;
   };
 
   return (
-    <Card>
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary">
-          Lista de Tiendas
-        </h3>
-        <Button onClick={handleAddStore} variant="primary" className="flex items-center">
-          <PlusCircleIcon className="w-5 h-5 mr-2" />
-          Agregar
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            Administración de Tiendas
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
+            Gestiona las tiendas del sistema
+          </p>
+        </div>
+        <Button
+          onClick={() => {
+            resetForm();
+            setShowModal(true);
+          }}
+          className="bg-blue-600 hover:bg-blue-700"
+        >
+          + Nueva Tienda
         </Button>
       </div>
 
-      {/* Filtros y Búsqueda */}
-      <div className="mb-6 space-y-4">
-        <div className="flex flex-wrap gap-4">
-          {/* Buscador general */}
-          <div className="flex-1 min-w-[200px]">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Buscar en todos los campos..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white"
-              />
-              <MagnifyingGlassIcon className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" />
-            </div>
-          </div>
-
-          {/* Filtro de Empresa */}
-          <div className="w-48">
-            <select
-              value={filterEmpresa}
-              onChange={(e) => setFilterEmpresa(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white"
-            >
-              <option value="">Todas las tiendas</option>
-              {uniqueEmpresas.map(empresa => (
-                <option key={empresa} value={empresa}>{empresa}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Filtro de Formato */}
-          <div className="w-48">
-            <select
-              value={filterFormato}
-              onChange={(e) => setFilterFormato(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-primary focus:border-primary dark:bg-gray-700 dark:text-white"
-            >
-              <option value="">Todos los formatos</option>
-              {uniqueFormatos.map(formato => (
-                <option key={formato} value={formato}>{formato}</option>
-              ))}
-            </select>
-          </div>
+      {/* Mensajes */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg dark:bg-red-900 dark:border-red-700 dark:text-red-300">
+          {error}
         </div>
+      )}
+      {success && (
+        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg dark:bg-green-900 dark:border-green-700 dark:text-green-300">
+          {success}
+        </div>
+      )}
 
-        {/* Resumen de filtros activos */}
-        {(searchTerm || filterEmpresa || filterFormato) && (
-          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-            <span>Filtros activos:</span>
-            {searchTerm && (
-              <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">
-                Búsqueda: {searchTerm}
-              </span>
-            )}
-            {filterEmpresa && (
-              <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">
-                Empresa: {filterEmpresa}
-              </span>
-            )}
-            {filterFormato && (
-              <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">
-                Formato: {filterFormato}
-              </span>
-            )}
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setFilterEmpresa('');
-                setFilterFormato('');
-              }}
-              className="text-primary dark:text-secondary hover:underline"
-            >
-              Limpiar filtros
-            </button>
+      {/* Estadísticas */}
+      {estadisticas && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card className="p-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                {estadisticas.totalTiendas}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Total Tiendas</div>
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                {estadisticas.tiendasActivas}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Activas</div>
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                {estadisticas.tiendasInactivas}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Inactivas</div>
+            </div>
+          </Card>
+          <Card className="p-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                {estadisticas.tiendasSuspendidas}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Suspendidas</div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Filtros */}
+      <Card className="p-4">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Filtros</h3>
+          <Button
+            onClick={() => setShowFilters(!showFilters)}
+            variant="outline"
+            size="sm"
+          >
+            {showFilters ? 'Ocultar' : 'Mostrar'} Filtros
+          </Button>
+        </div>
+        
+        {showFilters && (
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <SelectField
+              label="Estado"
+              value={filtros.estadoTienda || ''}
+              onChange={(value) => handleFilterChange('estadoTienda', value)}
+              options={[
+                { value: '', label: 'Todos' },
+                { value: 'ACTIVO', label: 'Activo' },
+                { value: 'INACTIVO', label: 'Inactivo' },
+                { value: 'SUSPENDIDO', label: 'Suspendido' }
+              ]}
+            />
+            <SelectField
+              label="Región"
+              value={filtros.region || ''}
+              onChange={(value) => handleFilterChange('region', value)}
+              options={[
+                { value: '', label: 'Todas' },
+                ...(estadisticas?.regiones?.map(r => ({ value: r, label: r })) || [])
+              ]}
+            />
+            <SelectField
+              label="Zona"
+              value={filtros.zona || ''}
+              onChange={(value) => handleFilterChange('zona', value)}
+              options={[
+                { value: '', label: 'Todas' },
+                ...(estadisticas?.zonas?.map(z => ({ value: z, label: z })) || [])
+              ]}
+            />
+            <SelectField
+              label="Tipo"
+              value={filtros.tipoTienda || ''}
+              onChange={(value) => handleFilterChange('tipoTienda', value)}
+              options={[
+                { value: '', label: 'Todos' },
+                ...(estadisticas?.tiposTienda?.map(t => ({ value: t, label: t })) || [])
+              ]}
+            />
+            <FormField
+              label="Búsqueda"
+              type="text"
+              value={filtros.busqueda || ''}
+              onChange={(e) => handleFilterChange('busqueda', e.target.value)}
+              placeholder="Buscar por nombre, código, ciudad..."
+            />
           </div>
         )}
-      </div>
-      
-      {/* Table and Pagination components remain the same, but use filteredStores instead of dummyStores */}
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-700">
-            <tr>
-              {displayColumns.map(col => (
-                <th key={col.key} scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  {col.label}
+        
+        {showFilters && (
+          <div className="flex gap-2 mt-4">
+            <Button onClick={aplicarFiltros} size="sm">
+              Aplicar Filtros
+            </Button>
+            <Button onClick={limpiarFiltros} variant="outline" size="sm">
+              Limpiar
+            </Button>
+          </div>
+        )}
+      </Card>
+
+      {/* Tabla de tiendas */}
+      <Card>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-800">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  Código
                 </th>
-              ))}
-              <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                Modificar
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-            {getCurrentPageStores().map((store) => (
-              <tr key={store.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                {displayColumns.map(col => (
-                  <td key={`${store.id}-${col.key}`} className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">
-                    {(store as any)[col.key]}
-                  </td>
-                ))}
-                <td className="px-4 py-3 whitespace-nowrap text-sm">
-                  <button onClick={() => handleModifyStore(store.id)} className="text-primary dark:text-secondary hover:underline p-1" aria-label={`Modificar tienda ${store.nombre}`}>
-                    <PencilSquareIcon className="w-5 h-5" />
-                  </button>
-                </td>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  Nombre
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  Ciudad
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  Región/Zona
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  Tipo
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  Estado
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                  Acciones
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Paginación */}
-      <div className="flex items-center justify-between px-4 py-3 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-        <div className="flex items-center text-sm text-gray-700 dark:text-gray-300">
-          Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} a {Math.min(currentPage * ITEMS_PER_PAGE, dummyStores.length)} de {dummyStores.length} resultados
+            </thead>
+            <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                    Cargando tiendas...
+                  </td>
+                </tr>
+              ) : tiendas.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                    No se encontraron tiendas
+                  </td>
+                </tr>
+              ) : (
+                tiendas.map((tienda) => (
+                  <tr key={tienda.idTienda} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                      {tienda.codigoTienda}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      {tienda.nombreTienda}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {tienda.ciudad}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {tienda.region} / {tienda.zona}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {tienda.tipoTienda}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getEstadoBadgeClass(tienda.estadoTienda || 'ACTIVO')}`}>
+                        {tienda.estadoTienda}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                      <Button
+                        onClick={() => handleView(tienda)}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Ver
+                      </Button>
+                      <Button
+                        onClick={() => handleEdit(tienda)}
+                        variant="outline"
+                        size="sm"
+                        className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        onClick={() => handleDelete(tienda)}
+                        variant="outline"
+                        size="sm"
+                        className="text-red-600 border-red-600 hover:bg-red-50"
+                      >
+                        Eliminar
+                      </Button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={handlePreviousPage}
-            disabled={currentPage === 1}
-            className={`px-3 py-1 rounded-md ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500' : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'}`}
-          >
-            Anterior
-          </button>
-          
-          {getPageNumbers().map(pageNumber => (
-            <button
-              key={pageNumber}
-              onClick={() => handlePageChange(pageNumber)}
-              className={`px-3 py-1 rounded-md ${pageNumber === currentPage ? 'bg-primary text-white dark:bg-secondary' : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'}`}
-            >
-              {pageNumber}
-            </button>
-          ))}
+      </Card>
 
-          <button
-            onClick={handleNextPage}
-            disabled={currentPage === totalPages}
-            className={`px-3 py-1 rounded-md ${currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-700 dark:text-gray-500' : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'}`}
-          >
-            Siguiente
-          </button>
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {modalMode === 'create' ? 'Nueva Tienda' : 
+                   modalMode === 'edit' ? 'Editar Tienda' : 'Ver Tienda'}
+                </h2>
+                <Button
+                  onClick={() => setShowModal(false)}
+                  variant="outline"
+                  size="sm"
+                >
+                  ✕
+                </Button>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    label="Código de Tienda *"
+                    type="text"
+                    value={formData.codigoTienda}
+                    onChange={(e) => setFormData(prev => ({ ...prev, codigoTienda: e.target.value }))}
+                    required
+                    disabled={modalMode === 'view'}
+                    placeholder="Ej: T001"
+                  />
+                  <FormField
+                    label="Nombre de Tienda *"
+                    type="text"
+                    value={formData.nombreTienda}
+                    onChange={(e) => setFormData(prev => ({ ...prev, nombreTienda: e.target.value }))}
+                    required
+                    disabled={modalMode === 'view'}
+                    placeholder="Nombre de la tienda"
+                  />
+                  <FormField
+                    label="Dirección"
+                    type="text"
+                    value={formData.direccion || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, direccion: e.target.value }))}
+                    disabled={modalMode === 'view'}
+                    placeholder="Dirección completa"
+                  />
+                  <FormField
+                    label="Ciudad"
+                    type="text"
+                    value={formData.ciudad || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, ciudad: e.target.value }))}
+                    disabled={modalMode === 'view'}
+                    placeholder="Ciudad"
+                  />
+                  <FormField
+                    label="Estado"
+                    type="text"
+                    value={formData.estado || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, estado: e.target.value }))}
+                    disabled={modalMode === 'view'}
+                    placeholder="Estado o provincia"
+                  />
+                  <FormField
+                    label="Código Postal"
+                    type="text"
+                    value={formData.codigoPostal || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, codigoPostal: e.target.value }))}
+                    disabled={modalMode === 'view'}
+                    placeholder="Código postal"
+                  />
+                  <FormField
+                    label="Teléfono"
+                    type="tel"
+                    value={formData.telefono || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, telefono: e.target.value }))}
+                    disabled={modalMode === 'view'}
+                    placeholder="Número de teléfono"
+                  />
+                  <FormField
+                    label="Email"
+                    type="email"
+                    value={formData.email || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                    disabled={modalMode === 'view'}
+                    placeholder="correo@ejemplo.com"
+                  />
+                  <FormField
+                    label="Gerente"
+                    type="text"
+                    value={formData.gerente || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, gerente: e.target.value }))}
+                    disabled={modalMode === 'view'}
+                    placeholder="Nombre del gerente"
+                  />
+                  <FormField
+                    label="Región"
+                    type="text"
+                    value={formData.region || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, region: e.target.value }))}
+                    disabled={modalMode === 'view'}
+                    placeholder="Región"
+                  />
+                  <FormField
+                    label="Zona"
+                    type="text"
+                    value={formData.zona || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, zona: e.target.value }))}
+                    disabled={modalMode === 'view'}
+                    placeholder="Zona"
+                  />
+                  <SelectField
+                    label="Tipo de Tienda"
+                    value={formData.tipoTienda || 'Sucursal'}
+                    onChange={(value) => setFormData(prev => ({ ...prev, tipoTienda: value }))}
+                    disabled={modalMode === 'view'}
+                    options={[
+                      { value: 'Sucursal', label: 'Sucursal' },
+                      { value: 'Franquicia', label: 'Franquicia' },
+                      { value: 'Corporativo', label: 'Corporativo' },
+                      { value: 'Outlet', label: 'Outlet' }
+                    ]}
+                  />
+                  <SelectField
+                    label="Estado de Tienda"
+                    value={formData.estadoTienda || 'ACTIVO'}
+                    onChange={(value) => setFormData(prev => ({ ...prev, estadoTienda: value }))}
+                    disabled={modalMode === 'view'}
+                    options={[
+                      { value: 'ACTIVO', label: 'Activo' },
+                      { value: 'INACTIVO', label: 'Inactivo' },
+                      { value: 'SUSPENDIDO', label: 'Suspendido' }
+                    ]}
+                  />
+                  <FormField
+                    label="Fecha de Apertura"
+                    type="date"
+                    value={formData.fechaApertura || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, fechaApertura: e.target.value }))}
+                    disabled={modalMode === 'view'}
+                  />
+                </div>
+
+                <TextareaField
+                  label="Observaciones"
+                  value={formData.observaciones || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, observaciones: e.target.value }))}
+                  disabled={modalMode === 'view'}
+                  placeholder="Observaciones adicionales..."
+                  rows={3}
+                />
+
+                {modalMode !== 'view' && (
+                  <div className="flex justify-end space-x-4">
+                    <Button
+                      type="button"
+                      onClick={() => setShowModal(false)}
+                      variant="outline"
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={loading}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      {loading ? 'Procesando...' : 
+                       modalMode === 'edit' ? 'Actualizar' : 'Crear'}
+                    </Button>
+                  </div>
+                )}
+              </form>
+            </div>
+          </div>
         </div>
-      </div>
-
-      {dummyStores.length === 0 && (
-        <p className="text-center py-4 text-gray-500 dark:text-gray-400">No hay tiendas registradas.</p>
       )}
-    </Card>
+    </div>
   );
 };
