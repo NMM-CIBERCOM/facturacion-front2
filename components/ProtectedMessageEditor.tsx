@@ -16,6 +16,7 @@ interface ProtectedMessageEditorProps {
   className?: string;
   required?: boolean;
   isProtected?: boolean;
+  compact?: boolean;
 }
 
 export const ProtectedMessageEditor: React.FC<ProtectedMessageEditorProps> = ({
@@ -25,7 +26,8 @@ export const ProtectedMessageEditor: React.FC<ProtectedMessageEditorProps> = ({
   rows = 12,
   className = "",
   required = false,
-  isProtected = false
+  isProtected = false,
+  compact = false
 }) => {
   const [protectedContent, setProtectedContent] = useState<string>('');
   const [editableContent, setEditableContent] = useState<string>('');
@@ -110,18 +112,24 @@ export const ProtectedMessageEditor: React.FC<ProtectedMessageEditorProps> = ({
   };
 
   // Variables dinámicas que deben protegerse
-  const protectedVariables = ['{serie}', '{folio}', '{uuid}', '{rfcReceptor}', '{facturaInfo}'];
+  const protectedVariables = ['{facturaInfo}', '{serie}', '{folio}', '{uuid}', '{rfcEmisor}'];
 
   // Texto completo que debe protegerse
   const protectedTexts = [
-    'Estimado cliente,',
+    'Estimado(a) cliente,',
     '',
-    'Se ha generado su factura electrónica con los siguientes datos:',
+    'Se ha generado su factura electrónica.',
     '',
+    'Gracias por su preferencia.',
+    '',
+    'Con los siguientes datos:',
     'Serie de la factura:',
     'Folio de la factura:',
     'UUID de la factura:',
-    'RFC del receptor:'
+    'RFC del emisor:',
+    '',
+    'Atentamente,',
+    'Equipo de Facturación Cibercom'
   ];
 
   useEffect(() => {
@@ -140,80 +148,44 @@ export const ProtectedMessageEditor: React.FC<ProtectedMessageEditorProps> = ({
 
   const separateContent = () => {
     // Contenido protegido limpio sin etiquetas para el correo final
-    const fixedProtectedContent = `Asunto: Factura Electrónica - {facturaInfo}
-Estimado cliente,
-Se ha generado su factura electrónica con los siguientes datos:
-Serie de la factura: {serie}
-Folio de la factura: {folio}
-UUID de la factura: {uuid}
-RFC del receptor: {rfcReceptor}`;
+    const fixedProtectedContent = `Estimado(a) cliente,\n\nSe ha generado su factura electrónica.\n\nGracias por su preferencia.\n\nCon los siguientes datos:\nSerie de la factura: {serie}\nFolio de la factura: {folio}\nUUID de la factura: {uuid}\nRFC del emisor: {rfcEmisor}\n\nAtentamente,\nEquipo de Facturación Cibercom`;
 
     // Contenido para mostrar en la interfaz con etiquetas
-    const displayProtectedContent = `Asunto: Factura Electrónica - {facturaInfo}
-Estimado cliente,(Texto protegido)
-Se ha generado su factura electrónica con los siguientes datos:(Texto protegido)
-Serie de la factura: {serie}(Texto protegido)
-Folio de la factura: {folio}(Texto protegido)
-UUID de la factura: {uuid}(Texto protegido)
-RFC del receptor: {rfcReceptor}(Texto protegido)`;
+    const displayProtectedContent = [
+      'Estimado(a) cliente,',
+      '',
+      'Se ha generado su factura electrónica.',
+      '',
+      'Gracias por su preferencia.',
+      '',
+      'Con los siguientes datos:',
+      '{facturaInfo}',
+      'Serie de la factura:',
+      '{serie}',
+      'Folio de la factura:',
+      '{folio}',
+      'UUID de la factura:',
+      '{uuid}',
+      'RFC del emisor:',
+      '{rfcEmisor}',
+      '',
+      'Atentamente,',
+      'Equipo de Facturación Cibercom'
+    ].join('\n');
 
     setProtectedContent(displayProtectedContent);
     setCleanProtectedContent(fixedProtectedContent);
     
-    // Extraer el contenido editable del valor total
-    if (value) {
-      // Buscar el contenido después del contenido protegido
-      const lines = value.split('\n');
-      
-      // Encontrar dónde termina el contenido protegido (después de "RFC del receptor:")
-      let editableStartIndex = -1;
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (line.startsWith('RFC del receptor:')) {
-          // Buscar la primera línea no vacía después de RFC del receptor
-          for (let j = i + 1; j < lines.length; j++) {
-            if (lines[j].trim() !== '') {
-              editableStartIndex = j;
-              break;
-            }
-          }
-          break;
-        }
-      }
-      
-      if (editableStartIndex > -1) {
-        const editableLines = lines.slice(editableStartIndex);
-        const editableContent = editableLines.join('\n').trim();
-        setEditableContent(editableContent);
-      } else {
-        // Si no encuentra el patrón, buscar después de una línea vacía
-        let foundEmptyLine = false;
-        let contentAfterEmpty = [];
-        for (let i = 0; i < lines.length; i++) {
-          if (foundEmptyLine) {
-            contentAfterEmpty.push(lines[i]);
-          } else if (lines[i].trim() === '' && i > 6) { // Después de las primeras líneas protegidas
-            foundEmptyLine = true;
-          }
-        }
-        if (contentAfterEmpty.length > 0) {
-          setEditableContent(contentAfterEmpty.join('\n').trim());
-        } else {
-          setEditableContent('');
-        }
-      }
-    } else {
-      setEditableContent('');
-    }
+    // Mantener el contenido editable con el valor actual (mensaje personalizado)
+    setEditableContent(value || '');
   };
 
   const handleEditableChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newEditableContent = e.target.value;
     setEditableContent(newEditableContent);
     
-    // Combinar contenido protegido limpio con contenido editable
-    const fullContent = cleanProtectedContent + '\n\n' + newEditableContent;
-    onChange(fullContent);
+    // Emitir solo el contenido editable al padre (el bloque protegido no se guarda)
+    onChange(newEditableContent);
   };
 
   const handleFontChange = (fontFamily: string) => {
@@ -249,7 +221,7 @@ RFC del receptor: {rfcReceptor}(Texto protegido)`;
   const renderProtectedContent = () => {
     if (!protectedContent) {
       return (
-        <div className="text-gray-400 dark:text-gray-500 italic">
+        <div className={`text-gray-400 dark:text-gray-500 italic ${compact ? 'text-xs' : ''}`}>
           No hay contenido protegido
         </div>
       );
@@ -260,7 +232,7 @@ RFC del receptor: {rfcReceptor}(Texto protegido)`;
       const trimmedLine = line.trim();
       
       if (trimmedLine === '') {
-        return <div key={`empty-${index}`} className="h-4"></div>;
+        return <div key={`empty-${index}`} className={compact ? 'h-2' : 'h-4'}></div>;
       }
 
       // Verificar si es una variable
@@ -270,22 +242,22 @@ RFC del receptor: {rfcReceptor}(Texto protegido)`;
 
       if (isVariable) {
         return (
-          <div key={`var-${index}`} className="flex items-center my-1">
-            <span className="bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 px-2 py-1 rounded border border-yellow-300 dark:border-yellow-700 font-mono inline-block">
+          <div key={`var-${index}`} className={`flex items-center ${compact ? 'my-0.5' : 'my-1'}`}>
+            <span className={`bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 ${compact ? 'px-1.5 py-0.5 text-xs' : 'px-2 py-1'} rounded border border-yellow-300 dark:border-yellow-700 font-mono inline-block`}>
               {trimmedLine}
             </span>
-            <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+            <span className={`ml-2 text-xs text-gray-500 dark:text-gray-400 ${compact ? 'leading-tight' : ''}`}>
               (Variable dinámica)
             </span>
           </div>
         );
       } else {
         return (
-          <div key={`text-${index}`} className="flex items-center my-1">
-            <span className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded border border-blue-300 dark:border-blue-700 inline-block">
+          <div key={`text-${index}`} className={`flex items-center ${compact ? 'my-0.5' : 'my-1'}`}>
+            <span className={`bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 ${compact ? 'px-1.5 py-0.5 text-xs' : 'px-2 py-1'} rounded border border-blue-300 dark:border-blue-700 inline-block`}>
               {line}
             </span>
-            <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+            <span className={`ml-2 text-xs text-gray-500 dark:text-gray-400 ${compact ? 'leading-tight' : ''}`}>
               (Texto protegido)
             </span>
           </div>
@@ -297,11 +269,11 @@ RFC del receptor: {rfcReceptor}(Texto protegido)`;
   return (
     <div className={`space-y-4 ${className}`}>
       {/* Contenido protegido */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="text-sm text-blue-600 font-medium mb-2">
+      <div className={`bg-blue-50 border border-blue-200 rounded-lg ${compact ? 'p-2' : 'p-4'}`}>
+        <div className={`${compact ? 'text-xs' : 'text-sm'} text-blue-600 font-medium mb-2`}>
           Contenido Protegido (No editable)
         </div>
-        <div className="whitespace-pre-wrap text-gray-700 text-sm">
+        <div className={`whitespace-pre-wrap text-gray-700 ${compact ? 'text-xs' : 'text-sm'}`}>
           {renderProtectedContent()}
         </div>
       </div>

@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8080/api/formato-correo';
+const API_URL = 'http://localhost:8080/api/configuracion-correo';
 
 export interface FormatoCorreoConfig {
   id?: number;
@@ -17,6 +17,7 @@ export interface FormatoCorreoDto {
   tipoFuente: string;
   tamanoFuente: number;
   esCursiva: boolean;
+  esSubrayado: boolean;
   colorTexto: string;
   activo: boolean;
   fechaCreacion?: string;
@@ -33,21 +34,24 @@ const formatoCorreoService = {
   obtenerConfiguracionActiva: async (): Promise<FormatoCorreoResponse> => {
     try {
       // Validar conexión al servidor
-      const response = await axios.get<FormatoCorreoDto>(`${API_URL}/activa`);
+      const response = await axios.get(`${API_URL}/obtener-configuracion-mensaje`);
       
-      if (!response.data) {
+      if (!response.data || !response.data.success) {
         throw new Error('No se recibió respuesta del servidor');
       }
 
+      const formatoCorreo = response.data.data.formatoCorreo;
+      
       return {
         exitoso: true,
         configuracion: {
-          id: response.data.id,
-          tipoFuente: response.data.tipoFuente,
-          tamañoFuente: response.data.tamanoFuente,
-          esCursiva: response.data.esCursiva,
-          colorTexto: response.data.colorTexto,
-          activo: response.data.activo
+          id: formatoCorreo.id,
+          tipoFuente: formatoCorreo.tipoFuente,
+          tamanoFuente: formatoCorreo.tamanoFuente,
+          esCursiva: formatoCorreo.esCursiva,
+          esSubrayado: formatoCorreo.esSubrayado,
+          colorTexto: formatoCorreo.colorTexto,
+          activo: true
         }
       };
     } catch (error) {
@@ -62,6 +66,7 @@ const formatoCorreoService = {
               tipoFuente: 'Arial',
               tamanoFuente: 14,
               esCursiva: false,
+              esSubrayado: false,
               colorTexto: '#000000',
               activo: true
             }
@@ -84,6 +89,7 @@ const formatoCorreoService = {
           tipoFuente: 'Arial',
           tamanoFuente: 14,
           esCursiva: false,
+          esSubrayado: false,
           colorTexto: '#000000',
           activo: true
         }
@@ -127,11 +133,18 @@ const formatoCorreoService = {
         // Validar conexión al servidor
         // Asegurarse de que el objeto enviado al backend es correcto
         console.log('Enviando al backend:', JSON.stringify(backendConfig));
-        const response = await axios.post<FormatoCorreoDto>(`${API_URL}`, backendConfig);
-        if (!response.data) {
+        
+        const requestData = {
+          mensaje: 'predefinido',
+          esPersonalizado: false,
+          formatoCorreo: backendConfig
+        };
+        
+        const response = await axios.post(`${API_URL}/guardar-configuracion-mensaje`, requestData);
+        if (!response.data || !response.data.success) {
           return {
             exitoso: false,
-            mensaje: 'No se recibió respuesta del servidor'
+            mensaje: response.data?.message || 'No se recibió respuesta del servidor'
           };
         }
         // Convertir la respuesta del backend a nuestro formato
@@ -139,11 +152,13 @@ const formatoCorreoService = {
           exitoso: true,
           mensaje: 'Configuración guardada correctamente',
           configuracion: {
-            tipoFuente: response.data.tipoFuente,
-            tamanoFuente: response.data.tamanoFuente,
-            esCursiva: response.data.esCursiva,
-            colorTexto: response.data.colorTexto,
-            activo: response.data.activo
+            id: config.id,
+            tipoFuente: backendConfig.tipoFuente,
+            tamanoFuente: backendConfig.tamanoFuente,
+            esCursiva: backendConfig.esCursiva,
+            esSubrayado: backendConfig.esSubrayado,
+            colorTexto: backendConfig.colorTexto,
+            activo: backendConfig.activo
           }
         };
       } catch (error: any) {
@@ -196,7 +211,7 @@ const formatoCorreoService = {
           mensaje: 'El tipo de fuente es requerido'
         };
       }
-      if (!config.tamañoFuente || config.tamañoFuente <= 0) {
+      if (!config.tamanoFuente || config.tamanoFuente <= 0) {
         return {
           exitoso: false,
           mensaje: 'El tamaño de fuente debe ser mayor a 0'
@@ -209,33 +224,39 @@ const formatoCorreoService = {
         };
       }
 
-      const backendConfig: FormatoCorreoDto = {
+      const backendConfig = {
         tipoFuente: config.tipoFuente,
-        tamanoFuente: config.tamañoFuente,
+        tamanoFuente: config.tamanoFuente,
         esCursiva: config.esCursiva,
         esSubrayado: config.esSubrayado,
         colorTexto: config.colorTexto,
         activo: true
       };
 
+      const requestData = {
+        mensaje: 'predefinido',
+        esPersonalizado: false,
+        formatoCorreo: backendConfig
+      };
+
       // Validar conexión al servidor
-      const response = await axios.put<FormatoCorreoDto>(`${API_URL}/${config.id}`, backendConfig);
+      const response = await axios.post(`${API_URL}/guardar-configuracion-mensaje`, requestData);
       
-      if (!response.data) {
-        throw new Error('No se recibió respuesta del servidor');
+      if (!response.data || !response.data.success) {
+        throw new Error(response.data?.message || 'No se recibió respuesta del servidor');
       }
 
       return {
           exitoso: true,
           mensaje: 'Configuración de formato actualizada correctamente',
           configuracion: {
-            id: response.data.id,
-            tipoFuente: response.data.tipoFuente,
-            tamanoFuente: response.data.tamanoFuente,
-            esCursiva: response.data.esCursiva,
-            esSubrayado: response.data.esSubrayado,
-            colorTexto: response.data.colorTexto,
-            activo: response.data.activo
+            id: config.id,
+            tipoFuente: backendConfig.tipoFuente,
+            tamanoFuente: backendConfig.tamanoFuente,
+            esCursiva: backendConfig.esCursiva,
+            esSubrayado: backendConfig.esSubrayado,
+            colorTexto: backendConfig.colorTexto,
+            activo: backendConfig.activo
           }
         };
     } catch (error) {
@@ -273,6 +294,20 @@ const formatoCorreoService = {
         mensaje: mensajeError
       };
     }
+  },
+
+  // Aplica formato HTML al texto según la configuración actual
+  aplicarFormatoHTML: (texto: string, config: FormatoCorreoConfig): string => {
+    const estilo: string[] = [];
+    if (config.tipoFuente) estilo.push(`font-family: ${config.tipoFuente}`);
+    if (config.tamanoFuente) estilo.push(`font-size: ${config.tamanoFuente}px`);
+    estilo.push(`font-style: ${config.esCursiva ? 'italic' : 'normal'}`);
+    estilo.push(`text-decoration: ${config.esSubrayado ? 'underline' : 'none'}`);
+    estilo.push(`font-weight: normal`);
+    if (config.colorTexto) estilo.push(`color: ${config.colorTexto}`);
+
+    const textoHtml = (texto || '').replace(/\n/g, '<br>');
+    return `<span style="${estilo.join('; ')}">${textoHtml}</span>`;
   }
 };
 

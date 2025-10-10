@@ -10,6 +10,7 @@ interface EnviarCorreoModalProps {
   facturaUuid: string;
   facturaInfo: string; // Serie + Folio para mostrar al usuario
   correoInicial?: string; // Correo del cliente si está disponible
+  rfcReceptor?: string; // RFC del cliente receptor
 }
 
 export const EnviarCorreoModal: React.FC<EnviarCorreoModalProps> = ({
@@ -17,7 +18,8 @@ export const EnviarCorreoModal: React.FC<EnviarCorreoModalProps> = ({
   onClose,
   facturaUuid,
   facturaInfo,
-  correoInicial = ''
+  correoInicial = '',
+  rfcReceptor = ''
 }) => {
   const [correoReceptor, setCorreoReceptor] = useState(correoInicial);
   const [asunto, setAsunto] = useState('');
@@ -31,7 +33,7 @@ export const EnviarCorreoModal: React.FC<EnviarCorreoModalProps> = ({
     if (isOpen) {
       cargarConfiguracionPredeterminada();
     }
-  }, [isOpen, facturaUuid, facturaInfo]);
+  }, [isOpen, facturaUuid, facturaInfo, rfcReceptor]);
 
   const cargarConfiguracionPredeterminada = async () => {
     setCargandoConfiguracion(true);
@@ -40,35 +42,64 @@ export const EnviarCorreoModal: React.FC<EnviarCorreoModalProps> = ({
       const configuracionMensaje = await configuracionCorreoService.obtenerMensajeParaEnvio();
       
       if (configuracionMensaje) {
-        // Procesar las variables en el asunto y mensaje
+        // Construir bloque protegido con variables dinámicas
+        const bloqueProtegido = `Estimado(a) cliente,\n\nSe ha generado su factura electrónica.\n\nGracias por su preferencia.\n\nCon los siguientes datos:\nSerie de la factura: {serie}\nFolio de la factura: {folio}\nUUID de la factura: {uuid}\nRFC del emisor: {rfcEmisor}\nRFC del receptor: {rfcReceptor}\n\nAtentamente,\nEquipo de Facturación Cibercom`;
+
+        // Procesar variables en el asunto y bloque protegido
         const asuntoProcesado = configuracionCorreoService.procesarMensaje(configuracionMensaje.asunto, {
           facturaInfo,
           serie: facturaInfo.split('-')[0] || 'A',
           folio: facturaInfo.split('-')[1] || '1',
           uuid: facturaUuid,
-          rfcEmisor: 'EEJ920629TE3' // Este valor debería venir de la configuración de la empresa
+          rfcEmisor: 'EEJ920629TE3',
+          rfcReceptor: rfcReceptor || ''
         });
-        
-        const mensajeProcesado = configuracionCorreoService.procesarMensaje(configuracionMensaje.mensaje, {
+
+        const bloqueProtegidoProcesado = configuracionCorreoService.procesarMensaje(bloqueProtegido, {
           facturaInfo,
           serie: facturaInfo.split('-')[0] || 'A',
           folio: facturaInfo.split('-')[1] || '1',
           uuid: facturaUuid,
-          rfcEmisor: 'EEJ920629TE3'
+          rfcEmisor: 'EEJ920629TE3',
+          rfcReceptor: rfcReceptor || ''
         });
+        
+        // El mensaje personalizado guardado por el usuario
+        const mensajePersonalizado = configuracionMensaje.mensaje || '';
+        
+        // Unir bloque protegido y mensaje personalizado separado por dos saltos de línea
+        const mensajeProcesado = `${bloqueProtegidoProcesado}\n\n${mensajePersonalizado}`;
         
         setAsunto(asuntoProcesado);
         setMensajeCorreo(mensajeProcesado);
       } else {
-        // Usar valores por defecto si no hay configuración
+        // Valores por defecto si no hay configuración
+        const porDefecto = `Estimado(a) cliente,\n\nSe ha generado su factura electrónica.\n\nGracias por su preferencia.\n\nCon los siguientes datos:\nSerie de la factura: {serie}\nFolio de la factura: {folio}\nUUID de la factura: {uuid}\nRFC del emisor: {rfcEmisor}\nRFC del receptor: {rfcReceptor}\n\nAtentamente,\nEquipo de Facturación Cibercom`;
+        const bloqueProtegidoProcesado = configuracionCorreoService.procesarMensaje(porDefecto, {
+          facturaInfo,
+          serie: facturaInfo.split('-')[0] || 'A',
+          folio: facturaInfo.split('-')[1] || '1',
+          uuid: facturaUuid,
+          rfcEmisor: 'EEJ920629TE3',
+          rfcReceptor: rfcReceptor || ''
+        });
         setAsunto(`Factura Electrónica - ${facturaInfo}`);
-        setMensajeCorreo(`Estimado cliente,\n\nSe ha generado su factura electrónica con los siguientes datos:\n\nSerie de la factura: ${facturaInfo.split('-')[0] || 'A'}\nFolio de la factura: ${facturaInfo.split('-')[1] || '1'}\nUUID de la factura: ${facturaUuid}\n\nRFC del emisor: EEJ920629TE3\n\nPuede descargar su factura desde nuestro portal web.\n\nGracias por su preferencia.\n\nAtentamente,\nSistema de Facturación Cibercom`);
+        setMensajeCorreo(`${bloqueProtegidoProcesado}\n\n`);
       }
     } catch (error) {
       console.error('Error al cargar configuración predeterminada:', error);
-      // Usar valores por defecto en caso de error
+      // Fallback en caso de error
+      const porDefecto = `Estimado(a) cliente,\n\nSe ha generado su factura electrónica.\n\nGracias por su preferencia.\n\nCon los siguientes datos:\nSerie de la factura: {serie}\nFolio de la factura: {folio}\nUUID de la factura: {uuid}\nRFC del emisor: {rfcEmisor}\nRFC del receptor: {rfcReceptor}\n\nAtentamente,\nEquipo de Facturación Cibercom`;
+      const bloqueProtegidoProcesado = configuracionCorreoService.procesarMensaje(porDefecto, {
+        facturaInfo,
+        serie: facturaInfo.split('-')[0] || 'A',
+        folio: facturaInfo.split('-')[1] || '1',
+        uuid: facturaUuid,
+        rfcEmisor: 'EEJ920629TE3',
+        rfcReceptor: rfcReceptor || ''
+      });
       setAsunto(`Factura Electrónica - ${facturaInfo}`);
-      setMensajeCorreo(`Estimado cliente,\n\nSe ha generado su factura electrónica con los siguientes datos:\n\nSerie de la factura: ${facturaInfo.split('-')[0] || 'A'}\nFolio de la factura: ${facturaInfo.split('-')[1] || '1'}\nUUID de la factura: ${facturaUuid}\n\nRFC del emisor: EEJ920629TE3\n\nPuede descargar su factura desde nuestro portal web.\n\nGracias por su preferencia.\n\nAtentamente,\nSistema de Facturación Cibercom`);
+      setMensajeCorreo(`${bloqueProtegidoProcesado}\n\n`);
     } finally {
       setCargandoConfiguracion(false);
     }

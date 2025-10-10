@@ -4,6 +4,7 @@ import formatoCorreoService from './formatoCorreoService';
 export interface ConfiguracionMensaje {
   asunto: string;
   mensaje: string;
+  mensajePersonalizado?: string;
   esPersonalizado: boolean;
 }
 
@@ -41,6 +42,9 @@ class ConfiguracionCorreoService {
 
       const data = await response.json();
       
+      // Obtener el mensaje predeterminado (base) siempre
+      const mensajePredeterminado = await this.obtenerMensajePredeterminado();
+      
       // Si hay configuración personalizada, usarla; si no, usar la predeterminada
       let configuracion: ConfiguracionMensaje;
       
@@ -49,15 +53,15 @@ class ConfiguracionCorreoService {
         const personalizado = data.mensajesPersonalizados[0];
         configuracion = {
           asunto: personalizado.asunto || 'Factura Electrónica - {facturaInfo}',
-          mensaje: personalizado.mensaje || '',
+          mensaje: mensajePredeterminado.mensaje || '', // Mensaje base (protegido)
+          mensajePersonalizado: personalizado.mensaje || '', // Solo la parte personalizada
           esPersonalizado: true
         };
       } else {
-        // Obtener el mensaje predeterminado de la base de datos
-        const mensajePredeterminado = await this.obtenerMensajePredeterminado();
         configuracion = {
           asunto: mensajePredeterminado.asunto || 'Factura Electrónica - {facturaInfo}',
           mensaje: mensajePredeterminado.mensaje || '',
+          mensajePersonalizado: '', // Sin mensaje personalizado
           esPersonalizado: false
         };
       }
@@ -74,7 +78,7 @@ class ConfiguracionCorreoService {
         exitoso: true,
         configuracion: {
           asunto: 'Factura Electrónica - {facturaInfo}',
-          mensaje: 'Estimado cliente,\n\nSe ha generado su factura electrónica.\n\nGracias por su preferencia.\n\nAtentamente,\nSistema de Facturación Cibercom',
+          mensaje: 'Se ha generado su factura electrónica.\n\nGracias por su preferencia.',
           esPersonalizado: false
         }
       };
@@ -105,23 +109,10 @@ class ConfiguracionCorreoService {
       };
     } catch (error) {
       console.error('Error al obtener mensaje predeterminado:', error);
-      // Retornar mensaje predeterminado hardcodeado
+      // Retornar mensaje predeterminado hardcodeado más amigable
       return {
-        asunto: 'Factura Electrónica - {facturaInfo}',
-        mensaje: `Asunto: Factura Electrónica - {facturaInfo}
-Estimado cliente,
-Se ha generado su factura electrónica con los siguientes datos:
-Serie de la factura: {serie}
-Folio de la factura: {folio}
-UUID de la factura: {uuid}
-RFC del receptor: {rfcReceptor}
-
-Puede descargar su factura desde nuestro portal web.
-
-Gracias por su preferencia.
-
-Atentamente,
-Sistema de Facturación Cibercom`,
+        asunto: 'Factura Electrónica',
+        mensaje: 'Estimado cliente,\n\nSe ha generado su factura electrónica.\n\nTenga un buen día\n\nDatos de la factura\nSerie:\tEJEMPLO\nFolio:\tEJEMPLO\nUUID:\tEJEMPLO\nRFC Receptor:\tEJEMPLO\n\nGracias por su preferencia.\n\nAtentamente,\nEquipo de Facturación Cibercom',
         esPersonalizado: false
       };
     }
@@ -221,6 +212,7 @@ Sistema de Facturación Cibercom`,
     folio?: string;
     uuid?: string;
     rfcEmisor?: string;
+    rfcReceptor?: string;
   }): string {
     let mensaje = plantilla;
     
@@ -239,6 +231,9 @@ Sistema de Facturación Cibercom`,
     if (variables.rfcEmisor) {
       mensaje = mensaje.replace(/{rfcEmisor}/g, variables.rfcEmisor);
     }
+    if (variables.rfcReceptor) {
+      mensaje = mensaje.replace(/{rfcReceptor}/g, variables.rfcReceptor);
+    }
     
     return mensaje;
   }
@@ -252,6 +247,7 @@ Sistema de Facturación Cibercom`,
     folio?: string;
     uuid?: string;
     rfcEmisor?: string;
+    rfcReceptor?: string;
   }): Promise<string> {
     // Primero procesar las variables
     const mensajeProcesado = this.procesarMensaje(plantilla, variables);

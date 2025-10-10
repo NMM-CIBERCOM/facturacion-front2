@@ -95,11 +95,13 @@ export const InvoiceForm: React.FC = () => {
     facturaUuid: string;
     facturaInfo: string;
     correoInicial: string;
+    rfcReceptor: string;
   }>({
     isOpen: false,
     facturaUuid: '',
     facturaInfo: '',
-    correoInicial: ''
+    correoInicial: '',
+    rfcReceptor: ''
   });
   const { empresaInfo } = useEmpresa();
 
@@ -315,8 +317,9 @@ export const InvoiceForm: React.FC = () => {
               uuidFactura: data.uuid,
               correoReceptor: formData.correoElectronico,
               asunto: `Factura ${serieFactura || 'A'}${folioFactura || '1'} - ${empresaInfo?.nombre || 'Empresa'}`,
-              mensaje: `Estimado cliente,\n\nAdjunto encontrará su factura con folio fiscal ${data.uuid}.\n\nGracias por su preferencia.`,
-            });
+              mensaje: `Se ha generado su factura electrónica.\n\nGracias por su preferencia.`,
+
+              });
             
             if (correoResponse.success) {
               console.log('✅ Correo enviado con PDF adjunto');
@@ -405,7 +408,8 @@ export const InvoiceForm: React.FC = () => {
       isOpen: true,
       facturaUuid: factura.uuid,
       facturaInfo: factura.codigoFacturacion,
-      correoInicial: formData.correoElectronico || ''
+      correoInicial: formData.correoElectronico || '',
+      rfcReceptor: factura.rfc || formData.rfc || ''
     });
   };
 
@@ -414,7 +418,8 @@ export const InvoiceForm: React.FC = () => {
       isOpen: false,
       facturaUuid: '',
       facturaInfo: '',
-      correoInicial: ''
+      correoInicial: '',
+      rfcReceptor: ''
     });
   };
 
@@ -749,6 +754,7 @@ export const InvoiceForm: React.FC = () => {
         facturaUuid={modalCorreo.facturaUuid}
         facturaInfo={modalCorreo.facturaInfo}
         correoInicial={modalCorreo.correoInicial}
+        rfcReceptor={modalCorreo.rfcReceptor}
       />
     </div>
   );
