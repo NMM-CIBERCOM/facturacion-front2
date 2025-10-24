@@ -5,6 +5,7 @@ import { PlusCircleIcon, PencilSquareIcon, MagnifyingGlassIcon } from './icons';
 import { FormField } from './FormField';
 import { SelectField } from './SelectField';
 import { TIENDA_OPTIONS } from '../constants';
+import { setSessionCodigoTienda } from '../services/sessionService';
 
 
 interface Kiosco {
@@ -62,6 +63,9 @@ export const AdminKioscosPage: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    if (name === 'tienda') {
+      setSessionCodigoTienda(value);
+    }
     if (editingKiosco) {
         setEditingKiosco(prev => prev ? {...prev, [name]:value} : null);
     } else {
@@ -167,6 +171,7 @@ export const AdminKioscosPage: React.FC = () => {
                 value={filtroTienda}
                 onChange={(e) => {
                   setFiltroTienda(e.target.value);
+                  setSessionCodigoTienda(e.target.value);
                   setCurrentPage(1);
                 }}
                 options={[{ value: '', label: 'Todas las tiendas' }, ...TIENDA_OPTIONS]}

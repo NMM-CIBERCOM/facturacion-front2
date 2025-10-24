@@ -99,8 +99,8 @@ export const ConsultasFacturasPage: React.FC = () => {
   }, [refreshInterval]);
 
   // Estado del modal de cancelación
-  const [cancelModal, setCancelModal] = useState<{ open: boolean; uuid: string | null; motivo: string; loading: boolean; error?: string }>(
-    { open: false, uuid: null, motivo: '02', loading: false }
+  const [cancelModal, setCancelModal] = useState<{ open: boolean; uuid: string | null; motivo: string; loading: boolean; error?: string; uuidSustituto?: string }>(
+    { open: false, uuid: null, motivo: '02', loading: false, uuidSustituto: '' }
   );
 
   // Funciones para manejar selección de facturas
@@ -178,7 +178,7 @@ export const ConsultasFacturasPage: React.FC = () => {
   };
 
   const openCancelModal = (factura: Factura) => {
-    setCancelModal({ open: true, uuid: factura.uuid, motivo: '02', loading: false });
+    setCancelModal({ open: true, uuid: factura.uuid, motivo: '02', loading: false, uuidSustituto: '' });
   };
 
   const closeCancelModal = () => {
@@ -268,12 +268,19 @@ export const ConsultasFacturasPage: React.FC = () => {
     if (!cancelModal.uuid) return;
     try {
       setCancelModal(prev => ({ ...prev, loading: true, error: undefined }));
-      const payload = {
+      if (cancelModal.motivo === '01' && !(cancelModal.uuidSustituto || '').trim()) {
+        setCancelModal(prev => ({ ...prev, error: 'Motivo 01 requiere UUID sustituto', loading: false }));
+        return;
+      }
+      const payload: any = {
         uuid: cancelModal.uuid,
         motivo: cancelModal.motivo,
         usuario: formData.usuario || 'operador',
         perfilUsuario,
       };
+      if (cancelModal.motivo === '01') {
+        payload.uuidSustituto = (cancelModal.uuidSustituto || '').trim();
+      }
       const resp = await fetch('http://localhost:8080/api/consulta-facturas/cancelar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -441,7 +448,7 @@ export const ConsultasFacturasPage: React.FC = () => {
                     className="flex items-center space-x-2"
                   >
                     {descargandoZIP ? (
-                      <div className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                      <div className="h-4 w-4 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />
                     ) : (
                       <ArrowDownTrayIcon className="h-4 w-4" />
                     )}
@@ -588,13 +595,15 @@ export const ConsultasFacturasPage: React.FC = () => {
       )}
 
       {cancelModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={closeCancelModal} />
-          <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md p-6">
-            <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Cancelar factura</h4>
-            <div className="space-y-3">
+        <div className="fixed inset-0 bg-black/40 dark:bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Confirmar cancelación</h3>
+            <div className="mt-4 space-y-3">
+              <div className="text-sm text-gray-700 dark:text-gray-200">
+                <div><span className="font-medium">UUID:</span> {cancelModal.uuid}</div>
+              </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Motivo de cancelación</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Motivo</label>
                 <select
                   className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-900 dark:text-gray-100"
                   value={cancelModal.motivo}
@@ -606,6 +615,18 @@ export const ConsultasFacturasPage: React.FC = () => {
                   <option value="04">04 - Operación nominativa relacionada en factura global</option>
                 </select>
               </div>
+              {cancelModal.motivo === '01' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">UUID sustituto</label>
+                  <input
+                    type="text"
+                    className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-900 dark:text-gray-100"
+                    placeholder="Ingrese UUID del comprobante sustituto"
+                    value={cancelModal.uuidSustituto || ''}
+                    onChange={(e) => setCancelModal(prev => ({ ...prev, uuidSustituto: e.target.value }))}
+                  />
+                </div>
+              )}
               {cancelModal.error && (<div className="text-sm text-red-600 dark:text-red-400">{cancelModal.error}</div>)}
             </div>
             <div className="mt-6 flex justify-end space-x-3">

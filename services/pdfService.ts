@@ -37,6 +37,11 @@ export interface LogoConfig {
   customColors: CustomColors;
 }
 
+export interface NotaCreditoData extends FacturaData {
+  referenciaFactura?: string;
+  motivo?: string;
+}
+
 export class PDFService {
   private static instance: PDFService;
   
@@ -45,6 +50,20 @@ export class PDFService {
       PDFService.instance = new PDFService();
     }
     return PDFService.instance;
+  }
+
+  // Helper para formar la src del logo correctamente
+  private getLogoSrc(logoUrl?: string, logoBase64?: string): string {
+    if (logoBase64 && logoBase64.trim()) {
+      const v = logoBase64.trim();
+      // Si ya es un data URI, usarlo tal cual
+      if (/^data:image\//i.test(v)) {
+        return v;
+      }
+      // Si no tiene prefijo, asumir SVG (backend retorna SVG por defecto)
+      return `data:image/svg+xml;base64,${v}`;
+    }
+    return logoUrl || '/images/cibercom-logo.svg';
   }
 
   /**
@@ -73,6 +92,7 @@ export class PDFService {
    */
   private generarHTMLFactura(facturaData: FacturaData, logoConfig: LogoConfig): string {
     const { customColors, logoUrl, logoBase64 } = logoConfig;
+    const logoSrc = this.getLogoSrc(logoUrl, logoBase64);
     
     return `
       <!DOCTYPE html>
@@ -265,7 +285,7 @@ export class PDFService {
           <!-- Header -->
           <div class="header">
             <div class="logo-section">
-                  <img src="${logoBase64 ? `data:image/svg+xml;base64,${logoBase64}` : logoUrl}" alt="Logo" class="logo" />
+              <img src="${logoSrc}" alt="Logo" class="logo" />
             </div>
             <div class="factura-info">
               <div class="factura-titulo">FACTURA</div>
@@ -374,7 +394,7 @@ export class PDFService {
   /**
    * Convierte HTML a PDF usando html2pdf
    */
-  private async convertirHTMLaPDF(htmlContent: string): Promise<Blob> {
+  private async convertirHTMLaPDF(htmlContent: string, filename: string = 'factura.pdf'): Promise<Blob> {
     return new Promise((resolve, reject) => {
       // Crear un elemento temporal para el HTML
       const tempDiv = document.createElement('div');
@@ -387,7 +407,7 @@ export class PDFService {
         // Configuración para html2pdf
         const options = {
           margin: 10,
-          filename: 'factura.pdf',
+          filename,
           image: { type: 'jpeg', quality: 0.98 },
           html2canvas: { scale: 2, useCORS: true },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -486,6 +506,155 @@ export class PDFService {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  }
+
+  /**
+   * Genera un PDF de Nota de Crédito usando HTML y CSS
+   */
+  public async generarPDFNotaCredito(
+    notaData: NotaCreditoData,
+    logoConfig: LogoConfig
+  ): Promise<Blob> {
+    try {
+      const htmlContent = this.generarHTMLNotaCredito(notaData, logoConfig);
+      const pdf = await this.convertirHTMLaPDF(htmlContent, 'nota_credito.pdf');
+      return pdf;
+    } catch (error) {
+      console.error('Error generando PDF de Nota de Crédito:', error);
+      throw new Error('Error al generar el PDF de la nota de crédito');
+    }
+  }
+
+  /**
+   * Genera el HTML de la Nota de Crédito con estilos
+   */
+  private generarHTMLNotaCredito(notaData: NotaCreditoData, logoConfig: LogoConfig): string {
+    const { customColors, logoUrl, logoBase64 } = logoConfig;
+    const logoSrc = this.getLogoSrc(logoUrl, logoBase64);
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Nota de Crédito ${notaData.serie}-${notaData.folio}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: Arial, sans-serif; font-size: 12px; line-height: 1.4; color: #333; }
+          .factura-container { max-width: 800px; margin: 0 auto; padding: 20px; background: white; }
+          .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; border-bottom: 2px solid ${customColors.primary}; padding-bottom: 20px; }
+          .logo-section { flex: 1; }
+          .logo { max-width: 200px; max-height: 80px; object-fit: contain; }
+          .factura-info { flex: 1; text-align: right; }
+          .factura-titulo { font-size: 24px; font-weight: bold; color: ${customColors.primary}; margin-bottom: 10px; }
+          .factura-numero { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
+          .emisor-receptor { display: flex; justify-content: space-between; margin-bottom: 20px; }
+          .emisor, .receptor { flex: 1; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+          .emisor { margin-right: 15px; background-color: ${customColors.secondary}20; }
+          .receptor { margin-left: 15px; background-color: ${customColors.accent}20; }
+          .seccion-titulo { font-weight: bold; font-size: 14px; color: ${customColors.primary}; margin-bottom: 10px; border-bottom: 1px solid ${customColors.primary}; padding-bottom: 5px; }
+          .referencias { margin-bottom: 20px; padding: 10px; border: 1px dashed ${customColors.primary}; border-radius: 5px; background-color: #f8fafc; }
+          .conceptos-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+          .conceptos-table th { background-color: ${customColors.primary}; color: white; padding: 12px 8px; text-align: left; font-weight: bold; }
+          .conceptos-table td { padding: 10px 8px; border-bottom: 1px solid #ddd; }
+          .conceptos-table tr:nth-child(even) { background-color: #f9f9f9; }
+          .totales { float: right; width: 300px; margin-bottom: 30px; }
+          .totales-table { width: 100%; border-collapse: collapse; }
+          .totales-table td { padding: 8px 12px; border: 1px solid #ddd; }
+          .totales-table .label { background-color: ${customColors.secondary}; color: white; font-weight: bold; text-align: right; }
+          .totales-table .total-final { background-color: ${customColors.primary}; color: white; font-weight: bold; font-size: 14px; }
+          .text-right { text-align: right; }
+          .text-center { text-align: center; }
+        </style>
+      </head>
+      <body>
+        <div class="factura-container">
+          <div class="header">
+            <div class="logo-section">
+              <img src="${logoSrc}" alt="Logo" class="logo" />
+            </div>
+            <div class="factura-info">
+              <div class="factura-titulo">NOTA DE CRÉDITO</div>
+              <div class="factura-numero">${notaData.serie}-${notaData.folio}</div>
+              <div><strong>UUID:</strong> ${notaData.uuid || ''}</div>
+              <div><strong>Fecha:</strong> ${new Date(notaData.fechaEmision).toLocaleDateString('es-MX')}</div>
+              <div><strong>Tipo Comprobante:</strong> E</div>
+            </div>
+          </div>
+
+          <div class="emisor-receptor">
+            <div class="emisor">
+              <div class="seccion-titulo">EMISOR</div>
+              <div><strong>Nombre:</strong> ${notaData.nombreEmisor}</div>
+              <div><strong>RFC:</strong> ${notaData.rfcEmisor}</div>
+            </div>
+            <div class="receptor">
+              <div class="seccion-titulo">RECEPTOR</div>
+              <div><strong>Nombre:</strong> ${notaData.nombreReceptor}</div>
+              <div><strong>RFC:</strong> ${notaData.rfcReceptor}</div>
+            </div>
+          </div>
+
+          <div class="referencias">
+            ${notaData.referenciaFactura ? `<div><strong>Factura original:</strong> ${notaData.referenciaFactura}</div>` : ''}
+            ${notaData.motivo ? `<div><strong>Motivo:</strong> ${notaData.motivo}</div>` : ''}
+          </div>
+
+          <table class="conceptos-table">
+            <thead>
+              <tr>
+                <th>Descripción</th>
+                <th class="text-center">Cantidad</th>
+                <th class="text-center">Unidad</th>
+                <th class="text-right">Precio Unitario</th>
+                <th class="text-right">Importe</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${notaData.conceptos.map(concepto => `
+                <tr>
+                  <td>${concepto.descripcion}</td>
+                  <td class="text-center">${concepto.cantidad}</td>
+                  <td class="text-center">${concepto.unidad}</td>
+                  <td class="text-right">$${concepto.precioUnitario.toFixed(2)}</td>
+                  <td class="text-right">$${concepto.importe.toFixed(2)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <div class="totales">
+            <table class="totales-table">
+              <tr>
+                <td class="label">Subtotal:</td>
+                <td class="text-right">$${notaData.subtotal.toFixed(2)}</td>
+              </tr>
+              <tr>
+                <td class="label">IVA:</td>
+                <td class="text-right">$${notaData.iva.toFixed(2)}</td>
+              </tr>
+              ${notaData.ieps ? `
+                <tr>
+                  <td class="label">IEPS:</td>
+                  <td class="text-right">$${notaData.ieps.toFixed(2)}</td>
+                </tr>
+              ` : ''}
+              <tr>
+                <td class="label total-final">Total:</td>
+                <td class="text-right total-final">$${notaData.importe.toFixed(2)}</td>
+              </tr>
+            </table>
+          </div>
+
+          <div style="clear: both; margin-top: 20px;">
+            <div><strong>Método de Pago:</strong> ${notaData.metodoPago}</div>
+            <div><strong>Forma de Pago:</strong> ${notaData.formaPago}</div>
+            <div><strong>Uso CFDI:</strong> ${notaData.usoCFDI}</div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
   }
 }
 

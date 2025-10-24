@@ -5,6 +5,8 @@ import { Button } from './Button';
 import { ProtectedMessageEditor } from './ProtectedMessageEditor';
 import { configuracionCorreoService } from '../services/configuracionCorreoService';
 import formatoCorreoService from '../services/formatoCorreoService';
+import { LogoUploader } from './LogoUploader';
+import { logoService } from '../services/logoService';
 
 interface ConfiguracionCorreo {
   asunto: string;
@@ -56,6 +58,7 @@ export const ConfiguracionCorreoPage: React.FC = () => {
   const [guardando, setGuardando] = useState(false);
   const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState<{ tipo: 'success' | 'error'; texto: string } | null>(null);
+  const [logo, setLogo] = useState<string>(logoService.obtenerLogo());
 
   useEffect(() => {
     cargarConfiguraciones();
@@ -105,6 +108,21 @@ export const ConfiguracionCorreoPage: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    const initLogo = async () => {
+      const backendLogo = await logoService.obtenerLogoActivoBackend();
+      if (backendLogo && backendLogo.trim() !== '') {
+        setLogo(backendLogo);
+        // Mantener copia local para vista previa inmediata
+        logoService.guardarLogo(backendLogo);
+      } else {
+        const savedLogo = logoService.obtenerLogo();
+        setLogo(savedLogo);
+      }
+    };
+    initLogo();
+  }, []);
+
   // Función para combinar el mensaje protegido con el mensaje personalizado
   const combinarMensajes = () => {
     const personal = (configuracion.mensajePersonalizado || '').trim();
@@ -126,6 +144,23 @@ export const ConfiguracionCorreoPage: React.FC = () => {
     protegido = protegido.replace('{facturaInfo}', 'Serie: A, Folio: 1');
     
     return protegido;
+  };
+
+  const handleLogoChange = async (logoBase64: string) => {
+    setLogo(logoBase64);
+    if (logoBase64 && logoBase64.trim() !== '') {
+      logoService.guardarLogo(logoBase64);
+      try {
+        await logoService.guardarLogoBackend(logoBase64);
+      } catch (e) {
+        console.warn('No se pudo persistir logo en backend en cambio inmediato:', e);
+      }
+    } else {
+      logoService.eliminarLogo();
+      try {
+        await logoService.guardarLogoBackend('');
+      } catch {}
+    }
   };
 
   const handleGuardarConfiguracion = async () => {
@@ -169,6 +204,13 @@ export const ConfiguracionCorreoPage: React.FC = () => {
           id: formatoGuardadoId
         }
       });
+  
+      // 3) Persistir logo actual en backend para PDF
+      try {
+        await logoService.guardarLogoBackend(logo || '');
+      } catch (e) {
+        console.warn('No se pudo persistir logo en backend al guardar configuración:', e);
+      }
   
       if (responseMensaje.exitoso) {
         // Actualizar los originales para reflejar el guardado
@@ -246,6 +288,13 @@ export const ConfiguracionCorreoPage: React.FC = () => {
     );
   }
 
+  // Evita template literals complejos dentro del JSX para el bloque de mensaje
+  const mensajeClassNameBase = 'mt-4 p-3 rounded-md text-sm ';
+  const mensajeColorClass = mensaje?.tipo === 'success'
+    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+    : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+  const mensajeClassName = mensajeClassNameBase + mensajeColorClass;
+
   return (
     <div className="animate-fadeIn p-6">
       <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-6">
@@ -253,49 +302,51 @@ export const ConfiguracionCorreoPage: React.FC = () => {
       </h2>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Panel de configuración */}
-        <Card>
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-            Configurar Mensaje de Facturación
-          </h3>
-          
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Mensaje Principal (Datos de Factura - Protegido)
-              </label>
-              <ProtectedMessageEditor
-                value={configuracion.mensaje}
-                onChange={(value) => setConfiguracion({
-                  ...configuracion, 
-                  mensaje: value,
-                  esPersonalizado: true
-                })}
-                placeholder="Contenido del mensaje que se enviará con las facturas"
-                rows={6}
-                required
-                isProtected={true}
-                compact={true}
-              />
-            </div>
+        <div className="space-y-6">
+          <LogoUploader onLogoChange={handleLogoChange} initialLogo={logo} />
+          {/* Panel de configuración */}
+          <Card>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+              Configurar Mensaje de Facturación
+            </h3>
             
-            <div className="space-y-2 mt-4">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Mensaje Personalizado (Opcional)
-              </label>
-              <textarea
-                value={configuracion.mensajePersonalizado || ''}
-                onChange={(e) => setConfiguracion({
-                  ...configuracion, 
-                  mensajePersonalizado: e.target.value,
-                  esPersonalizado: true
-                })}
-                placeholder="Añada un mensaje personalizado (ej. Feliz Navidad, Felices Fiestas, etc.)"
-                rows={4}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-              />
-            </div>
-
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Mensaje Principal (Datos de Factura - Protegido)
+                </label>
+                <ProtectedMessageEditor
+                  value={configuracion.mensaje}
+                  onChange={(value) => setConfiguracion({
+                    ...configuracion, 
+                    mensaje: value,
+                    esPersonalizado: true
+                  })}
+                  placeholder="Contenido del mensaje que se enviará con las facturas"
+                  rows={6}
+                  required
+                  isProtected={true}
+                  compact={true}
+                />
+              </div>
+              
+              <div className="space-y-2 mt-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Mensaje Personalizado (Opcional)
+                </label>
+                <textarea
+                  value={configuracion.mensajePersonalizado || ''}
+                  onChange={(e) => setConfiguracion({
+                    ...configuracion, 
+                    mensajePersonalizado: e.target.value,
+                    esPersonalizado: true
+                  })}
+                  placeholder="Añada un mensaje personalizado (ej. Feliz Navidad, Felices Fiestas, etc.)"
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                />
+              </div>
+            
             {/* Selector de tipo de fuente */}
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -487,6 +538,53 @@ export const ConfiguracionCorreoPage: React.FC = () => {
               </div>
             </div>
 
+            {/* Selector de color de texto */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Color de texto
+              </label>
+              <div className="flex items-center space-x-3">
+                <input
+                  type="color"
+                  value={formatoCorreo.colorTexto || '#000000'}
+                  onChange={e => {
+                    const nuevo = {
+                      ...formatoCorreo,
+                      colorTexto: e.target.value
+                    };
+                    setFormatoCorreo(nuevo);
+                    const persistPromise = nuevo.id
+                      ? formatoCorreoService.actualizarConfiguracionFormato({
+                          id: nuevo.id,
+                          tipoFuente: nuevo.tipoFuente,
+                          tamanoFuente: nuevo.tamanoFuente,
+                          esCursiva: nuevo.esCursiva,
+                          esSubrayado: nuevo.esSubrayado,
+                          colorTexto: nuevo.colorTexto,
+                          activo: true
+                        })
+                      : formatoCorreoService.guardarConfiguracionFormato({
+                          tipoFuente: nuevo.tipoFuente,
+                          tamanoFuente: nuevo.tamanoFuente,
+                          esCursiva: nuevo.esCursiva,
+                          esSubrayado: nuevo.esSubrayado,
+                          colorTexto: nuevo.colorTexto,
+                          activo: true
+                        });
+                    persistPromise
+                      .then(resp => {
+                        if (resp?.exitoso && resp.configuracion?.id) {
+                          setFormatoCorreo(prev => ({ ...prev, id: resp.configuracion!.id }));
+                        }
+                      })
+                      .catch(err => console.error('Error al guardar color de texto:', err));
+                  }}
+                  className="w-16 h-10 p-1 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700"
+                />
+                <span className="text-xs text-gray-500 dark:text-gray-400">{formatoCorreo.colorTexto}</span>
+              </div>
+            </div>
+
             <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
               <span className={`inline-block w-2 h-2 rounded-full ${configuracion.esPersonalizado ? 'bg-blue-500' : 'bg-green-500'}`}></span>
               <span>
@@ -529,8 +627,10 @@ export const ConfiguracionCorreoPage: React.FC = () => {
             </Button>
           </div>
         </Card>
+        </div>
 
         {/* Panel de vista previa */}
+        <div className="space-y-6">
         <Card>
           <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
             Vista Previa del Mensaje
@@ -568,14 +668,11 @@ export const ConfiguracionCorreoPage: React.FC = () => {
             </div>
           </div>
         </Card>
+        </div>
       </div>
 
       {mensaje && (
-        <div className={`mt-4 p-3 rounded-md text-sm ${
-          mensaje.tipo === 'success' 
-            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-        }`}>
+        <div className={mensajeClassName}>
           {mensaje.texto}
         </div>
       )}

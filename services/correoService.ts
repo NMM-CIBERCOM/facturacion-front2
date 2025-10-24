@@ -31,10 +31,28 @@ export interface EnvioCorreoPdfRequest {
   asunto: string;
   mensaje: string;
   cuerpo?: string;
+  // Nuevo: logo base64 opcional para branding del PDF
+  logoBase64?: string;
 }
 
+export interface EnvioPdfDirectoRequest {
+  pdfBase64: string;
+  correoReceptor: string;
+  asunto: string;
+  mensaje: string;
+  nombreAdjunto?: string;
+  cuerpo?: string;
+  templateVars?: Record<string, string>;
+  // Nuevo: XML opcional
+  xmlBase64?: string;
+  nombreAdjuntoXml?: string;
+}
+
+import { apiUrl } from './api';
+import { logoService } from './logoService';
+
 class CorreoService {
-  private baseUrl = 'http://localhost:8080/api/correo';
+  private baseUrl = apiUrl('/correo');
 
   /**
    * Envía correo de factura por UUID
@@ -119,14 +137,21 @@ class CorreoService {
    */
   async enviarCorreoConPdfAdjunto(request: EnvioCorreoPdfRequest): Promise<CorreoResponse> {
     try {
+      // Incluir logoBase64 desde localStorage si no viene en el request
+      const storedLogo = logoService.obtenerLogo();
+      const logoBase64 = request.logoBase64 && request.logoBase64.trim().length > 0
+        ? request.logoBase64
+        : (storedLogo || '');
+
       // Asignar mensaje a cuerpo para compatibilidad con el backend
       const requestData = {
         ...request,
         cuerpo: request.mensaje,
-        mensaje: request.mensaje // Asegurar que ambos campos tengan el mismo valor
+        mensaje: request.mensaje,
+        logoBase64,
       };
       
-      console.log('Enviando solicitud de correo con PDF:', JSON.stringify(requestData, null, 2));
+      console.log('Enviando solicitud de correo con PDF:', JSON.stringify({ ...requestData, mensaje: '[omitted]', cuerpo: '[omitted]' }, null, 2));
       
       const response = await fetch(`${this.baseUrl}/enviar-con-pdf`, {
         method: 'POST',
@@ -144,6 +169,38 @@ class CorreoService {
       return await response.json();
     } catch (error) {
       console.error('Error al enviar correo con PDF adjunto:', error);
+      throw error;
+    }
+  }
+  /**
+   * Envía PDF directo por correo (sin UUID)
+   */
+  async enviarPdfDirecto(request: EnvioPdfDirectoRequest): Promise<CorreoResponse> {
+    try {
+      const requestData = {
+        ...request,
+        cuerpo: request.mensaje,
+        templateVars: request.templateVars || {},
+        xmlBase64: request.xmlBase64 || undefined,
+        nombreAdjuntoXml: request.nombreAdjuntoXml || undefined,
+      };
+      console.log('Enviando solicitud de correo con PDF directo:', JSON.stringify({ ...requestData, mensaje: '[omitted]', cuerpo: '[omitted]' }, null, 2));
+      const response = await fetch(`${this.baseUrl}/enviar-pdf-directo`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error HTTP: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error al enviar PDF directo:', error);
       throw error;
     }
   }

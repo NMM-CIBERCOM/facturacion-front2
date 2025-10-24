@@ -45,8 +45,8 @@ export const NAV_ITEMS: NavItem[] = [
     icon: DocumentTextIcon,
     children: [
       { label: 'Artículos', path: 'facturacion-articulos', icon: CubeIcon },
-      { label: 'Intereses', path: 'facturacion-intereses', icon: CurrencyDollarIcon },
-      { label: 'Carta Factura', path: 'facturacion-carta', icon: DocumentTextIcon },
+      { label: 'Notas de crédito', path: 'facturacion-intereses', icon: CurrencyDollarIcon },
+      { label: 'Carta Porte', path: 'facturacion-carta-porte', icon: DocumentTextIcon },
       { label: 'Captura Libre', path: 'facturacion-captura', icon: ChevronDoubleRightIcon },
       { label: 'Factura Global', path: 'facturacion-global', icon: DocumentTextIcon },
       { label: 'Cancelación Masiva', path: 'facturacion-cancelacion', icon: StopIcon },

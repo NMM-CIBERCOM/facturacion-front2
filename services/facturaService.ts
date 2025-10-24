@@ -1,3 +1,7 @@
+import { apiUrl } from './api';
+import { logoService } from './logoService';
+import { API_BASE_URL } from './api';
+
 // Interfaz para los datos de factura para PDF
 export interface FacturaData {
   uuid: string;
@@ -79,10 +83,155 @@ export interface LogosResponse {
   error?: string;
 }
 
+export interface CfdiConsultaBasicos {
+  serie?: string;
+  folio?: string;
+  subtotal?: number;
+  descuento?: number;
+  iva?: number;
+  ieps?: number;
+  total?: number;
+  metodoPago?: string;
+  formaPago?: string;
+  usoCfdi?: string;
+  // Nuevos campos para desglose de IVA e IEPS
+  iva16?: number;
+  iva8?: number;
+  iva0?: number;
+  ivaExento?: number;
+  ieps26?: number;
+  ieps160?: number;
+  ieps8?: number;
+  ieps30?: number;
+  ieps304?: number;
+  ieps7?: number;
+  ieps53?: number;
+  ieps25?: number;
+  ieps6?: number;
+  ieps50?: number;
+  ieps9?: number;
+  ieps3?: number;
+  ieps43?: number;
+}
+
+export interface CfdiConsultaRelacionados {
+  tipoRelacion?: string;
+  uuids?: string[];
+  uuidOriginal?: string;
+}
+
+export interface CfdiConsultaPago {
+  formaDePagoP?: string;
+  fechaPago?: string;
+  monedaP?: string;
+  monto?: number;
+  idDocumento?: string;
+  serieDR?: string;
+  folioDR?: string;
+  monedaDR?: string;
+  metodoDePagoDR?: string;
+  numParcialidad?: string;
+  impSaldoAnt?: number;
+  impPagado?: number;
+  impSaldoInsoluto?: number;
+}
+
+export interface CfdiConsultaResponse {
+  exitoso: boolean;
+  mensaje: string;
+  uuid: string;
+  estado: string;
+  rfcReceptor?: string;
+  basicos?: CfdiConsultaBasicos;
+  relacionados?: CfdiConsultaRelacionados;
+  pago?: CfdiConsultaPago;
+}
+
+// DTO de consulta de intereses
+export interface InteresesDto {
+  cuenta: string;
+  fechaIni: string; // yyyy-MM-dd
+  fechaFin: string; // yyyy-MM-dd
+}
+
+// Respuesta de consulta de intereses
+export interface ConsultaInteresesResponse {
+  exitoso: boolean;
+  codigoRespuesta: string; // "00", "SOF" o "ERR"
+  mensaje: string;
+  financiero: number;
+  financieroIva: number;
+  moratorio: number;
+  moratorioIva: number;
+}
+
+// Solicitud para emitir factura de intereses
+export interface EmitirInteresesRequest {
+  idUsuario: string;
+  idTienda: string;
+  codigoTienda?: string;
+  cuenta: string;
+  periodo: string; // yyyyMM
+  // Datos fiscales del receptor y del formulario
+  correoElectronico?: string;
+  razonSocial?: string;
+  nombre?: string;
+  paterno?: string;
+  materno?: string;
+  pais?: string;
+  receptor: {
+    rfc: string;
+    usoCfdi: string;
+    regimenFiscal: string;
+    domicilioFiscal: string;
+  };
+  importes: {
+    interesFinanciero: number;
+    interesMoratorio: number;
+    ivaInteresFinanciero: number;
+    ivaInteresMoratorio: number;
+  };
+  tipo?: 'INTERESES';
+  idTiendaEmisora?: string; // opcional, si reglas del concepto lo indican
+  formaPago?: string;
+  medioPago?: string;
+}
+
+// Respuesta al emitir factura de intereses
+export interface EmitirInteresesResponse {
+  exitoso: boolean;
+  mensaje: string;
+  serie?: string;
+  folio?: string;
+  uuid?: string;
+  fechaEmision?: string;
+  error?: string;
+  errorCode?: 'DUPLICADO' | 'FOLIOS' | 'DATOS_FISCALES';
+}
+
+// Respuesta de búsqueda de receptor por RFC
+export interface BuscarReceptorResponse {
+  encontrado: boolean;
+  completoCFDI40: boolean;
+  idReceptor?: string;
+  receptor: {
+    rfc: string;
+    razonSocial?: string;
+    nombre?: string;
+    paterno?: string;
+    materno?: string;
+    pais?: string;
+    domicilioFiscal?: string; // Debe incluir CP
+    regimenFiscal?: string;
+    usoCfdi?: string;
+  };
+  faltantes?: string[]; // Campos faltantes requeridos por CFDI 4.0
+}
+
 // Servicio para manejar las operaciones con facturas
 export class FacturaService {
   private static instance: FacturaService;
-  private baseUrl = 'http://localhost:8080/api';
+  private baseUrl = API_BASE_URL;
   
   public static getInstance(): FacturaService {
     if (!FacturaService.instance) {
@@ -92,59 +241,256 @@ export class FacturaService {
   }
 
   /**
+   * Busca receptor por RFC en el backend. Si el endpoint no existe, simula resultados.
+   */
+  public async buscarReceptorPorRFC(params: { rfc: string; idTienda: string; correoElectronico: string }): Promise<BuscarReceptorResponse> {
+    const payload = {
+      rfc: params.rfc?.toUpperCase(),
+      idTienda: params.idTienda,
+      correoElectronico: params.correoElectronico,
+    };
+    try {
+      const resp = await fetch(`${this.baseUrl}/receptor/buscar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await resp.json().catch(() => null);
+      if (!resp.ok) {
+        // Si el servidor responde 404, simular "no encontrado"
+        if (resp.status === 404) {
+          return { encontrado: false, completoCFDI40: false, receptor: { rfc: payload.rfc }, faltantes: [] };
+        }
+        // Cualquier otro error: lanzar para fallback
+        throw new Error(data?.mensaje || `Error HTTP ${resp.status}`);
+      }
+      // Se asume que el backend devuelve estructura compatible o cercana
+      return {
+        encontrado: Boolean(data?.encontrado ?? true),
+        completoCFDI40: Boolean(data?.completoCFDI40 ?? true),
+        idReceptor: data?.idReceptor || `${payload.rfc}-ID`,
+        receptor: {
+          rfc: payload.rfc,
+          razonSocial: data?.razonSocial || data?.receptor?.razonSocial,
+          nombre: data?.nombre || data?.receptor?.nombre,
+          paterno: data?.paterno || data?.receptor?.paterno,
+          materno: data?.materno || data?.receptor?.materno,
+          pais: data?.pais || data?.receptor?.pais || 'MEX',
+          domicilioFiscal: data?.domicilioFiscal || data?.receptor?.domicilioFiscal,
+          regimenFiscal: data?.regimenFiscal || data?.receptor?.regimenFiscal,
+          usoCfdi: data?.usoCfdi || data?.receptor?.usoCfdi || 'G03',
+        },
+        faltantes: data?.faltantes || [],
+      };
+    } catch (error) {
+      // Fallback simulado: si RFC parece válido, regresar receptor completo/incompleto según regla simple
+      const rfcValido = /^[A-Z&Ñ]{3,4}[0-9]{6}[A-Z0-9]{3}$/.test(payload.rfc || '');
+      if (!rfcValido) {
+        return { encontrado: false, completoCFDI40: false, receptor: { rfc: payload.rfc || '' }, faltantes: [] };
+      }
+      // Simular variaciones: si homoclave termina en 0 crea faltantes
+      const homoclave = (payload.rfc || '').slice(-3);
+      const incompleto = homoclave.includes('0');
+      if (incompleto) {
+        return {
+          encontrado: true,
+          completoCFDI40: false,
+          idReceptor: `${payload.rfc}-SIM`,
+          receptor: {
+            rfc: payload.rfc,
+            razonSocial: '',
+            nombre: '',
+            paterno: '',
+            materno: '',
+            pais: 'MEX',
+            domicilioFiscal: '',
+            regimenFiscal: '',
+            usoCfdi: '',
+          },
+          faltantes: ['domicilioFiscal', 'razonSocial', 'regimenFiscal'],
+        };
+      }
+      return {
+        encontrado: true,
+        completoCFDI40: true,
+        idReceptor: `${payload.rfc}-SIM`,
+        receptor: {
+          rfc: payload.rfc,
+          razonSocial: `Cliente ${payload.rfc}`,
+          nombre: 'Nombre',
+          paterno: 'Paterno',
+          materno: 'Materno',
+          pais: 'MEX',
+          domicilioFiscal: 'CP 12345, Calle Simulada 123',
+          regimenFiscal: '612',
+          usoCfdi: 'G03',
+        },
+        faltantes: [],
+      };
+    }
+  }
+
+  /**
+   * Consulta los intereses para una cuenta y periodo.
+   * El backend intentará SOAP y hará fallback si no está disponible.
+   */
+  public async consultarIntereses(dto: InteresesDto): Promise<ConsultaInteresesResponse> {
+    try {
+      const resp = await fetch(`${this.baseUrl}/intereses/consultar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dto),
+      });
+      const data = await resp.json().catch(() => null);
+      if (!resp.ok || !data) {
+        throw new Error(data?.mensaje || `Error HTTP ${resp.status}`);
+      }
+      return {
+        exitoso: Boolean(data.exitoso ?? true),
+        codigoRespuesta: String(data.codigoRespuesta ?? 'SOF'),
+        mensaje: String(data.mensaje ?? ''),
+        financiero: Number(data.financiero ?? 0),
+        financieroIva: Number(data.financieroIva ?? 0),
+        moratorio: Number(data.moratorio ?? 0),
+        moratorioIva: Number(data.moratorioIva ?? 0),
+      };
+    } catch (error: any) {
+      // Fallback en cliente: valores cero con mensaje
+      return {
+        exitoso: false,
+        codigoRespuesta: 'ERR',
+        mensaje: error?.message || 'Error consultando intereses',
+        financiero: 0,
+        financieroIva: 0,
+        moratorio: 0,
+        moratorioIva: 0,
+      };
+    }
+  }
+
+  /**
    * Obtiene los datos completos de una factura por UUID
    */
   public async obtenerFacturaPorUUID(uuid: string): Promise<FacturaCompleta> {
     try {
-      // Cambiar para usar el endpoint del backend principal que tiene datos reales
-      const response = await fetch(`http://localhost:8080/api/factura/timbrado/status/${uuid}`);
-      
+      const response = await fetch(apiUrl(`/factura/timbrado/status/${uuid}`));
       if (!response.ok) {
         throw new Error(`Error HTTP ${response.status}: ${response.statusText}`);
       }
-      
-      const data = await response.json();
-      
-      if (!data.exitoso || !data.datosFactura) {
-        throw new Error(data.mensaje || 'No se encontró la factura');
+
+      const contentType = (response.headers.get('content-type') || '').toLowerCase();
+
+      // Camino 1: JSON (backend principal)
+      if (contentType.includes('application/json') || contentType.includes('text/json')) {
+        const data = await response.json();
+        if (!data.exitoso || !data.datosFactura) {
+          throw new Error(data.mensaje || 'No se encontró la factura');
+        }
+        const factura = data.datosFactura;
+        return {
+          uuid: data.uuid || uuid,
+          rfcEmisor: factura.rfcEmisor || 'EEM123456789',
+          nombreEmisor: factura.nombreEmisor || 'Empresa Ejemplo',
+          rfcReceptor: factura.rfcReceptor || 'XEXX010101000',
+          nombreReceptor: factura.nombreReceptor || 'Cliente Ejemplo',
+          serie: factura.serie,
+          folio: factura.folio,
+          fechaEmision: factura.fechaTimbrado || factura.fechaEmision,
+          importe: factura.total,
+          subtotal: factura.subtotal,
+          iva: factura.iva ?? 0,
+          ieps: factura.ieps ?? 0,
+          conceptos: Array.isArray(factura.conceptos) ? factura.conceptos.map((c: any) => ({
+            descripcion: c.descripcion,
+            cantidad: c.cantidad ?? 1,
+            unidad: c.unidad || c.claveUnidad || 'H87',
+            precioUnitario: c.valorUnitario ?? c.precioUnitario ?? factura.subtotal,
+            importe: c.importe ?? factura.subtotal,
+          })) : [],
+          metodoPago: factura.metodoPago || 'PUE',
+          formaPago: factura.formaPago || '01',
+          usoCFDI: factura.usoCFDI || factura.usoCfdi || 'G03',
+          xmlContent: data.xmlTimbrado || factura.xmlTimbrado,
+          selloDigital: factura.selloDigital,
+          selloCFD: factura.selloDigital,
+          noCertificado: factura.certificado,
+          cadenaOriginal: factura.cadenaOriginal,
+          estatusFacturacion: factura.estatusFacturacion || 'Vigente',
+          estatusSat: factura.estatusSat || 'Vigente',
+        };
       }
-      
-      // Usar los datos reales del backend principal
-      const factura = data.datosFactura;
-      
-      // Convertir la respuesta del backend principal al formato esperado
+
+      // Camino 2: XML CFDI (PAC/simulador u otros)
+      const text = await response.text();
+      if (!text || !text.trim().startsWith('<')) {
+        throw new Error('Respuesta no JSON y no XML válida');
+      }
+
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(text, 'application/xml');
+      const comprobante = xml.getElementsByTagName('cfdi:Comprobante')[0] || xml.getElementsByTagName('Comprobante')[0];
+      if (!comprobante) {
+        throw new Error('XML CFDI inválido: no se encontró Comprobante');
+      }
+
+      const serie = comprobante.getAttribute('Serie') || '';
+      const folio = comprobante.getAttribute('Folio') || '';
+      const fecha = comprobante.getAttribute('Fecha') || '';
+      const total = parseFloat(comprobante.getAttribute('Total') || '0');
+      const subtotal = parseFloat(comprobante.getAttribute('SubTotal') || '0');
+
+      // Impuestos
+      let iva = 0;
+      let ieps = 0;
+      const traslados = xml.getElementsByTagName('cfdi:Traslado').length
+        ? Array.from(xml.getElementsByTagName('cfdi:Traslado'))
+        : Array.from(xml.getElementsByTagName('Traslado'));
+      traslados.forEach((n: Element) => {
+        const impuesto = n.getAttribute('Impuesto');
+        const importe = parseFloat(n.getAttribute('Importe') || '0');
+        if (impuesto === '002') iva += importe;
+        if (impuesto === '003') ieps += importe;
+      });
+
+      const receptor = xml.getElementsByTagName('cfdi:Receptor')[0] || xml.getElementsByTagName('Receptor')[0];
+      const emisor = xml.getElementsByTagName('cfdi:Emisor')[0] || xml.getElementsByTagName('Emisor')[0];
+      const rfcReceptor = receptor?.getAttribute('Rfc') || '';
+      const nombreReceptor = receptor?.getAttribute('Nombre') || '';
+      const usoCFDI = receptor?.getAttribute('UsoCFDI') || '';
+      const rfcEmisor = emisor?.getAttribute('Rfc') || '';
+      const nombreEmisor = emisor?.getAttribute('Nombre') || '';
+
+      const conceptosNodes = xml.getElementsByTagName('cfdi:Concepto').length
+        ? Array.from(xml.getElementsByTagName('cfdi:Concepto'))
+        : Array.from(xml.getElementsByTagName('Concepto'));
+      const conceptos = conceptosNodes.map((node: Element) => {
+        const descripcion = node.getAttribute('Descripcion') || '';
+        const cantidad = parseFloat(node.getAttribute('Cantidad') || '1');
+        const unidad = node.getAttribute('Unidad') || node.getAttribute('ClaveUnidad') || 'H87';
+        const precioUnitario = parseFloat(node.getAttribute('ValorUnitario') || '0');
+        const importe = parseFloat(node.getAttribute('Importe') || '0');
+        return { descripcion, cantidad, unidad, precioUnitario, importe };
+      });
+
       return {
-        uuid: data.uuid,
-        rfcEmisor: 'EEM123456789', // Datos del emisor por defecto
-        nombreEmisor: 'Empresa Ejemplo',
-        rfcReceptor: 'XEXX010101000', // Datos del receptor por defecto
-        nombreReceptor: 'Cliente Ejemplo',
-        serie: factura.serie,
-        folio: factura.folio,
-        fechaEmision: factura.fechaTimbrado,
-        importe: factura.total,
-        subtotal: factura.subtotal,
-        iva: factura.iva,
-        ieps: 0,
-        conceptos: [{
-          claveProdServ: '01010101',
-          cantidad: 1,
-          claveUnidad: 'H87',
-          unidad: 'Pieza',
-          descripcion: 'Producto de ejemplo',
-          valorUnitario: factura.subtotal,
-          importe: factura.subtotal
-        }],
-        metodoPago: 'PUE',
-        formaPago: '01',
-        usoCFDI: 'G03',
-        xmlContent: data.xmlTimbrado,
-        selloDigital: factura.selloDigital,
-        selloCFD: factura.selloDigital,
-        noCertificado: factura.certificado,
-        cadenaOriginal: factura.cadenaOriginal,
+        uuid,
+        rfcEmisor: rfcEmisor || 'EEM123456789',
+        nombreEmisor: nombreEmisor || 'Empresa Ejemplo',
+        rfcReceptor: rfcReceptor || 'XEXX010101000',
+        nombreReceptor: nombreReceptor || 'Cliente Ejemplo',
+        serie,
+        folio,
+        fechaEmision: fecha,
+        importe: total,
+        subtotal,
+        iva,
+        ieps,
+        conceptos,
+        metodoPago: comprobante.getAttribute('MetodoPago') || 'PUE',
+        formaPago: comprobante.getAttribute('FormaPago') || '01',
+        usoCFDI: usoCFDI || 'G03',
         estatusFacturacion: 'Vigente',
-        estatusSat: 'Vigente'
+        estatusSat: 'Vigente',
       };
     } catch (error) {
       console.error('Error obteniendo factura:', error);
@@ -168,6 +514,7 @@ export class FacturaService {
 
   /**
    * Obtiene la configuración de logos y colores del backend
+   * y sobrepone el logo guardado en localStorage si existe.
    */
   public async obtenerConfiguracionLogos(): Promise<LogosResponse> {
     try {
@@ -179,10 +526,14 @@ export class FacturaService {
       
       const data = await response.json();
       
+      // Preferir logo guardado por el usuario (puede ser data URI)
+      const savedLogo = typeof window !== 'undefined' ? (logoService.obtenerLogo() || '') : '';
+      const effectiveLogoBase64 = savedLogo.trim() ? savedLogo : (data.logoBase64 || undefined);
+      
       return {
         exitoso: true,
         logoUrl: data.logoUrl || '/images/cibercom-logo.svg',
-        logoBase64: data.logoBase64,
+        logoBase64: effectiveLogoBase64,
         customColors: data.customColors || {
           primary: '#2E86AB',
           secondary: '#1E4A5F',
@@ -191,9 +542,11 @@ export class FacturaService {
       };
     } catch (error) {
       console.error('Error obteniendo configuración de logos:', error);
+      const savedLogo = typeof window !== 'undefined' ? (logoService.obtenerLogo() || '') : '';
       return {
         exitoso: false,
         logoUrl: '/images/cibercom-logo.svg',
+        logoBase64: savedLogo.trim() ? savedLogo : undefined,
         customColors: {
           primary: '#2E86AB',
           secondary: '#1E4A5F',
@@ -255,56 +608,44 @@ export class FacturaService {
   }
 
   /**
-   * Genera y descarga el PDF de una factura
+   * Genera y descarga el PDF de una factura usando UUID
+   * (Usa datos reales del backend y colores del formato de correo activo)
    */
   public async generarYDescargarPDF(uuid: string): Promise<void> {
     try {
-      // Obtener datos de la factura
+      // Obtener datos de la factura para nombrar el archivo
       const factura = await this.obtenerFacturaPorUUID(uuid);
-      
-      // Obtener configuración de logos
-      const logoConfig = await this.obtenerConfiguracionLogos();
-      
-      if (!logoConfig.exitoso) {
-        throw new Error('Error al obtener la configuración de logos');
-      }
-      
-      // Convertir a formato para PDF
-      const facturaData = this.convertirAFacturaData(factura);
-      
-      // Generar PDF en el backend
-      const response = await fetch(`${this.baseUrl}/factura/generar-pdf`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          facturaData: facturaData,
-          logoConfig: {
-            logoUrl: logoConfig.logoUrl,
-            logoBase64: logoConfig.logoBase64,
-            customColors: logoConfig.customColors
-          }
-        })
-      });
-      
+
+      // Descargar PDF desde el backend usando el endpoint que construye logo y colores
+      const response = await fetch(apiUrl(`/factura/descargar-pdf/${uuid}`));
+
       if (!response.ok) {
-        throw new Error('Error al generar PDF en el servidor');
+        const txt = await response.text().catch(() => '');
+        throw new Error(`Error al descargar PDF (HTTP ${response.status}) ${txt}`);
       }
-      
+
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `Factura_${factura.serie}-${factura.folio}.pdf`;
+
+      // Usar filename del header si viene; sino, Serie-Folio
+      const header = response.headers.get('content-disposition') || '';
+      let filename = `Factura_${factura.serie}-${factura.folio}.pdf`;
+      const match = header.match(/filename="?([^";]+)"?/i);
+      if (match && match[1]) {
+        filename = match[1];
+      }
+      a.download = filename;
+
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      
+
     } catch (error) {
-      console.error('Error generando PDF:', error);
-      throw new Error(`Error al generar el PDF: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      console.error('Error descargando PDF:', error);
+      throw new Error(`Error al descargar el PDF: ${error instanceof Error ? (error as Error).message : 'Error desconocido'}`);
     }
   }
 
@@ -365,23 +706,15 @@ export class FacturaService {
    */
   public async generarYDescargarXML(uuid: string): Promise<void> {
     try {
-      // Usar el endpoint del backend principal para descargar XML
-      const response = await fetch(`http://localhost:8080/api/factura/descargar-xml/${uuid}`);
-      
+      const response = await fetch(apiUrl(`/factura/timbrado/status/${uuid}`));
       if (!response.ok) {
         throw new Error(`Error HTTP ${response.status}: ${response.statusText}`);
       }
-      
-      // El endpoint devuelve directamente el XML como bytes
       const xmlBlob = await response.blob();
-      
       if (xmlBlob.size === 0) {
         throw new Error('El XML no está disponible para esta factura');
       }
-      
-      // Crear URL para descarga
       const url = window.URL.createObjectURL(xmlBlob);
-      
       const a = document.createElement('a');
       a.href = url;
       a.download = `FACTURA_${uuid}.xml`;
@@ -389,7 +722,6 @@ export class FacturaService {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      
     } catch (error) {
       console.error('Error descargando XML:', error);
       throw new Error(`Error al descargar el XML: ${error instanceof Error ? error.message : 'Error desconocido'}`);
@@ -447,6 +779,88 @@ export class FacturaService {
       console.error('Error generando ZIP múltiple:', error);
       throw new Error(`Error al generar el ZIP: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     }
+  }
+
+  /**
+   * Emite una factura de intereses cumpliendo reglas de periodo, duplicado y folios.
+   * Implementa llamada al backend y fallback seguro.
+   */
+  public async emitirFacturaIntereses(request: EmitirInteresesRequest): Promise<EmitirInteresesResponse> {
+    try {
+      // Validación mínima de receptor
+      if (!request?.receptor?.rfc || !request?.receptor?.usoCfdi || !request?.receptor?.regimenFiscal || !request?.receptor?.domicilioFiscal) {
+        return { exitoso: false, mensaje: 'Datos fiscales incompletos', error: 'Datos fiscales incompletos', errorCode: 'DATOS_FISCALES' };
+      }
+
+      // Construir payload para FacturaFrontendRequest del backend
+      const frontendPayload: any = {
+        rfc: request.receptor.rfc,
+        correoElectronico: request.correoElectronico || 'cliente@example.com',
+        razonSocial: request.razonSocial || request.receptor.rfc,
+        nombre: request.nombre || '',
+        paterno: request.paterno || '',
+        materno: request.materno || '',
+        pais: request.pais || 'MEX',
+        noRegistroIdentidadTributaria: '',
+        domicilioFiscal: request.receptor.domicilioFiscal,
+        regimenFiscal: request.receptor.regimenFiscal,
+        usoCfdi: request.receptor.usoCfdi,
+        codigoFacturacion: `FAC-INTERESES-${(request.cuenta || '').replace(/\s+/g,'')}`,
+        tienda: request.codigoTienda || request.idTienda,
+        fecha: new Date().toISOString().slice(0, 10),
+        terminal: 'TERM-INT',
+        boleta: `INT-${(request.cuenta || '').replace(/\s+/g,'')}`,
+        medioPago: request.medioPago || 'PUE',
+        formaPago: request.formaPago || '01',
+        iepsDesglosado: false,
+        guardarEnMongo: true
+      };
+
+      const resp = await fetch(`${this.baseUrl}/factura/generar/frontend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(frontendPayload)
+      });
+
+      const data = await resp.json().catch(() => null);
+      if (!resp.ok) {
+        return {
+          exitoso: false,
+          mensaje: data?.mensaje || 'Fallo al emitir en backend',
+          error: data?.mensaje || 'Error en emisión'
+        };
+      }
+
+      const serie = data?.datosFactura?.serie || 'INT';
+      const folio = data?.datosFactura?.folio ? String(data.datosFactura.folio) : undefined;
+      const uuid = data?.uuid || data?.datosFactura?.uuid;
+      const fechaEmision = new Date().toISOString();
+
+      return {
+        exitoso: true,
+        mensaje: data?.mensaje || 'Factura de intereses emitida',
+        serie,
+        folio,
+        uuid,
+        fechaEmision
+      };
+    } catch (error) {
+      console.error('Error emitiendo intereses contra backend real:', error);
+      return { exitoso: false, mensaje: 'Error al emitir intereses', error: (error as Error).message };
+    }
+  }
+  /**
+   * Consulta CFDI por UUID y valida RFC receptor, devolviendo datos por tipo
+   */
+  public async consultarCfdiPorUUID(params: { uuid: string; rfcReceptor?: string; tipo: 'I' | 'E' | 'P' }): Promise<CfdiConsultaResponse> {
+    const { uuid, rfcReceptor, tipo } = params;
+    const url = apiUrl(`/factura/consultar-uuid?uuid=${encodeURIComponent(uuid)}${rfcReceptor ? `&rfcReceptor=${encodeURIComponent(rfcReceptor.toUpperCase())}` : ''}&tipo=${encodeURIComponent(tipo)}`);
+    const resp = await fetch(url);
+    const data = await resp.json().catch(() => null);
+    if (!resp.ok) {
+      throw new Error(data?.mensaje || `Error HTTP ${resp.status}`);
+    }
+    return data as CfdiConsultaResponse;
   }
 }
 

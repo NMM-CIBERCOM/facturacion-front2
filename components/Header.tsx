@@ -30,15 +30,23 @@ export const Header: React.FC<HeaderProps> = ({
       const nombreEmpleado = localStorage.getItem('nombreEmpleado');
       const perfilData = localStorage.getItem('perfil');
       
-      if (nombreEmpleado && perfilData) {
-        try {
-          const perfil = JSON.parse(perfilData);
-          setCurrentUser({
-            name: nombreEmpleado,
-            perfil: perfil.nombrePerfil
-          });
-        } catch (error) {
-          console.error('Error parsing perfil data:', error);
+      if (nombreEmpleado) {
+        // Evitar parsear valores inválidos guardados como string
+        const invalidPerfilValues = [undefined, null, 'undefined', 'null', ''];
+        const looksJsonObject = typeof perfilData === 'string' && perfilData.trim().startsWith('{');
+        if (perfilData && !invalidPerfilValues.includes(perfilData as any) && looksJsonObject) {
+          try {
+            const perfil = JSON.parse(perfilData);
+            setCurrentUser({
+              name: nombreEmpleado,
+              perfil: perfil?.nombrePerfil || 'Sin perfil'
+            });
+          } catch {
+            // No ensuciar la consola con errores si el formato no es JSON válido
+            setCurrentUser({ name: nombreEmpleado, perfil: 'Sin perfil' });
+          }
+        } else {
+          // Si no hay perfil almacenado o no es JSON, mostrar nombre y perfil genérico
           setCurrentUser({ name: nombreEmpleado, perfil: 'Sin perfil' });
         }
       }
