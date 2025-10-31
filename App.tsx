@@ -4,14 +4,13 @@ import { Header } from './components/Header';
 import { MainContent } from './components/MainContent';
 import { InvoiceForm } from './components/InvoiceForm'; // Facturacion Articulos
 import { LoginPage } from './components/LoginPage';
-import { NAV_ITEMS, DEFAULT_USER, DEFAULT_COLORS, DUMMY_CREDENTIALS } from './constants';
+import { TwoFactorAuthPage } from './components/TwoFactorAuthPage';
+import { NAV_ITEMS, DEFAULT_USER, DEFAULT_COLORS } from './constants';
 import type { Theme, CustomColors, User } from './types';
 
 // Icons
 import { SunIcon } from './components/icons/SunIcon';
 import { MoonIcon } from './components/icons/MoonIcon';
-import CubeIcon from './components/icons/CubeIcon';
-import { HomeIcon } from './components/icons/HomeIcon';
 
 // Page Components
 import { DashboardPage } from './components/DashboardPage';
@@ -59,6 +58,15 @@ import { ReportesFiscalesRepsSustituidosPage } from './components/ReportesFiscal
 import { ConfiguracionTemasPage } from './components/ConfiguracionTemasPage';
 import { ConfiguracionEmpresaPage } from './components/ConfiguracionEmpresaPage';
 import { ConfiguracionCorreoPage } from './components/ConfiguracionCorreoPage';
+import ConfiguracionMenusPage from './components/ConfiguracionMenusPage';
+
+// Registro CFDI Pages
+import RegistroCFDIPage from './components/RegistroCFDIPage';
+
+// Nuevos Reportes Pages
+import ReporteConsultaMonederosPage from './components/ReporteConsultaMonederosPage';
+import ReporteVentasMaquinaCorporativasPage from './components/ReporteVentasMaquinaCorporativasPage';
+import ReporteRegimenFacturacionNoMismaBoletaPage from './components/ReporteRegimenFacturacionNoMismaBoletaPage';
 
 // Monitor Pages
 import { MonitorGraficasPage } from './components/MonitorGraficasPage';
@@ -67,15 +75,9 @@ import { MonitorPermisosPage } from './components/MonitorPermisosPage';
 import { MonitorDisponibilidadPage } from './components/MonitorDisponibilidadPage';
 import { MonitorLogsPage } from './components/MonitorLogsPage';
 import { MonitorDecodificadorPage } from './components/MonitorDecodificadorPage';
-import { ProfileSelectorPage } from './components/ProfileSelectorPage';
 import TestPdfPage from './components/TestPdfPage';
 import ITextPdfTest from './components/ITextPdfTest';
 
-const PROFILE_OPTIONS = [
-  "Administrador",
-  "Jefe de Credito",
-  "Operador de Credito",
-];
 
 interface EmpresaInfo {
   nombre: string;
@@ -120,9 +122,17 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   // Quitamos setCurrentUser para evitar warning porque no se usa
   const [currentUser] = useState<User>(DEFAULT_USER);
+  
+  // Estados para 2FA
+  const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
+  const [twoFactorData, setTwoFactorData] = useState<{
+    username: string;
+    sessionToken: string;
+    qrCodeUrl?: string;
+    secretKey?: string;
+  } | null>(null);
 
   const [activePage, setActivePage] = useState<string>('Dashboard');
-  const [activePageIcon, setActivePageIcon] = useState<React.FC<React.SVGProps<SVGSVGElement>>>(() => HomeIcon);
 
   const [customColors, setCustomColors] = useState<CustomColors>(() => {
     const storedColors = localStorage.getItem('customColors');
@@ -135,6 +145,11 @@ const App: React.FC = () => {
   });
 
   const [profileSelected, setProfileSelected] = useState<string | null>(() => {
+    const perfilData = localStorage.getItem('perfil');
+    if (perfilData) {
+      const perfil = JSON.parse(perfilData);
+      return perfil.nombrePerfil;
+    }
     return localStorage.getItem('profileSelected');
   });
 
@@ -146,6 +161,23 @@ const App: React.FC = () => {
       const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
       setTheme(prefersDark ? 'dark' : 'light');
     }
+
+    // Inicializar favicon al cargar la aplicación (usa el mismo logo que el sistema)
+    const updateFavicon = () => {
+      let favicon = document.querySelector('link[rel="icon"]') as HTMLLinkElement;
+      
+      if (!favicon) {
+        favicon = document.createElement('link');
+        favicon.rel = 'icon';
+        document.head.appendChild(favicon);
+      }
+      
+      const storedLogo = localStorage.getItem('logoUrl');
+      // Usar el mismo logo del sistema como favicon
+      favicon.href = storedLogo || '/images/cibercom-logo.svg';
+    };
+    
+    updateFavicon();
   }, []);
 
   useEffect(() => {
@@ -170,15 +202,26 @@ const App: React.FC = () => {
 
   useEffect(() => {
     localStorage.setItem('logoUrl', logoUrl);
+    
+    // Actualizar el favicon cuando cambia el logo del sistema
+    const updateFavicon = () => {
+      let favicon = document.querySelector('link[rel="icon"]') as HTMLLinkElement;
+      
+      if (!favicon) {
+        favicon = document.createElement('link');
+        favicon.rel = 'icon';
+        document.head.appendChild(favicon);
+      }
+      
+      favicon.href = logoUrl;
+    };
+    
+    updateFavicon();
   }, [logoUrl]);
 
   useEffect(() => {
     if (isAuthenticated) {
-      const dashboardItem = NAV_ITEMS.find(item => item.label === 'Dashboard');
-      if (dashboardItem) {
-        setActivePage(dashboardItem.label);
-        setActivePageIcon(() => dashboardItem.icon as React.FC<React.SVGProps<SVGSVGElement>>);
-      }
+      setActivePage('Dashboard');
     }
   }, [isAuthenticated]);
 
@@ -190,29 +233,8 @@ const App: React.FC = () => {
     setIsSidebarOpen((prev) => !prev);
   }, []);
 
-  const handleNavItemClick = useCallback(
-  (label: string, icon?: React.FC<React.SVGProps<SVGSVGElement>>) => {
+  const handleNavItemClick = useCallback((label: string) => {
     setActivePage(label);
-
-    if (icon && typeof icon === 'function') {
-      setActivePageIcon(() => icon);
-    } else {
-      const allItems = NAV_ITEMS.flatMap(i =>
-        i.children ? [i, ...i.children] : [i]
-      );
-      const found = allItems.find(i => i.label === label);
-
-      if (found && typeof found.icon === 'function') {
-        setActivePageIcon(() => found.icon);
-      } else {
-        const topLevel = NAV_ITEMS.find(i => i.label === label);
-        if (topLevel && typeof topLevel.icon === 'function') {
-          setActivePageIcon(() => topLevel.icon);
-        } else {
-          setActivePageIcon(() => CubeIcon); // fallback seguro
-        }
-      }
-    }
 
     if (window.innerWidth < 768) {
       setIsSidebarOpen(false);
@@ -238,22 +260,38 @@ const App: React.FC = () => {
       const data = await response.json();
       
       if (data.success && data.usuario) {
+        // Verificar si requiere 2FA
+        if (data.requiresTwoFactor) {
+          console.log('Login exitoso, pero requiere 2FA');
+          setTwoFactorData({
+            username: usernameInput,
+            sessionToken: data.token,
+            qrCodeUrl: data.qrCodeUrl,
+            secretKey: data.secretKey
+          });
+          setRequiresTwoFactor(true);
+          return true; // Login exitoso, pero pendiente de 2FA
+        }
+        
+        // Login completo sin 2FA
         localStorage.setItem('isAuthenticated', 'true');
         localStorage.setItem('username', data.usuario.noUsuario);
         localStorage.setItem('nombreEmpleado', data.usuario.nombreEmpleado);
-        localStorage.setItem('perfil', JSON.stringify(data.usuario.perfil));
+        localStorage.setItem('perfil', JSON.stringify({
+          idPerfil: data.usuario.idPerfil,
+          nombrePerfil: data.usuario.nombrePerfil
+        }));
         
         setIsAuthenticated(true);
-        setProfileSelected(data.usuario.perfil.nombrePerfil);
+        setProfileSelected(data.usuario.nombrePerfil);
+        
+        console.log('Login successful:', {
+          usuario: data.usuario.noUsuario,
+          nombrePerfil: data.usuario.nombrePerfil,
+          idPerfil: data.usuario.idPerfil
+        });
 
-        const dashboardItem = NAV_ITEMS.find(item => item.label === 'Dashboard');
-        if (dashboardItem) {
-          setActivePage(dashboardItem.label);
-          setActivePageIcon(() => dashboardItem.icon as React.FC<React.SVGProps<SVGSVGElement>>);
-        } else {
-          setActivePage('Dashboard');
-          setActivePageIcon(() => HomeIcon);
-        }
+        setActivePage('Dashboard');
 
         if (window.innerWidth >= 768) {
           setIsSidebarOpen(true);
@@ -269,6 +307,64 @@ const App: React.FC = () => {
     }
   }, []);
 
+  const handleTwoFactorVerify = useCallback(async (code: string, sessionToken: string): Promise<boolean> => {
+    try {
+      const response = await fetch('http://localhost:8080/api/auth/2fa/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: twoFactorData?.username,
+          code: code,
+          sessionToken: sessionToken
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.usuario) {
+        // 2FA verificado exitosamente
+        localStorage.setItem('isAuthenticated', 'true');
+        localStorage.setItem('username', data.usuario.noUsuario);
+        localStorage.setItem('nombreEmpleado', data.usuario.nombreEmpleado);
+        localStorage.setItem('perfil', JSON.stringify({
+          idPerfil: data.usuario.idPerfil,
+          nombrePerfil: data.usuario.nombrePerfil
+        }));
+        
+        setIsAuthenticated(true);
+        setProfileSelected(data.usuario.nombrePerfil);
+        setRequiresTwoFactor(false);
+        setTwoFactorData(null);
+        
+        console.log('2FA verification successful:', {
+          usuario: data.usuario.noUsuario,
+          nombrePerfil: data.usuario.nombrePerfil,
+          idPerfil: data.usuario.idPerfil
+        });
+
+        setActivePage('Dashboard');
+
+        if (window.innerWidth >= 768) {
+          setIsSidebarOpen(true);
+        }
+        return true;
+      } else {
+        console.error('2FA verification failed:', data.message);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error durante la verificación 2FA:', error);
+      return false;
+    }
+  }, [twoFactorData]);
+
+  const handleTwoFactorCancel = useCallback(() => {
+    setRequiresTwoFactor(false);
+    setTwoFactorData(null);
+  }, []);
+
   const handleLogout = useCallback(() => {
     localStorage.removeItem('isAuthenticated');
     localStorage.removeItem('profileSelected');
@@ -277,32 +373,238 @@ const App: React.FC = () => {
     localStorage.removeItem('perfil');
     setIsAuthenticated(false);
     setProfileSelected(null);
+    setRequiresTwoFactor(false);
+    setTwoFactorData(null);
     setActivePage('Dashboard');
-    setActivePageIcon(() => HomeIcon);
   }, []);
 
-  const handleProfileSelect = (profile: string) => {
-    setProfileSelected(profile);
-    localStorage.setItem('profileSelected', profile);
+
+  const [menuConfig, setMenuConfig] = useState<any[]>([]);
+  const [pantallasConfig, setPantallasConfig] = useState<any[]>([]);
+
+  // Logs para rastrear actualizaciones de estado
+  useEffect(() => {
+    console.log('*** menuConfig state updated ***', menuConfig.length, menuConfig);
+  }, [menuConfig]);
+
+  useEffect(() => {
+    console.log('*** pantallasConfig state updated ***', pantallasConfig.length, pantallasConfig);
+  }, [pantallasConfig]);
+
+  // Cargar configuración de menús desde la base de datos
+  const cargarConfiguracionMenus = async () => {
+    console.log('=== cargarConfiguracionMenus INICIADO ===');
+    console.log('profileSelected:', profileSelected);
+    
+    if (!profileSelected) {
+      console.log('❌ No hay profileSelected, saliendo');
+      return;
+    }
+    
+    try {
+      // Obtener el ID del perfil desde el localStorage o desde la respuesta del login
+      const perfilData = localStorage.getItem('perfil');
+      console.log('perfilData from localStorage:', perfilData);
+      
+      if (!perfilData) {
+        console.log('❌ No hay perfilData en localStorage, saliendo');
+        return;
+      }
+      
+      const perfil = JSON.parse(perfilData);
+      const idPerfil = perfil.idPerfil;
+      console.log('idPerfil extraído:', idPerfil);
+      
+      // Cargar pestañas principales (sin MENU_PATH)
+      const urlPestañas = `http://localhost:8080/api/menu-config/perfil/${idPerfil}`;
+      console.log('🔗 Llamando a:', urlPestañas);
+      
+      const responsePestañas = await fetch(urlPestañas);
+      console.log('📡 Response pestañas status:', responsePestañas.status);
+      
+      if (!responsePestañas.ok) {
+        console.error('❌ Error en response pestañas:', responsePestañas.status, responsePestañas.statusText);
+        throw new Error('Error al cargar configuración de pestañas');
+      }
+      
+      const pestañasData = await responsePestañas.json();
+      console.log('📊 pestañasData recibido:', pestañasData);
+      
+      const pestañasPrincipales = pestañasData.filter((item: any) => !item.menuPath);
+      console.log('🎯 pestañasPrincipales filtradas:', pestañasPrincipales);
+      setMenuConfig(pestañasPrincipales);
+
+      // Cargar pantallas específicas (con MENU_PATH)
+      const urlPantallas = `http://localhost:8080/api/menu-config/pantallas/${idPerfil}`;
+      console.log('🔗 Llamando a:', urlPantallas);
+      
+      const responsePantallas = await fetch(urlPantallas);
+      console.log('📡 Response pantallas status:', responsePantallas.status);
+      
+      if (!responsePantallas.ok) {
+        console.error('❌ Error en response pantallas:', responsePantallas.status, responsePantallas.statusText);
+        throw new Error('Error al cargar configuración de pantallas');
+      }
+      
+      const pantallasData = await responsePantallas.json();
+      console.log('📊 pantallasData recibido:', pantallasData);
+      setPantallasConfig(pantallasData);
+      
+      console.log('✅ cargarConfiguracionMenus COMPLETADO');
+    } catch (error) {
+      console.error('❌ Error al cargar configuración de menús:', error);
+      // Si hay error, usar configuración por defecto
+      setMenuConfig([]);
+      setPantallasConfig([]);
+    } finally {
+      // Loading state handled
+    }
   };
 
+  // Asegurar que profileSelected se actualice desde localStorage al cargar la página
+  useEffect(() => {
+    if (isAuthenticated) {
+      const perfilData = localStorage.getItem('perfil');
+      if (perfilData) {
+        const perfil = JSON.parse(perfilData);
+        if (perfil.nombrePerfil !== profileSelected) {
+          console.log('🔄 Actualizando profileSelected desde localStorage:', perfil.nombrePerfil);
+          setProfileSelected(perfil.nombrePerfil);
+        }
+      }
+    }
+  }, [isAuthenticated, profileSelected]);
+
+  useEffect(() => {
+    if (isAuthenticated && profileSelected) {
+      cargarConfiguracionMenus();
+    }
+  }, [isAuthenticated, profileSelected]);
+
   const getFilteredNavItems = () => {
-    if (profileSelected === "Administrador") {
-      return NAV_ITEMS; // Muestra todo
+    console.log('=== getFilteredNavItems called ===');
+    console.log('profileSelected:', profileSelected);
+    console.log('menuConfig.length:', menuConfig.length);
+    console.log('pantallasConfig.length:', pantallasConfig.length);
+    console.log('menuConfig:', menuConfig);
+    console.log('pantallasConfig:', pantallasConfig);
+
+    // Si no hay configuración cargada, usar configuración por defecto
+    if (menuConfig.length === 0) {
+      console.log('⚠️ USANDO CONFIGURACIÓN POR DEFECTO - No hay menuConfig cargado');
+      let filteredItems = NAV_ITEMS;
+      
+      // Verificar si es administrador por ID de perfil (más confiable)
+      const perfilData = localStorage.getItem('perfil');
+      const isAdmin = perfilData ? JSON.parse(perfilData).idPerfil === 3 : false;
+      
+      if (isAdmin || profileSelected === "Administrador" || profileSelected?.toLowerCase().includes("admin")) {
+        console.log('Usuario identificado como administrador');
+        return NAV_ITEMS; // Muestra todo
+      }
+      // Para operadores y jefes de crédito, solo mostrar secciones clave
+      if (profileSelected === "Operador de Credito" || profileSelected?.toLowerCase().includes("operador")) {
+        filteredItems = NAV_ITEMS.filter(item =>
+          item.label === "Dashboard" || ["Facturación", "Consultas", "Reportes Facturación Fiscal", "Registro CFDI"].includes(item.label)
+        );
+      }
+      if (profileSelected === "Jefe de Credito" || profileSelected?.toLowerCase().includes("jefe")) {
+        filteredItems = NAV_ITEMS.filter(item =>
+          item.label === "Dashboard" || ["Facturación", "Consultas", "Reportes Facturación Fiscal", "Administración", "Registro CFDI"].includes(item.label)
+        );
+      }
+      
+      return filteredItems;
     }
-    // Para operadores y jefes de crédito, solo mostrar secciones clave
-    if (profileSelected === "Operador de Credito") {
-      return NAV_ITEMS.filter(item =>
-        ["Facturación", "Consultas", "Reportes Facturación Fiscal"].includes(item.label)
-      );
-    }
-    if (profileSelected === "Jefe de Credito") {
-      return NAV_ITEMS.filter(item =>
-        ["Facturación", "Consultas", "Reportes Facturación Fiscal", "Administración"].includes(item.label)
-      );
-    }
-    // Por defecto, muestra todo
-    return NAV_ITEMS;
+
+    // Usar configuración dinámica de la base de datos
+    const menuLabelsVisibles = menuConfig
+      .filter(config => config.isVisible)
+      .map(config => config.menuLabel);
+
+    // Obtener pantallas visibles por pestaña
+    const pantallasVisibles = pantallasConfig
+      .filter(pantalla => pantalla.isVisible)
+      .map(pantalla => pantalla.menuLabel);
+
+    console.log('=== FILTRADO DE MENÚS ===');
+    console.log('Menu labels visibles:', menuLabelsVisibles);
+    console.log('Pantallas visibles:', pantallasVisibles);
+    console.log('Total pantallas configuradas:', pantallasConfig.length);
+    console.log('Pantallas habilitadas:', pantallasConfig.filter(p => p.isVisible).length);
+    console.log('Pantallas deshabilitadas:', pantallasConfig.filter(p => !p.isVisible).length);
+    
+    // Debug: Mostrar algunas pantallas específicas para depuración
+    console.log('🔍 Pantallas de Facturación:', pantallasConfig.filter(p => p.menuLabel === 'Artículos' || p.menuLabel === 'Intereses'));
+    console.log('🔍 Pantallas de Consultas:', pantallasConfig.filter(p => p.menuLabel === 'Facturas' || p.menuLabel === 'SKU'));
+
+    const filteredItems = NAV_ITEMS.map(item => {
+      // Dashboard siempre debe estar visible para todos los perfiles
+      if (item.label === 'Dashboard') {
+        console.log(`Dashboard: SIEMPRE VISIBLE`);
+        return item;
+      }
+      
+      // Filtrar elementos principales
+      if (menuLabelsVisibles.includes(item.label)) {
+        console.log(`Pestaña ${item.label}: VISIBLE`);
+        
+        // Si es un elemento con children, filtrar también los children
+        if (item.children) {
+          const filteredChildren = item.children.filter(child => {
+            // Solo administradores pueden ver la configuración de menús
+            if (child.label === "Configuración de Menús") {
+              const perfilData = localStorage.getItem('perfil');
+              const isAdmin = perfilData ? JSON.parse(perfilData).idPerfil === 3 : false;
+              const canSee = isAdmin || profileSelected === "Administrador" || profileSelected?.toLowerCase().includes("admin");
+              console.log(`Configuración de Menús: ${canSee ? 'VISIBLE' : 'OCULTO'} (admin: ${isAdmin})`);
+              return canSee;
+            }
+            
+            // Para administradores, las pantallas de Configuración siempre son visibles
+            if (item.label === "Configuración") {
+              const perfilData = localStorage.getItem('perfil');
+              const isAdmin = perfilData ? JSON.parse(perfilData).idPerfil === 3 : false;
+              if (isAdmin || profileSelected === "Administrador" || profileSelected?.toLowerCase().includes("admin")) {
+                console.log(`Pantalla ${child.label} (Configuración): SIEMPRE VISIBLE para admin`);
+                return true;
+              }
+            }
+            
+            // Filtrar pantallas específicas basándose en la configuración de la base de datos
+            const isVisible = pantallasVisibles.includes(child.label);
+            console.log(`Pantalla ${child.label}: ${isVisible ? 'VISIBLE' : 'OCULTO'} (está en pantallasVisibles: ${pantallasVisibles.includes(child.label)})`);
+            return isVisible;
+          });
+          
+          console.log(`Pestaña ${item.label}: ${filteredChildren.length} pantallas visibles de ${item.children.length} total`);
+          console.log(`Pantallas filtradas para ${item.label}:`, filteredChildren.map(c => c.label));
+          
+          const filteredItem = {
+            ...item,
+            children: filteredChildren
+          };
+          console.log(`Retornando pestaña ${item.label} con ${filteredChildren.length} children:`, filteredChildren.map(c => c.label));
+          return filteredItem;
+        }
+        return item;
+      } else {
+        console.log(`Pestaña ${item.label}: OCULTA`);
+        return null; // Marcar como null para filtrar después
+      }
+    }).filter(item => item !== null); // Filtrar los elementos null
+
+    console.log('=== RESULTADO FINAL ===');
+    console.log('Items filtrados:', filteredItems.length);
+    filteredItems.forEach(item => {
+      if (item.children) {
+        console.log(`${item.label}: ${item.children.length} pantallas`);
+        console.log(`  Pantallas de ${item.label}:`, item.children.map(c => c.label));
+      }
+    });
+
+    console.log('🎯 ARRAY FINAL QUE SE PASA AL SIDEBAR:', filteredItems);
+    return filteredItems;
   };
 
   if (!isAuthenticated) {
@@ -313,13 +615,22 @@ const App: React.FC = () => {
     );
   }
 
-  if (!profileSelected) {
+  if (requiresTwoFactor && twoFactorData) {
     return (
       <ThemeContext.Provider value={{ theme, toggleTheme, customColors, setCustomColors, logoUrl, setLogoUrl }}>
-        <ProfileSelectorPage profiles={PROFILE_OPTIONS} onSelect={handleProfileSelect} />
+        <TwoFactorAuthPage 
+          onVerify={handleTwoFactorVerify}
+          onCancel={handleTwoFactorCancel}
+          username={twoFactorData.username}
+          sessionToken={twoFactorData.sessionToken}
+          qrCodeUrl={twoFactorData.qrCodeUrl}
+          secretKey={twoFactorData.secretKey}
+        />
       </ThemeContext.Provider>
     );
   }
+
+  // Eliminamos el selector de perfil estático - ahora se maneja dinámicamente
 
   const renderPageContent = () => {
     // Dashboard
@@ -368,6 +679,15 @@ const App: React.FC = () => {
     if (activePage === 'Temas') return <ConfiguracionTemasPage />;
     if (activePage === 'Empresa') return <ConfiguracionEmpresaPage />;
     if (activePage === 'Mensajes de Correo') return <ConfiguracionCorreoPage />;
+    if (activePage === 'Configuración de Menús') return <ConfiguracionMenusPage />;
+
+    // Registro CFDI
+    if (activePage === 'Registro de Constancias') return <RegistroCFDIPage />;
+
+    // Nuevos Reportes
+    if (activePage === 'Reporte de Consulta Monederos') return <ReporteConsultaMonederosPage />;
+    if (activePage === 'Reporte de Ventas Máquina Corporativas Serely Polu') return <ReporteVentasMaquinaCorporativasPage />;
+    if (activePage === 'Régimen de Facturación No Misma Boleta') return <ReporteRegimenFacturacionNoMismaBoletaPage />;
 
     // Monitor
     if (activePage === 'Gráficas') return <MonitorGraficasPage />;
@@ -424,7 +744,7 @@ const App: React.FC = () => {
                 }
               />
               <ErrorBoundary>
-                <MainContent pageTitle={activePage} PageIcon={activePageIcon}>
+                <MainContent pageTitle={activePage}>
                   {renderPageContent()}
                 </MainContent>
               </ErrorBoundary>

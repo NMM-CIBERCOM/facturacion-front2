@@ -1,8 +1,10 @@
 // src/components/MonitorLogsPage.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Card } from './Card';
 import { SelectField } from './SelectField';
 import { Button } from './Button';
+import LogPreviewModal from './LogPreviewModal';
+import DirectoryPickerModal from './DirectoryPickerModal';
 
 // --- Icono de Descarga (Componente interno) ---
 const DownloadIcon: React.FC<{ className?: string }> = ({ className }) => (
@@ -11,16 +13,20 @@ const DownloadIcon: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
+// --- Icono de Vista Previa (Ojo) ---
+const EyeIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" className={className || 'h-6 w-6'} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+
 // --- Opciones para los Selectores ---
 const DIRECTORY_OPTIONS = [ { value: 'server_logs', label: 'Logs del servidor' } ];
 const LINES_OPTIONS = [ { value: 'all', label: 'Todas' }, { value: '100', label: 'Últimas 100' } ];
 const ITEMS_PER_PAGE_OPTIONS = [ { value: '15', label: '15' }, { value: '25', label: '25' }, { value: '50', label: '50' } ];
 
-// --- Datos de ejemplo ---
-const mockLogFiles = Array.from({ length: 35 }, (_, i) => ({
-  id: i + 1,
-  name: i < 2 ? (i === 0 ? 'fact_server.log' : 'server.log') : `server.log.2024-12-${18 - i}`,
-}));
+type ListedFile = { name: string; relative: string; size: number; modified: number };
 
 interface MonitorFilters {
   directory: string;
@@ -37,6 +43,14 @@ export const MonitorLogsPage: React.FC = () => {
   });
   
   const [currentPage, setCurrentPage] = useState(1);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewFile, setPreviewFile] = useState<string>('');
+  const [baseDir, setBaseDir] = useState<string>(() => localStorage.getItem('logsBaseDir') || '');
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [files, setFiles] = useState<ListedFile[]>([]);
+  const [loadingFiles, setLoadingFiles] = useState(false);
+  const [errorFiles, setErrorFiles] = useState<string | null>(null);
+  const apiBase = (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_URL) ? (import.meta as any).env.VITE_API_URL : '';
   
   const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -49,19 +63,59 @@ export const MonitorLogsPage: React.FC = () => {
   const paginatedLogs = useMemo(() => {
     const lastIndex = currentPage * parseInt(filters.itemsPerPage);
     const firstIndex = lastIndex - parseInt(filters.itemsPerPage);
-    return mockLogFiles.slice(firstIndex, lastIndex);
-  }, [currentPage, filters.itemsPerPage]);
+    return files.slice(firstIndex, lastIndex);
+  }, [currentPage, filters.itemsPerPage, files]);
   
-  const totalPages = Math.ceil(mockLogFiles.length / parseInt(filters.itemsPerPage));
+  const totalPages = Math.max(1, Math.ceil(files.length / parseInt(filters.itemsPerPage)));
 
-  const handleDownload = (fileName: string) => {
-    alert(`Iniciando descarga de: ${fileName}`);
+  const handleDownload = (fileRel: string) => {
+    const baseParam = baseDir ? `&baseDir=${encodeURIComponent(baseDir)}` : '';
+    const url = `${apiBase}/api/logs/download?file=${encodeURIComponent(fileRel)}${baseParam}`;
+    window.open(url, '_blank');
+  };
+
+  const handlePreview = (fileName: string) => {
+    setPreviewFile(fileName);
+    setPreviewOpen(true);
   };
   
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
     }
+  };
+
+  const loadFiles = () => {
+    if (!baseDir) { setFiles([]); return; }
+    setLoadingFiles(true); setErrorFiles(null);
+    fetch(`${apiBase}/api/logs/list?baseDir=${encodeURIComponent(baseDir)}`)
+      .then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json(); })
+      .then(data => { setFiles(data.files || []); setCurrentPage(1); })
+      .catch(e => setErrorFiles(e.message || 'No se pudieron cargar los logs'))
+      .finally(() => setLoadingFiles(false));
+  };
+
+  useEffect(() => { loadFiles(); }, [baseDir]);
+
+  useEffect(() => {
+    // Si no hay baseDir guardado, intenta leer el que usa el backend
+    if (!baseDir) {
+      fetch(`${apiBase}/api/logs/config`).then(r => r.text()).then(t => {
+        // formato: yml=...\nsysprop=...\nenv=...\neffective=...
+        const match = t.match(/effective=(.*)/);
+        const eff = match?.[1]?.trim();
+        if (eff) {
+          setBaseDir(eff);
+          localStorage.setItem('logsBaseDir', eff);
+        }
+      }).catch(() => {});
+    }
+  }, []);
+
+  const handleSaveBaseDir = () => {
+    localStorage.setItem('logsBaseDir', baseDir);
+    // feedback mínimo
+    alert('Directorio de logs establecido');
   };
 
   return (
@@ -80,9 +134,58 @@ export const MonitorLogsPage: React.FC = () => {
             onChange={handleFilterChange} 
             options={ITEMS_PER_PAGE_OPTIONS} 
           />
+          <div className="col-span-1 md:col-span-2 lg:col-span-4">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ruta base de logs (servidor)</label>
+            <div className="flex gap-3 items-center">
+              <input
+                type="text"
+                value={baseDir}
+                readOnly
+                placeholder="C:/cibercom/logs"
+                className="flex-1 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={async () => {
+                  try {
+                    const resp = await fetch(`${apiBase}/api/logs/pick-dir?start=${encodeURIComponent(baseDir || '')}`);
+                    if (resp.status === 204) return; // cancelado
+                    if (!resp.ok) throw new Error(await resp.text());
+                    const data = await resp.json();
+                    if (data.path) setBaseDir(data.path);
+                  } catch {
+                    // Fallback al modal de navegador de carpetas del servidor
+                    setPickerOpen(true);
+                  }
+                }}
+              >
+                Elegir ruta
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={async () => {
+                  if (!baseDir) { alert('Selecciona una ruta primero'); return; }
+                  try {
+                    const resp = await fetch(`${apiBase}/api/logs/set-log-dir?baseDir=${encodeURIComponent(baseDir)}&fileName=${encodeURIComponent('server.log')}`, { method: 'POST' });
+                    const txt = await resp.text();
+                    if (!resp.ok) throw new Error(txt);
+                    alert('El backend guardará logs en: ' + (JSON.parse(txt).path || baseDir));
+                  } catch (e:any) {
+                    alert('No se pudo reconfigurar logging: ' + (e?.message || ''));
+                  }
+                }}
+              >
+                Usar para escribir logs
+              </Button>
+              <Button type="button" variant="primary" onClick={handleSaveBaseDir}>Guardar</Button>
+            </div>
+            <p className="mt-1 text-xs text-gray-500">Usa el selector para navegar carpetas en el servidor y establecer la ruta.</p>
+          </div>
         </div>
         <div className="mt-6 flex justify-end">
-          <Button type="button" variant="primary">
+          <Button type="button" variant="primary" onClick={loadFiles}>
             Mostrar Descargas
           </Button>
         </div>
@@ -94,20 +197,44 @@ export const MonitorLogsPage: React.FC = () => {
             <thead className="bg-primary dark:bg-secondary">
               <tr>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Nombre</th>
-                <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-white uppercase tracking-wider">Descarga</th>
+                <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-white uppercase tracking-wider">Acciones</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800">
-              {paginatedLogs.map((file, index) => (
-                <tr key={file.id} className={index % 2 !== 0 ? 'bg-pink-50 dark:bg-purple-900/20' : ''}>
+              {loadingFiles && (
+                <tr><td className="px-6 py-4" colSpan={2}>Cargando…</td></tr>
+              )}
+              {errorFiles && !loadingFiles && (
+                <tr><td className="px-6 py-4 text-red-600" colSpan={2}>{errorFiles}</td></tr>
+              )}
+              {!loadingFiles && !errorFiles && paginatedLogs.map((file, index) => (
+                <tr key={file.relative} className={index % 2 !== 0 ? 'bg-pink-50 dark:bg-purple-900/20' : ''}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">{file.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <button onClick={() => handleDownload(file.name)} className="text-gray-600 hover:text-purple-700 dark:text-gray-400 dark:hover:text-white transition-colors">
-                      <DownloadIcon />
-                    </button>
+                    <div className="inline-flex items-center gap-3">
+                      <button
+                        onClick={() => handlePreview(file.relative)}
+                        className="text-gray-600 hover:text-purple-700 dark:text-gray-400 dark:hover:text-white transition-colors"
+                        title="Vista previa"
+                        aria-label={`Vista previa de ${file.name}`}
+                      >
+                        <EyeIcon />
+                      </button>
+                      <button
+                        onClick={() => handleDownload(file.relative)}
+                        className="text-gray-600 hover:text-purple-700 dark:text-gray-400 dark:hover:text-white transition-colors"
+                        title="Descargar"
+                        aria-label={`Descargar ${file.name}`}
+                      >
+                        <DownloadIcon />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
+              {!loadingFiles && !errorFiles && files.length === 0 && (
+                <tr><td className="px-6 py-4 text-sm text-gray-500" colSpan={2}>No hay archivos en la ruta seleccionada</td></tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -136,6 +263,21 @@ export const MonitorLogsPage: React.FC = () => {
           </nav>
         </div>
       </Card>
+      {/* Modal de Vista Previa */}
+      <LogPreviewModal
+        isOpen={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        file={previewFile}
+        lines={200}
+        baseDir={baseDir || undefined}
+      />
+
+      <DirectoryPickerModal
+        isOpen={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        initialBaseDir={baseDir}
+        onSelect={(full) => { setBaseDir(full); setPickerOpen(false); }}
+      />
     </div>
   );
 };

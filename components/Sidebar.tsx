@@ -127,6 +127,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ navItems, isOpen, toggleSideba
   const { theme } = useContext(ThemeContext);
   const [activePath, setActivePath] = useState('dashboard');
 
+  // Debug: Log what the sidebar is receiving
+  console.log('=== SIDEBAR RECIBE ===');
+  console.log('Total navItems:', navItems.length);
+  navItems.forEach(item => {
+    if (item.children) {
+      console.log(`${item.label}: ${item.children.length} children`, item.children.map(c => c.label));
+    }
+  });
+
   const handleInternalNavItemClick = (label: string, icon: React.FC<React.SVGProps<SVGSVGElement>>, path?: string) => {
     onNavItemClick(label, icon, path); 
     if(path) setActivePath(path); 
