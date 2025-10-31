@@ -96,6 +96,7 @@ export const FacturacionCartaPortePage: React.FC = () => {
   const [formData, setFormData] = useState<CartaPorteFormData>(initialCartaPorteFormData);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [enviandoCorreo, setEnviandoCorreo] = useState<boolean>(false);
+  const [guardandoBD, setGuardandoBD] = useState<boolean>(false);
   const { empresaInfo } = useEmpresa();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -289,6 +290,132 @@ export const FacturacionCartaPortePage: React.FC = () => {
     }
   };
 
+  const handleGuardarEnBD = async () => {
+    try {
+      setGuardandoBD(true);
+      
+      // Validaciones básicas
+      if (!formData.rfcIniciales || !formData.rfcFecha || !formData.rfcHomoclave) {
+        alert('RFC completo es requerido (iniciales, fecha y homoclave)');
+        return;
+      }
+      
+      if (!formData.correoElectronico?.trim()) {
+        alert('Correo electrónico es requerido');
+        return;
+      }
+      
+      if (!formData.razonSocial?.trim()) {
+        alert('Razón social es requerida');
+        return;
+      }
+      
+      if (!formData.domicilioFiscal?.trim()) {
+        alert('Domicilio fiscal es requerido');
+        return;
+      }
+      
+      if (!formData.descripcion?.trim()) {
+        alert('Descripción es requerida');
+        return;
+      }
+      
+      if (!formData.numeroSerie?.trim()) {
+        alert('Número de serie es requerido');
+        return;
+      }
+      
+      if (!formData.precio?.trim()) {
+        alert('Precio es requerido');
+        return;
+      }
+      
+      if (!formData.personaAutoriza?.trim()) {
+        alert('Persona que autoriza es requerida');
+        return;
+      }
+      
+      if (!formData.puesto?.trim()) {
+        alert('Puesto es requerido');
+        return;
+      }
+
+      // Preparar datos para enviar al backend
+      const cartaPorteData = {
+        // Datos fiscales del receptor
+        rfcIniciales: formData.rfcIniciales.toUpperCase(),
+        rfcFecha: formData.rfcFecha,
+        rfcHomoclave: formData.rfcHomoclave.toUpperCase(),
+        correoElectronico: formData.correoElectronico.trim(),
+        razonSocial: formData.razonSocial.trim(),
+        nombre: formData.nombre?.trim() || null,
+        apellidoPaterno: formData.paterno?.trim() || null,
+        apellidoMaterno: formData.materno?.trim() || null,
+        pais: formData.pais || 'México',
+        noRegistroTrib: formData.noRegistroIdentidadTributaria?.trim() || null,
+        domicilioFiscal: formData.domicilioFiscal.trim(),
+        regimenFiscal: formData.regimenFiscal,
+        usoCfdi: formData.usoCfdi,
+        
+        // Información general
+        descripcion: formData.descripcion.trim(),
+        numeroSerie: formData.numeroSerie.trim(),
+        precio: formData.precio.trim(),
+        personaAutoriza: formData.personaAutoriza.trim(),
+        puesto: formData.puesto.trim(),
+        
+        // Datos de transporte
+        tipoTransporte: formData.tipoTransporte || null,
+        permisoSct: formData.permisoSCT?.trim() || null,
+        noPermisoSct: formData.numeroPermisoSCT?.trim() || null,
+        placasVehiculo: formData.placasVehiculo?.trim() || null,
+        configVehicular: formData.configVehicular?.trim() || null,
+        nombreTransportista: formData.nombreTransportista?.trim() || null,
+        rfcTransportista: formData.rfcTransportista?.trim() || null,
+        bienesTransportados: formData.bienesTransportados?.trim() || null,
+        
+        // Origen y destino
+        origenDomicilio: formData.origen?.trim() || null,
+        destinoDomicilio: formData.destino?.trim() || null,
+        fechaSalida: formData.fechaSalida ? formData.fechaSalida.split('T')[0] : null, // Solo fecha YYYY-MM-DD
+        fechaLlegada: formData.fechaLlegada ? formData.fechaLlegada.split('T')[0] : null, // Solo fecha YYYY-MM-DD
+      };
+
+      // Enviar al backend
+      const response = await fetch(apiUrl('/carta-porte/guardar'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(cartaPorteData),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Error ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+      
+      // Primera alerta de éxito
+      alert(`✅ Factura procesada y guardada exitosamente\nUUID: ${result.uuid || 'N/A'}\nFactura guardada en base de datos`);
+      
+      // Segunda alerta para preguntar sobre envío del PDF
+      const enviarPdf = confirm('¿Desea enviar los archivos al correo del receptor?');
+      
+      if (enviarPdf) {
+        // Aquí se puede llamar a la función de envío de correo
+        handleEnviarCorreo();
+      }
+      
+    } catch (err) {
+      console.error('Error guardando Carta Porte en BD:', err);
+      alert(`Error al guardar en base de datos: ${err instanceof Error ? err.message : 'Error desconocido'}`);
+    } finally {
+      setGuardandoBD(false);
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <DatosFiscalesSection
@@ -335,11 +462,15 @@ export const FacturacionCartaPortePage: React.FC = () => {
         <Button type="button" variant="secondary" onClick={handleDescargarXML} disabled={submitting}>
           Descargar XML
         </Button>
+        {/* Nuevo: Guardar */}
+        <Button type="button" variant="primary" onClick={handleGuardarEnBD} disabled={submitting || enviandoCorreo || guardandoBD}>
+          {guardandoBD ? 'GUARDANDO...' : 'Guardar'}
+        </Button>
         {/* Nuevo: Enviar al correo */}
-        <Button type="button" variant="primary" onClick={handleEnviarCorreo} disabled={submitting || enviandoCorreo}>
+        <Button type="button" variant="primary" onClick={handleEnviarCorreo} disabled={submitting || enviandoCorreo || guardandoBD}>
           {enviandoCorreo ? 'ENVIANDO…' : 'Enviar al correo'}
         </Button>
-        <Button type="submit" variant="primary" disabled={submitting}>
+        <Button type="submit" variant="primary" disabled={submitting || enviandoCorreo || guardandoBD}>
           {submitting ? 'GENERANDO...' : 'GENERAR CARTA PORTE'}
         </Button>
       </div>

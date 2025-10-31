@@ -42,6 +42,50 @@ export interface NotaCreditoData extends FacturaData {
   motivo?: string;
 }
 
+// Tipos para resumen de Facturación Global (reporte PDF)
+export interface FacturaGlobalTicketDetalle {
+  descripcion?: string;
+  cantidad?: number;
+  unidad?: string;
+  precioUnitario?: number;
+  subtotal?: number;
+  ivaImporte?: number;
+  total?: number;
+}
+
+export interface FacturaGlobalTicket {
+  idTicket: number;
+  fecha?: string;
+  folio?: number;
+  formaPago?: string;
+  total?: number;
+  detalles?: FacturaGlobalTicketDetalle[];
+}
+
+export interface FacturaGlobalFactura {
+  uuid: string;
+  serie?: string;
+  folio?: string | number;
+  fechaEmision?: string;
+  importe?: number;
+  estatusFacturacion?: string;
+  estatusSat?: string;
+  tienda?: string;
+  tickets?: FacturaGlobalTicket[];
+}
+
+export interface GlobalResumenStats {
+  totalFacturas?: number;
+  totalTickets?: number;
+  totalCartaPorte?: number;
+}
+
+export interface GlobalResumenMeta {
+  periodoLabel: string;
+  fecha: string;
+  tiendaLabel: string;
+}
+
 export class PDFService {
   private static instance: PDFService;
   
@@ -64,6 +108,67 @@ export class PDFService {
       return `data:image/svg+xml;base64,${v}`;
     }
     return logoUrl || '/images/cibercom-logo.svg';
+  }
+
+  // Cargar script externo de forma dinámica
+  private cargarScript(url: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const existing = Array.from(document.getElementsByTagName('script')).find(s => s.src === url);
+      if (existing) return resolve();
+      const script = document.createElement('script');
+      script.src = url;
+      script.async = true;
+      script.crossOrigin = 'anonymous';
+      (script as any).referrerPolicy = 'no-referrer';
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error(`No se pudo cargar script: ${url}`));
+      document.head.appendChild(script);
+    });
+  }
+
+  // Asegurar que hay motor de PDF disponible (html2pdf o fallback html2canvas+jsPDF)
+  private async asegurarMotorPDF(): Promise<void> {
+    const w = window as any;
+    if (typeof w.html2pdf === 'function') return; // ya está
+
+    // 1) Intentar cargar mediante imports locales (preferido)
+    try {
+      const mod = await import(/* webpackIgnore: true */ 'html2pdf.js');
+      w.html2pdf = (mod as any).default || (mod as any);
+    } catch {}
+
+    if (typeof w.html2pdf !== 'function') {
+      // Fallback local: html2canvas y jsPDF desde paquetes instalados
+      try {
+        const h2cMod = await import(/* webpackIgnore: true */ 'html2canvas');
+        w.html2canvas = (h2cMod as any).default || (h2cMod as any);
+      } catch {}
+      try {
+        const jspdfMod = await import(/* webpackIgnore: true */ 'jspdf');
+        const jsPDFCtor = (jspdfMod as any).jsPDF || (jspdfMod as any).default?.jsPDF || (jspdfMod as any).default || (jspdfMod as any);
+        if (jsPDFCtor) {
+          w.jspdf = { jsPDF: jsPDFCtor };
+          w.jsPDF = jsPDFCtor;
+        }
+      } catch {}
+    }
+
+    // 2) Si aún no se tiene el motor, intentar CDN como último recurso
+    if (typeof w.html2pdf !== 'function' && !(typeof w.html2canvas === 'function' && (w.jspdf?.jsPDF || w.jsPDF))) {
+      try {
+        await this.cargarScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js');
+      } catch {
+        try {
+          await this.cargarScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+          await this.cargarScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+        } catch {}
+      }
+    }
+
+    // 3) Validación final
+    if (typeof w.html2pdf !== 'function' && !(typeof w.html2canvas === 'function' && (w.jspdf?.jsPDF || w.jsPDF))) {
+      throw new Error('Motor de PDF no disponible (html2pdf/jsPDF/html2canvas)');
+    }
   }
 
   /**
@@ -395,7 +500,13 @@ export class PDFService {
    * Convierte HTML a PDF usando html2pdf
    */
   private async convertirHTMLaPDF(htmlContent: string, filename: string = 'factura.pdf'): Promise<Blob> {
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
+      // Asegurar que el motor de PDF esté disponible
+      try {
+        await this.asegurarMotorPDF();
+      } catch (err) {
+        return reject(err);
+      }
       // Crear un elemento temporal para el HTML
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = htmlContent;
@@ -409,36 +520,55 @@ export class PDFService {
           margin: 10,
           filename,
           image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true },
+          html2canvas: { scale: 2, useCORS: true, logging: false },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
-        // Verificar si html2pdf está disponible
-        if (typeof (window as any).html2pdf === 'undefined') {
-          // Fallback: usar window.print() si html2pdf no está disponible
-          const printWindow = window.open('', '_blank');
-          if (printWindow) {
-            printWindow.document.write(htmlContent);
-            printWindow.document.close();
-            printWindow.print();
-          }
-          reject(new Error('html2pdf no está disponible'));
+        const html2pdf = (window as any).html2pdf;
+        // Preferir el flujo oficial: toPdf().get('pdf').output('blob')
+        if (typeof html2pdf === 'function') {
+          html2pdf()
+            .from(tempDiv)
+            .set(options)
+            .toPdf()
+            .get('pdf')
+            .then((pdf: any) => {
+              const blob: Blob = pdf.output('blob');
+              document.body.removeChild(tempDiv);
+              resolve(blob);
+            })
+            .catch((error: any) => {
+              document.body.removeChild(tempDiv);
+              reject(error);
+            });
           return;
         }
 
-        // Generar PDF con html2pdf
-        (window as any).html2pdf()
-          .from(tempDiv)
-          .set(options)
-          .outputPdf('blob')
-          .then((pdfBlob: Blob) => {
-            document.body.removeChild(tempDiv);
-            resolve(pdfBlob);
-          })
-          .catch((error: any) => {
-            document.body.removeChild(tempDiv);
-            reject(error);
-          });
+        // Fallback robusto: usar html2canvas + jsPDF si están disponibles
+        const html2canvas = (window as any).html2canvas;
+        const jsPDFCtor = (window as any).jspdf?.jsPDF || (window as any).jsPDF;
+        if (typeof html2canvas === 'function' && typeof jsPDFCtor === 'function') {
+          html2canvas(tempDiv, options.html2canvas)
+            .then((canvas: HTMLCanvasElement) => {
+              const imgData = canvas.toDataURL('image/jpeg', 0.98);
+              const pdf = new jsPDFCtor(options.jsPDF);
+              const pageWidth = pdf.internal.pageSize.getWidth();
+              const pageHeight = pdf.internal.pageSize.getHeight();
+              pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth, pageHeight);
+              const blob: Blob = pdf.output('blob');
+              document.body.removeChild(tempDiv);
+              resolve(blob);
+            })
+            .catch((error: any) => {
+              document.body.removeChild(tempDiv);
+              reject(error);
+            });
+          return;
+        }
+
+        // Último recurso: rechazar explícitamente para evitar abrir impresión
+        document.body.removeChild(tempDiv);
+        reject(new Error('Motor de PDF no disponible (html2pdf/jsPDF/html2canvas)'));
       } catch (error) {
         document.body.removeChild(tempDiv);
         reject(error);
@@ -651,6 +781,214 @@ export class PDFService {
             <div><strong>Forma de Pago:</strong> ${notaData.formaPago}</div>
             <div><strong>Uso CFDI:</strong> ${notaData.usoCFDI}</div>
           </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  /**
+   * Genera un PDF de resumen de Facturación Global con facturas, tickets y detalles.
+   */
+  public async generarPDFResumenGlobal(
+    facturasAgregadas: FacturaGlobalFactura[],
+    stats: GlobalResumenStats,
+    meta: GlobalResumenMeta,
+    logoConfig: LogoConfig
+  ): Promise<Blob> {
+    try {
+      const html = this.generarHTMLResumenGlobal(facturasAgregadas, stats, meta, logoConfig);
+      const filename = `Resumen_Global_${meta.fecha}.pdf`;
+      return await this.convertirHTMLaPDF(html, filename);
+    } catch (error) {
+      console.error('Error generando PDF de resumen global:', error);
+      throw new Error('Error al generar el PDF de resumen global');
+    }
+  }
+
+  /**
+   * Construye el HTML del resumen global
+   */
+  private generarHTMLResumenGlobal(
+    facturasAgregadas: FacturaGlobalFactura[],
+    stats: GlobalResumenStats,
+    meta: GlobalResumenMeta,
+    logoConfig: LogoConfig
+  ): string {
+    const { customColors, logoUrl, logoBase64 } = logoConfig;
+    const logoSrc = this.getLogoSrc(logoUrl, logoBase64);
+
+    const fmtCurrency = (n: number | undefined) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(Number(n ?? 0));
+
+    const facturasHtml = facturasAgregadas.map((f) => {
+      const header = `
+        <div class="agg-header">
+          <div>
+            <div class="agg-line"><b>Factura:</b> ${f.serie ? `${f.serie}-${f.folio ?? ''}` : (f.folio ?? '')}</div>
+            <div class="agg-line"><b>UUID:</b> ${f.uuid}</div>
+            <div class="agg-line"><b>Fecha:</b> ${f.fechaEmision ?? ''}</div>
+            <div class="agg-line"><b>Estatus:</b> ${f.estatusFacturacion ?? ''}${f.estatusSat ? ` (${f.estatusSat})` : ''}</div>
+          </div>
+          <div class="agg-right">
+            <div class="agg-line"><b>Tienda:</b> ${f.tienda ?? ''}</div>
+            <div class="agg-total">${fmtCurrency(f.importe)}</div>
+          </div>
+        </div>
+      `;
+
+      const ticketsTable = Array.isArray(f.tickets) && f.tickets.length > 0 ? `
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Ticket</th>
+                <th>Folio</th>
+                <th>Fecha</th>
+                <th>Forma Pago</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${f.tickets!.map(t => `
+                <tr>
+                  <td>${t.idTicket}</td>
+                  <td>${t.folio ?? ''}</td>
+                  <td>${t.fecha ?? ''}</td>
+                  <td>${t.formaPago ?? ''}</td>
+                  <td class="text-right">${fmtCurrency(t.total)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` : '<div class="no-data">Sin tickets vinculados.</div>';
+
+      const detallesHtml = Array.isArray(f.tickets) ? f.tickets!.map(t => {
+        if (!Array.isArray(t.detalles) || t.detalles.length === 0) return '';
+        return `
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Descripción</th>
+                  <th class="text-center">Cantidad</th>
+                  <th class="text-center">Unidad</th>
+                  <th class="text-right">Precio</th>
+                  <th class="text-right">Subtotal</th>
+                  <th class="text-right">IVA</th>
+                  <th class="text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${t.detalles!.map(d => `
+                  <tr>
+                    <td>${d.descripcion ?? ''}</td>
+                    <td class="text-center">${d.cantidad ?? ''}</td>
+                    <td class="text-center">${d.unidad ?? ''}</td>
+                    <td class="text-right">${fmtCurrency(d.precioUnitario)}</td>
+                    <td class="text-right">${fmtCurrency(d.subtotal)}</td>
+                    <td class="text-right">${fmtCurrency(d.ivaImporte)}</td>
+                    <td class="text-right">${fmtCurrency(d.total)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }).join('') : '';
+
+      const allDetalles = Array.isArray(f.tickets)
+        ? f.tickets.flatMap(t => Array.isArray(t.detalles) ? t.detalles : [])
+        : [];
+      const subtotalSum = allDetalles.reduce((acc, d) => acc + (Number(d?.subtotal) || 0), 0);
+      const ivaSum = allDetalles.reduce((acc, d) => acc + (Number(d?.ivaImporte) || 0), 0);
+      const totalSum = allDetalles.reduce((acc, d) => acc + (Number(d?.total) || 0), 0);
+      const totalesBoxHtml = allDetalles.length > 0 ? `
+        <div class="totales-box">
+          <div>Subtotal: <span class="label">${fmtCurrency(subtotalSum)}</span></div>
+          <div>IVA: <span class="label">${fmtCurrency(ivaSum)}</span></div>
+          <div class="total">TOTAL: ${fmtCurrency(totalSum)}</div>
+        </div>
+      ` : '';
+
+      return `
+        <div class="agg-card">
+          ${header}
+          ${ticketsTable}
+          ${detallesHtml}
+          ${totalesBoxHtml}
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Resumen Facturación Global</title>
+        <style>
+          * { box-sizing: border-box; }
+          body { font-family: Arial, sans-serif; font-size: 12px; color: #333; }
+          .container { max-width: 900px; margin: 0 auto; padding: 20px; background: #fff; }
+
+          /* Banner superior tipo factura */
+          .banner { display: flex; justify-content: space-between; align-items: center; background-color: ${customColors.primary}; color: #fff; padding: 16px; border-radius: 6px; }
+          .banner-title { font-size: 18px; font-weight: bold; }
+          .banner-meta { font-size: 12px; opacity: 0.95; }
+          .logo img { max-height: 64px; object-fit: contain; background: #fff0; }
+
+          /* Línea separadora */
+          .separator { height: 3px; background-color: ${customColors.primary}; margin: 14px 0 10px; border-radius: 2px; }
+
+          /* Stats alineadas como en la factura */
+          .stats { display: flex; gap: 16px; margin-bottom: 12px; color: #111; }
+          .stats b { color: #000; }
+
+          /* Tarjeta por factura agregada */
+          .agg-card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+          .agg-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+          .agg-right { text-align: right; }
+          .agg-line { margin-bottom: 4px; }
+          .agg-total { font-weight: bold; font-size: 14px; color: #000; }
+
+          /* Tablas estilo "Conceptos" */
+          .table-wrap { overflow-x: auto; margin-top: 8px; }
+          table.table { width: 100%; border-collapse: collapse; }
+          table.table thead tr { background-color: ${customColors.primary}; color: #fff; }
+          table.table th { padding: 8px 6px; text-align: left; font-weight: bold; }
+          table.table td { padding: 8px 6px; border-bottom: 1px solid #ddd; }
+          table.table tr:nth-child(even) { background-color: #f9f9f9; }
+          .text-center { text-align: center; }
+          .text-right { text-align: right; }
+          .no-data { margin-top: 8px; color: #777; }
+
+          /* Caja de totales similar a factura */
+          .totales-box { float: right; width: 280px; border: 2px solid ${customColors.primary}; border-radius: 6px; padding: 10px; margin-top: 6px; }
+          .totales-box .label { font-weight: bold; }
+          .totales-box .total { color: ${customColors.primary}; font-weight: bold; font-size: 14px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="banner">
+            <div>
+              <div class="banner-title">Resumen Facturación Global</div>
+              <div class="banner-meta">${meta.periodoLabel} · Fecha ${meta.fecha}${meta.tiendaLabel ? ` · Tienda ${meta.tiendaLabel}` : ''}</div>
+            </div>
+            <div class="logo"><img src="${logoSrc}" alt="Logo" /></div>
+          </div>
+          <div class="separator"></div>
+
+          ${(typeof stats.totalFacturas === 'number' || typeof stats.totalTickets === 'number' || typeof stats.totalCartaPorte === 'number') ? `
+            <div class="stats">
+              <div>Facturas: <b>${stats.totalFacturas ?? '-'}</b></div>
+              <div>Tickets: <b>${stats.totalTickets ?? '-'}</b></div>
+              <div>Carta Porte: <b>${stats.totalCartaPorte ?? '-'}</b></div>
+            </div>
+          ` : ''}
+
+          ${facturasHtml}
         </div>
       </body>
       </html>

@@ -10,6 +10,7 @@ import { useEmpresa } from '../context/EmpresaContext';
 import { correoService } from '../services/correoService';
 import { configuracionCorreoService } from '../services/configuracionCorreoService';
 import { facturaService } from '../services/facturaService';
+import { ticketService, Ticket, TicketSearchFilters } from '../services/ticketService';
 import {
   PAIS_OPTIONS,
   REGIMEN_FISCAL_OPTIONS,
@@ -87,7 +88,10 @@ export const InvoiceForm: React.FC = () => {
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [facturas, setFacturas] = useState<Factura[]>([]);
   const [cargandoFacturas, setCargandoFacturas] = useState(false);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [cargandoTickets, setCargandoTickets] = useState(false);
   const [mostrarTabla, setMostrarTabla] = useState(false);
+  const [ticketSeleccionado, setTicketSeleccionado] = useState<Ticket | null>(null);
   const [paginaActual, setPaginaActual] = useState(1);
   const [elementosPorPagina] = useState(5);
   const [modalCorreo, setModalCorreo] = useState<{
@@ -241,11 +245,11 @@ export const InvoiceForm: React.FC = () => {
     }
   }, []);
 
-  // Cargar facturas al montar el componente
-  useEffect(() => {
-    console.log('🔄 useEffect ejecutado - cargando facturas');
-    cargarFacturas();
-  }, [cargarFacturas]);
+  // Cargar facturas sólo bajo demanda desde el botón; evitar carga automática al montar
+  // useEffect(() => {
+  //   console.log('🔄 useEffect ejecutado - cargando facturas');
+  //   cargarFacturas();
+  // }, [cargarFacturas]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -332,6 +336,52 @@ export const InvoiceForm: React.FC = () => {
 
   const handleAgregarBoleta = () => {
     alert(`Boleta agregada: Código ${formData.codigoFacturacion}, Tienda ${formData.tienda}, Fecha ${formData.fecha}`);
+  };
+
+  const handleBuscarTicket = async () => {
+    try {
+      setCargandoTickets(true);
+      const filtros: TicketSearchFilters = {
+        codigoTienda: formData.tienda,
+        terminalId: formData.terminal ? Number(formData.terminal) : undefined,
+        fecha: formData.fecha,
+        folio: formData.boleta ? Number(formData.boleta) : undefined,
+      };
+      const resultados = await ticketService.buscarTickets(filtros);
+      setTickets(resultados);
+      // Mostrar tabla solo si hay múltiples resultados
+      setMostrarTabla(resultados && resultados.length > 1);
+      if (!resultados || resultados.length === 0) {
+        alert('No se encontraron tickets con los filtros proporcionados.');
+      } else {
+        if (resultados.length === 1) {
+          setTicketSeleccionado(resultados[0]);
+          rellenarFormularioConTicket(resultados[0]);
+        } else {
+          setTicketSeleccionado(null);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error al consultar tickets:', error);
+      alert('Error al consultar tickets. Revisa la consola para más detalles.');
+    } finally {
+      setCargandoTickets(false);
+    }
+  };
+
+  // Rellena las secciones del formulario usando los datos del ticket encontrado
+  const rellenarFormularioConTicket = (t: Ticket) => {
+    setFormData(prev => ({
+      ...prev,
+      tienda: t.codigoTienda ?? prev.tienda,
+      fecha: t.fecha ?? prev.fecha,
+      terminal: t.terminalId != null ? String(t.terminalId) : prev.terminal,
+      boleta: t.folio != null ? String(t.folio) : prev.boleta,
+      // El backend devuelve formaPago tipo SAT (01, 03, 28...). Lo mapeamos a Medio de Pago.
+      medioPago: t.formaPago ?? prev.medioPago,
+      // Suponemos PUE por defecto si no hay valor explícito
+      formaPago: prev.formaPago || 'PUE',
+    }));
   };
 
   const formatearMoneda = (valor: number) => {
@@ -515,20 +565,104 @@ export const InvoiceForm: React.FC = () => {
           </div>
         </Card>
 
-        <Card title="Consultar Boleta">
+        {mostrarTabla && tickets.length > 1 && (
+          <Card title="Tickets encontrados">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tienda</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Terminal</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Folio</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IVA</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Forma Pago</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RFC</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estatus</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID Factura</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {tickets.map((t) => (
+                    <tr key={t.idTicket} className="cursor-pointer hover:bg-gray-50" onClick={() => { setTicketSeleccionado(t); rellenarFormularioConTicket(t); }}>
+                      <td className="px-4 py-2">{t.codigoTienda}</td>
+                      <td className="px-4 py-2">{new Date(t.fecha).toLocaleDateString()}</td>
+                      <td className="px-4 py-2">{t.terminalId ?? '-'}</td>
+                      <td className="px-4 py-2">{t.folio}</td>
+                      <td className="px-4 py-2">{t.subtotal?.toFixed(2)}</td>
+                      <td className="px-4 py-2">{t.iva?.toFixed(2)}</td>
+                      <td className="px-4 py-2">{t.total?.toFixed(2)}</td>
+                      <td className="px-4 py-2">{t.formaPago ?? '-'}</td>
+                      <td className="px-4 py-2">{t.nombreCliente ?? '-'}</td>
+                      <td className="px-4 py-2">{t.rfcCliente ?? '-'}</td>
+                      <td className="px-4 py-2">{t.status === 1 ? 'Activo' : 'Cancelado'}</td>
+                      <td className="px-4 py-2">{t.idFactura ?? '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+
+        <Card title="Consultar Ticket">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 items-end">
             <FormField name="codigoFacturacion" label="Código de Facturación" value={formData.codigoFacturacion} onChange={handleChange} />
             <SelectField name="tienda" label="Tienda" value={formData.tienda} onChange={handleChange} options={TIENDA_OPTIONS} />
             <FormField name="fecha" label="Fecha" type="date" value={formData.fecha} onChange={handleChange} />
             <FormField name="terminal" label="Terminal" value={formData.terminal} onChange={handleChange} />
-            <FormField name="boleta" label="Boleta" value={formData.boleta} onChange={handleChange} />
+            <FormField name="boleta" label="Ticket (Folio)" value={formData.boleta} onChange={handleChange} />
           </div>
           <div className="mt-6 flex justify-end">
-            <Button type="button" onClick={handleAgregarBoleta} variant="secondary">
-              Agregar
+            <Button type="button" onClick={handleBuscarTicket} variant="secondary" disabled={cargandoTickets}>
+              {cargandoTickets ? 'Buscando…' : 'Buscar Ticket'}
             </Button>
           </div>
         </Card>
+
+        {ticketSeleccionado && (
+          <Card title="Información del Ticket">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tienda</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Terminal</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Folio</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IVA</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Forma Pago</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RFC</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estatus</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID Factura</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  <tr>
+                    <td className="px-4 py-2">{ticketSeleccionado?.codigoTienda ?? '-'}</td>
+                    <td className="px-4 py-2">{ticketSeleccionado ? new Date(ticketSeleccionado.fecha).toLocaleDateString() : '-'}</td>
+                    <td className="px-4 py-2">{ticketSeleccionado?.terminalId ?? '-'}</td>
+                    <td className="px-4 py-2">{ticketSeleccionado?.folio ?? '-'}</td>
+                    <td className="px-4 py-2">{ticketSeleccionado?.subtotal != null ? ticketSeleccionado!.subtotal!.toFixed(2) : '-'}</td>
+                    <td className="px-4 py-2">{ticketSeleccionado?.iva != null ? ticketSeleccionado!.iva!.toFixed(2) : '-'}</td>
+                    <td className="px-4 py-2">{ticketSeleccionado?.total != null ? ticketSeleccionado!.total!.toFixed(2) : '-'}</td>
+                    <td className="px-4 py-2">{ticketSeleccionado?.formaPago ?? '-'}</td>
+                    <td className="px-4 py-2">{ticketSeleccionado?.nombreCliente ?? '-'}</td>
+                    <td className="px-4 py-2">{ticketSeleccionado?.rfcCliente ?? '-'}</td>
+                    <td className="px-4 py-2">{ticketSeleccionado?.status === 1 ? 'Activo' : 'Cancelado'}</td>
+                    <td className="px-4 py-2">{ticketSeleccionado?.idFactura ?? '-'}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
 
         <Card title="Forma de Pago">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

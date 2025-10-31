@@ -1,6 +1,5 @@
-import { apiUrl } from './api';
+import { apiUrl, pacUrl, API_BASE_URL } from './api';
 import { logoService } from './logoService';
-import { API_BASE_URL } from './api';
 
 // Interfaz para los datos de factura para PDF
 export interface FacturaData {
@@ -233,6 +232,16 @@ export class FacturaService {
   private static instance: FacturaService;
   private baseUrl = API_BASE_URL;
   
+  // Normaliza UUID al formato esperado por PAC (lowercase y con guiones si viene en 32 chars)
+  private normalizarUuidParaPac(uuid: string): string {
+    const clean = String(uuid || '').trim();
+    if (clean.length === 32) {
+      const guionado = `${clean.substring(0,8)}-${clean.substring(8,12)}-${clean.substring(12,16)}-${clean.substring(16,20)}-${clean.substring(20)}`;
+      return guionado.toLowerCase();
+    }
+    return clean.toLowerCase();
+  }
+  
   public static getInstance(): FacturaService {
     if (!FacturaService.instance) {
       FacturaService.instance = new FacturaService();
@@ -373,9 +382,15 @@ export class FacturaService {
    */
   public async obtenerFacturaPorUUID(uuid: string): Promise<FacturaCompleta> {
     try {
-      const response = await fetch(apiUrl(`/factura/timbrado/status/${uuid}`));
+      let response = await fetch(apiUrl(`/factura/timbrado/status/${uuid}`));
+      // Fallback al PAC simulador si no está disponible en backend principal
       if (!response.ok) {
-        throw new Error(`Error HTTP ${response.status}: ${response.statusText}`);
+        const uuidPac = this.normalizarUuidParaPac(uuid);
+        const pacResp = await fetch(pacUrl(`/descargar-xml/${encodeURIComponent(uuidPac)}`));
+        if (!pacResp.ok) {
+          throw new Error(`Error HTTP ${response.status}: ${response.statusText}`);
+        }
+        response = pacResp;
       }
 
       const contentType = (response.headers.get('content-type') || '').toLowerCase();
@@ -613,8 +628,19 @@ export class FacturaService {
    */
   public async generarYDescargarPDF(uuid: string): Promise<void> {
     try {
-      // Obtener datos de la factura para nombrar el archivo
-      const factura = await this.obtenerFacturaPorUUID(uuid);
+      // Intentar obtener datos de la factura para nombrar el archivo.
+      // Si falla (p.ej. 404 en timbrado/status), continuar con nombre por defecto.
+      let fallbackFilename = `Factura_${uuid}.pdf`;
+      try {
+        const factura = await this.obtenerFacturaPorUUID(uuid);
+        const serie = (factura.serie || '').trim();
+        const folio = (factura.folio || '').trim();
+        if (serie || folio) {
+          fallbackFilename = `Factura_${serie}-${folio}.pdf`;
+        }
+      } catch (e) {
+        console.warn('No se pudo obtener datos de la factura para el nombre del archivo. Usando nombre por defecto.', e);
+      }
 
       // Descargar PDF desde el backend usando el endpoint que construye logo y colores
       const response = await fetch(apiUrl(`/factura/descargar-pdf/${uuid}`));
@@ -631,7 +657,7 @@ export class FacturaService {
 
       // Usar filename del header si viene; sino, Serie-Folio
       const header = response.headers.get('content-disposition') || '';
-      let filename = `Factura_${factura.serie}-${factura.folio}.pdf`;
+      let filename = fallbackFilename;
       const match = header.match(/filename="?([^";]+)"?/i);
       if (match && match[1]) {
         filename = match[1];
@@ -667,8 +693,8 @@ export class FacturaService {
       // Convertir a formato para PDF
       const facturaData = this.convertirAFacturaData(factura);
       
-      // Generar ZIP en el backend (pac-simulator-back en puerto 8085)
-      const response = await fetch(`http://localhost:8085/api/generar-zip`, {
+      // Generar ZIP en el PAC (configurable vía VITE_PAC_BASE_URL)
+      const response = await fetch(pacUrl('/generar-zip'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -706,9 +732,15 @@ export class FacturaService {
    */
   public async generarYDescargarXML(uuid: string): Promise<void> {
     try {
-      const response = await fetch(apiUrl(`/factura/timbrado/status/${uuid}`));
+      // Intento principal: backend real
+      let response = await fetch(apiUrl(`/factura/timbrado/status/${uuid}`));
+      // Fallback si backend devuelve error (p. ej. 404 -> XML no disponible en Oracle)
       if (!response.ok) {
-        throw new Error(`Error HTTP ${response.status}: ${response.statusText}`);
+        const uuidPac = this.normalizarUuidParaPac(uuid);
+        response = await fetch(pacUrl(`/descargar-xml/${encodeURIComponent(uuidPac)}`));
+      }
+      if (!response.ok) {
+        throw new Error(`XML no disponible (HTTP ${response.status})`);
       }
       const xmlBlob = await response.blob();
       if (xmlBlob.size === 0) {
@@ -747,8 +779,8 @@ export class FacturaService {
         throw new Error('Error al obtener la configuración de logos');
       }
       
-      // Generar ZIP en el backend (pac-simulator-back en puerto 8085)
-      const response = await fetch(`http://localhost:8085/api/generar-zip`, {
+      // Generar ZIP en el PAC (configurable vía VITE_PAC_BASE_URL)
+      const response = await fetch(pacUrl('/generar-zip'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

@@ -138,6 +138,7 @@ export const FacturacionCapturaLibrePage: React.FC = () => {
   const [consultaCfdi, setConsultaCfdi] = useState<CfdiConsultaResponse | null>(null);
   const [consultaError, setConsultaError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [guardandoBD, setGuardandoBD] = useState<boolean>(false);
 
   useEffect(() => {
     if (!formData.tiendaBoleta && tiendasOpts.length > 0) {
@@ -511,6 +512,127 @@ export const FacturacionCapturaLibrePage: React.FC = () => {
       alert(error?.message || 'Error de red al generar factura');
     }
   };
+
+  const handleGuardarEnBD = async () => {
+    try {
+      setGuardandoBD(true);
+      
+      // Validaciones básicas
+      const rfc = clienteCatalogoService.buildRfc(formData.rfcIniciales, formData.rfcFecha, formData.rfcHomoclave);
+      if (!rfc || rfc.length < 12) {
+        alert('RFC completo es requerido (iniciales, fecha y homoclave)');
+        return;
+      }
+      
+      if (!formData.correoElectronico?.trim()) {
+        alert('Correo electrónico es requerido');
+        return;
+      }
+      
+      if (!formData.razonSocial?.trim()) {
+        alert('Razón social es requerida');
+        return;
+      }
+      
+      if (!formData.domicilioFiscal?.trim()) {
+        alert('Domicilio fiscal es requerido');
+        return;
+      }
+
+      // Preparar datos para enviar al backend
+      const facturaLibreData = {
+        // Datos fiscales del receptor
+        rfc: rfc.toUpperCase(),
+        correoElectronico: formData.correoElectronico.trim(),
+        razonSocial: formData.razonSocial.trim(),
+        nombre: formData.nombre?.trim() || null,
+        paterno: formData.paterno?.trim() || null,
+        materno: formData.materno?.trim() || null,
+        pais: formData.pais || 'MEX',
+        noRegistroIdentidadTributaria: formData.noRegistroIdentidadTributaria?.trim() || null,
+        domicilioFiscal: formData.domicilioFiscal.trim(),
+        regimenFiscal: formData.regimenFiscal,
+        usoCfdi: normalizeUsoCfdi(formData.usoCfdi) || 'G03',
+        
+        // Datos de boleta
+        tienda: formData.tiendaBoleta || '',
+        terminal: formData.terminalBoleta || '',
+        boleta: formData.numeroBoleta || '',
+        justificacion: formData.justificacion,
+        
+        // Datos del documento
+        tipoDocumento: formData.tipoDocumento,
+        uuid: formData.uuid?.trim() || null,
+        emisor: formData.emisor,
+        fechaEmision: formData.fechaEmision,
+        
+        // Datos del concepto
+        concepto: {
+          sku: formData.concepto.sku,
+          unidadMedida: formData.concepto.unidadMedida,
+          descripcion: formData.concepto.descripcion,
+          valorUnitario: formData.concepto.valorUnitario,
+          descuentoConcepto: formData.concepto.descuentoConcepto,
+          tasaIva: formData.concepto.tasaIva,
+          iva: formData.concepto.iva,
+          tasaIeps: formData.concepto.tasaIeps,
+          ieps: formData.concepto.ieps,
+          tasaIe: formData.concepto.tasaIe,
+          ie: formData.concepto.ie,
+          noPedimento: formData.concepto.noPedimento,
+        },
+        
+        // Datos de pago y totales
+        medioPago: formData.medioPago,
+        formaPago: formData.formaPago,
+        descuentoTotal: formData.descuentoTotal,
+        subtotal: formData.subtotal,
+        ivaTotal: formData.ivaTotal,
+        iepsTotal: formData.iepsTotal,
+        total: formData.total,
+        ivaDesglosado: formData.ivaDesglosado,
+        iepsDesglosado: formData.iepsDesglosado,
+        comentarios: formData.comentarios?.trim() || null,
+      };
+
+      // Enviar al backend
+      const response = await fetch(apiUrl('/factura-libre/guardar'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(facturaLibreData),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Error ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+      
+      // Actualizar el estado con el UUID recibido
+      setFormData(prev => ({ ...prev, uuid: result.uuid }));
+      
+      // Primera alerta de éxito
+      alert(`✅ Factura procesada y guardada exitosamente\nUUID: ${result.uuid || 'N/A'}\nFactura guardada en base de datos`);
+      
+      // Segunda alerta para preguntar sobre envío del PDF
+      const enviarPdf = confirm('¿Desea enviar los archivos al correo del receptor?');
+      
+      if (enviarPdf) {
+        // Aquí se puede llamar a la función de envío de correo
+        handleEnviarCorreo(result.uuid);
+      }
+      
+    } catch (err) {
+      console.error('Error guardando Factura Libre en BD:', err);
+      alert(`Error al guardar en base de datos: ${err instanceof Error ? err.message : 'Error desconocido'}`);
+    } finally {
+      setGuardandoBD(false);
+    }
+  };
+
   const handleDescargarPdf = async () => {
     const uuid = (formData.uuid || '').trim();
     if (!uuid) {
@@ -535,7 +657,7 @@ export const FacturacionCapturaLibrePage: React.FC = () => {
       alert(error?.message || 'Error al descargar XML');
     }
   };
-  const handleEnviarCorreo = async () => {
+  const handleEnviarCorreo = async (uuidFromGuardar?: string) => {
     if (!formData.correoElectronico || !formData.correoElectronico.trim()) {
       alert('Por favor ingresa un correo electrónico válido antes de enviar.');
       return;
@@ -546,7 +668,7 @@ export const FacturacionCapturaLibrePage: React.FC = () => {
       return;
     }
 
-    const uuid = (formData.uuid || '').trim();
+    const uuid = uuidFromGuardar || (formData.uuid || '').trim();
     if (!uuid) {
       alert('Primero genera la factura para obtener el UUID y poder enviarla por correo.');
       return;
@@ -677,6 +799,9 @@ export const FacturacionCapturaLibrePage: React.FC = () => {
         </Button>
         <Button type="button" onClick={handleEnviarCorreo} variant="secondary">
           Enviar por Correo
+        </Button>
+        <Button type="button" onClick={handleGuardarEnBD} variant="primary" disabled={guardandoBD}>
+          Guardar
         </Button>
         <Button type="submit" variant="primary">
           Facturar

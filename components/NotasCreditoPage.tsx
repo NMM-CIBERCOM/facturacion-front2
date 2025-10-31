@@ -13,6 +13,10 @@ import { correoService } from '../services/correoService';
 import { configuracionCorreoService } from '../services/configuracionCorreoService';
 import { apiUrl } from '../services/api';
 
+// Base URL para endpoints de notas de crédito (no usan /api)
+const CREDIT_NOTES_BASE_URL: string = (
+  (import.meta as any)?.env?.VITE_CREDIT_NOTES_BASE_URL || 'http://localhost:8081'
+).replace(/\/+$/,'');
 interface ConceptoForm {
   descripcion: string;
   cantidad: number | '';
@@ -95,7 +99,7 @@ export const NotasCreditoPage: React.FC = () => {
   const obtenerUuidNotaCredito = async (uuidFacturaOrigen?: string) => {
     try {
       if (!uuidFacturaOrigen || !uuidFacturaOrigen.trim()) return undefined as undefined | { uuidNc: string; serie?: string; folio?: string };
-      const resp = await fetch(`http://localhost:8080/credit-notes/search?uuidFactura=${encodeURIComponent(uuidFacturaOrigen.trim())}`);
+      const resp = await fetch(`${CREDIT_NOTES_BASE_URL}/credit-notes/search?uuidFactura=${encodeURIComponent(uuidFacturaOrigen.trim())}`);
       if (!resp.ok) return undefined;
       const lista = await resp.json();
       if (!Array.isArray(lista) || lista.length === 0) return undefined;
@@ -175,6 +179,122 @@ export const NotasCreditoPage: React.FC = () => {
     return `<?xml version="1.0" encoding="UTF-8"?>\n<cfdi:Comprobante Version="4.0" Serie="${notaData.serie}" Folio="${notaData.folio}" Fecha="${fecha}" SubTotal="${notaData.subtotal.toFixed(2)}" Total="${notaData.importe.toFixed(2)}" Moneda="MXN" TipoDeComprobante="E" LugarExpedicion="12345" xmlns:cfdi="http://www.sat.gob.mx/cfd/4">\n  <cfdi:Emisor Rfc="${notaData.rfcEmisor}" Nombre="${notaData.nombreEmisor}" RegimenFiscal="601"/>\n  <cfdi:Receptor Rfc="${notaData.rfcReceptor}" Nombre="${notaData.nombreReceptor}" UsoCFDI="${notaData.usoCFDI || notaData.usoCfdi}"/>\n  <cfdi:Conceptos>\n    ${conceptosXML}\n  </cfdi:Conceptos>\n</cfdi:Comprobante>`;
   };
 
+  // Guardar la nota de crédito en Oracle (FACTURAS y NOTAS_CREDITO) antes de generar/descargar
+  const guardarNotaCreditoEnBD = async (notaData: any, rfcReceptor: string) => {
+    try {
+      const xmlContent = crearXMLNotaCredito(notaData);
+      const payload = {
+        uuidFacturaOrig: formData.referenciaFactura || undefined,
+        serieFacturaOrig: undefined,
+        folioFacturaOrig: undefined,
+        uuidNc: notaData.uuid || undefined,
+        serieNc: notaData.serie,
+        folioNc: notaData.folio,
+        fechaEmision: notaData.fechaEmision,
+        usoCfdi: formData.usoCfdi,
+        regimenFiscal: formData.regimenFiscal,
+        motivo: formData.motivo || undefined,
+        concepto: notaData.conceptos?.[0]?.descripcion || 'Nota de crédito',
+        cantidad: notaData.conceptos?.[0]?.cantidad || 1,
+        unidad: notaData.conceptos?.[0]?.unidad || 'E48',
+        precioUnitario: notaData.conceptos?.[0]?.precioUnitario || 0,
+        subtotal: notaData.subtotal,
+        ivaImporte: notaData.iva,
+        ivaPorcentaje: 0.16,
+        iepsImporte: notaData.ieps || 0,
+        iepsPorcentaje: undefined,
+        total: notaData.importe,
+        xmlContent,
+        selloDigital: undefined,
+        estatusSat: undefined,
+        codeSat: undefined,
+        rfcEmisor: empresaInfo.rfc,
+        rfcReceptor,
+        formaPago: formData.formaPago,
+        metodoPago: formData.metodoPago,
+      };
+      const resp = await fetch(`${CREDIT_NOTES_BASE_URL}/credit-notes/guardar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!resp.ok) {
+        throw new Error('No se pudo guardar la nota de crédito en BD');
+      }
+      const data = await resp.json();
+      if (!data?.ok) {
+        const errs = (data?.errors || []) as string[];
+        const msg = errs.length ? errs.join(' | ') : 'Guardado incompleto';
+        throw new Error(msg);
+      }
+      return true;
+    } catch (e) {
+      console.warn('Fallo guardando NOTA_CREDITO:', e);
+      return false;
+    }
+  };
+
+  // Guardar únicamente en BD, sin generar PDF/XML
+  const handleGuardarFactura = async () => {
+    setMensaje(null);
+    if (!validarCampos()) {
+      setMensaje({ tipo: 'error', texto: 'Completa los datos fiscales obligatorios' });
+      return;
+    }
+    if (concepto.descripcion === 'OTRO' && !descripcionLibre.trim()) {
+      setMensaje({ tipo: 'error', texto: 'Especifica la descripción libre del concepto' });
+      return;
+    }
+
+    const rfcReceptor = `${formData.rfcIniciales}${formData.rfcFecha}${formData.rfcHomoclave}`;
+    const { subtotal, iva, total } = calcularImportes();
+    const uuidInfo = await obtenerUuidNotaCredito(formData.referenciaFactura);
+
+    const notaData = {
+      uuid: uuidInfo?.uuidNc || '',
+      rfcEmisor: empresaInfo.rfc,
+      nombreEmisor: empresaInfo.nombre,
+      rfcReceptor,
+      nombreReceptor: formData.razonSocial || `${formData.nombre} ${formData.paterno} ${formData.materno}`.trim(),
+      serie: (formData.serie || uuidInfo?.serie || 'NC'),
+      folio: (formData.folio || uuidInfo?.folio || new Date().getTime().toString().slice(-6)),
+      fechaEmision: new Date().toISOString(),
+      importe: total,
+      subtotal,
+      iva,
+      ieps: undefined,
+      conceptos: [
+        {
+          descripcion: (concepto.descripcion === 'OTRO'
+            ? descripcionLibre
+            : (CONCEPTO_DESC_OPTIONS.find(o => o.value === concepto.descripcion)?.label || concepto.descripcion)),
+          cantidad: typeof concepto.cantidad === 'number' ? concepto.cantidad : 0,
+          unidad: concepto.unidad,
+          precioUnitario: typeof concepto.precioUnitario === 'number' ? concepto.precioUnitario : 0,
+          importe: subtotal,
+        },
+      ],
+      metodoPago: formData.metodoPago,
+      formaPago: formData.formaPago,
+      usoCFDI: formData.usoCfdi,
+      referenciaFactura: formData.referenciaFactura || undefined,
+      motivo: formData.motivo || undefined,
+    };
+
+    try {
+      setGenerando(true);
+      const ok = await guardarNotaCreditoEnBD(notaData, rfcReceptor);
+      if (ok) {
+        setMensaje({ tipo: 'success', texto: 'Nota de crédito guardada correctamente' });
+      } else {
+        setMensaje({ tipo: 'error', texto: 'No se pudo guardar la nota de crédito' });
+      }
+    } catch (e: any) {
+      setMensaje({ tipo: 'error', texto: e?.message || 'Error al guardar la nota de crédito' });
+    } finally {
+      setGenerando(false);
+    }
+  };
   const convertirANotaDataParaPDF = (notaData: any) => {
     return {
       uuid: notaData.uuid,
@@ -286,6 +406,8 @@ export const NotasCreditoPage: React.FC = () => {
 
     try {
       setGenerando(true);
+      // Guardar en BD antes de generar/descargar
+      await guardarNotaCreditoEnBD(notaData, rfcReceptor);
       // Adaptar datos y llamar endpoint backend para PDF
       const facturaData = convertirANotaDataParaPDF(notaData as any);
       const response = await fetch(apiUrl('/factura/generar-pdf'), {
@@ -458,6 +580,8 @@ export const NotasCreditoPage: React.FC = () => {
   
     try {
       setGenerando(true);
+      // Guardar en BD antes de generar PDF
+      await guardarNotaCreditoEnBD(notaData, rfcReceptor);
       const facturaData = convertirANotaDataParaPDF(notaData as any);
       const response = await fetch(apiUrl('/factura/generar-pdf'), {
         method: 'POST',
@@ -538,6 +662,8 @@ export const NotasCreditoPage: React.FC = () => {
 
     try {
       setEnviandoCorreo(true);
+      // Guardar en BD antes de enviar correo
+      await guardarNotaCreditoEnBD(notaData, rfcReceptor);
       const facturaData = convertirANotaDataParaPDF(notaData);
       const response = await fetch(apiUrl('/factura/generar-pdf'), {
         method: 'POST',
@@ -643,6 +769,9 @@ export const NotasCreditoPage: React.FC = () => {
       </Card>
 
       <div className="flex justify-end mt-4">
+        <Button type="button" variant="secondary" onClick={handleGuardarFactura} disabled={generando || enviandoCorreo}>
+          Guardar factura
+        </Button>
         <Button type="button" variant="secondary" onClick={handleEnviarCorreo} disabled={generando || enviandoCorreo}>
           Enviar por correo
         </Button>
