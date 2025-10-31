@@ -10,8 +10,17 @@ export default function ConfiguracionCorreo() {
 
   useEffect(() => {
     // Cargar logo al iniciar
-    const logoGuardado = logoService.obtenerLogo();
-    setLogo(logoGuardado);
+    const initLogo = async () => {
+      const activo = await logoService.obtenerLogoActivoBackend();
+      if (activo && activo.trim() !== '') {
+        setLogo(activo);
+        logoService.guardarLogo(activo);
+      } else {
+        const logoGuardado = logoService.obtenerLogo();
+        setLogo(logoGuardado);
+      }
+    };
+    initLogo();
   }, []);
 
   const handleLogoChange = (logoBase64: string) => {
@@ -19,8 +28,13 @@ export default function ConfiguracionCorreo() {
     setGuardado(false);
   };
 
-  const handleGuardar = () => {
+  const handleGuardar = async () => {
     logoService.guardarLogo(logo);
+    try {
+      await logoService.guardarLogoBackend(logo || '');
+    } catch (e) {
+      console.warn('No se pudo persistir logo en backend:', e);
+    }
     setGuardado(true);
     setTimeout(() => setGuardado(false), 3000);
   };

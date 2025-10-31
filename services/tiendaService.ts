@@ -1,4 +1,5 @@
 // Servicio para la gestión de tiendas
+import { apiUrl } from './api';
 export interface Tienda {
   idTienda?: number;
   codigoTienda: string;
@@ -49,7 +50,7 @@ export interface FiltrosTienda {
 }
 
 class TiendaService {
-  private baseUrl = 'http://localhost:8080/api/tiendas';
+  private baseUrl = apiUrl('/tiendas');
 
   /**
    * Crear una nueva tienda
@@ -172,8 +173,8 @@ class TiendaService {
    */
   async eliminarTienda(id: number, usuarioModificacion?: string): Promise<TiendaResponse> {
     try {
-      const params = usuarioModificacion ? `?usuarioModificacion=${usuarioModificacion}` : '';
-      const response = await fetch(`${this.baseUrl}/${id}${params}`, {
+      const url = usuarioModificacion ? `${this.baseUrl}/${id}?usuarioModificacion=${encodeURIComponent(usuarioModificacion)}` : `${this.baseUrl}/${id}`;
+      const response = await fetch(url, {
         method: 'DELETE',
       });
 
@@ -247,7 +248,7 @@ class TiendaService {
   }
 
   /**
-   * Verificar el estado del servicio
+   * Health check
    */
   async healthCheck(): Promise<TiendaResponse> {
     try {
@@ -255,10 +256,10 @@ class TiendaService {
       const data = await response.json();
       return data;
     } catch (error) {
-      console.error('Error en health check:', error);
+      console.error('Error al verificar salud del servicio de tiendas:', error);
       return {
         success: false,
-        message: 'Error de conexión con el servicio',
+        message: 'Error de conexión al verificar salud del servicio de tiendas',
         error: error instanceof Error ? error.message : 'Error desconocido'
       };
     }

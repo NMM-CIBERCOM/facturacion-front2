@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Download, FileText, CheckCircle, AlertCircle } from 'lucide-react';
+import { logoService } from '../services/logoService';
 
 interface TestResult {
   success: boolean;
@@ -13,6 +14,8 @@ const ITextPdfTest: React.FC = () => {
   const [logoTest, setLogoTest] = useState<TestResult | null>(null);
 
   const API_BASE_URL = 'http://localhost:8080/api/itext';
+
+
 
   const testLogo = async () => {
     try {
@@ -81,6 +84,8 @@ const ITextPdfTest: React.FC = () => {
       setIsLoading(true);
       setTestResult(null);
       
+      const savedLogo = logoService.obtenerLogo();
+      
       const customData = {
         facturaData: {
           uuid: `CUSTOM-${Date.now()}`,
@@ -99,7 +104,7 @@ const ITextPdfTest: React.FC = () => {
           usoCFDI: 'G03'
         },
         logoConfig: {
-          logoUrl: '/images/Logo Cibercom.png',
+          ...(savedLogo ? { logoBase64: savedLogo } : { logoUrl: '/images/Logo Cibercom.png' }),
           customColors: {
             primary: '#1d4ed8',
             primaryDark: '#1e40af',
@@ -161,6 +166,8 @@ const ITextPdfTest: React.FC = () => {
           Nueva implementación de generación de PDFs usando iText con mejor manejo de logos
         </p>
       </div>
+
+      {/* Se usará el logo guardado desde Configuración de Correo */}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <button

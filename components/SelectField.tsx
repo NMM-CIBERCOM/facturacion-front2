@@ -16,6 +16,7 @@ interface SelectFieldProps {
   required?: boolean;
   className?: string;
   disabled?: boolean;
+  error?: boolean;
 }
 
 export const SelectField: React.FC<SelectFieldProps> = ({
@@ -27,12 +28,14 @@ export const SelectField: React.FC<SelectFieldProps> = ({
   required = false,
   className = '',
   disabled = false,
+  error = false,
 }) => {
   const { theme } = useContext(ThemeContext);
   const baseSelectClasses = "w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 sm:text-sm appearance-none transition-colors duration-200";
   const lightModeClasses = "border-gray-300 focus:ring-primary focus:border-primary bg-white text-gray-900";
   const darkModeClasses = "dark:border-gray-600 dark:focus:ring-secondary dark:focus:border-secondary dark:bg-gray-700 dark:text-gray-100";
   const disabledClasses = "disabled:bg-gray-100 disabled:dark:bg-gray-800 disabled:text-gray-500 disabled:dark:text-gray-400 disabled:cursor-not-allowed";
+  const errorClasses = error ? "border-red-600 focus:ring-red-600 focus:border-red-600" : "";
   
   return (
     <div className={`mb-1 ${className}`}>
@@ -48,7 +51,7 @@ export const SelectField: React.FC<SelectFieldProps> = ({
           onChange={onChange}
           required={required}
           disabled={disabled}
-          className={`${baseSelectClasses} ${theme === 'light' ? lightModeClasses : darkModeClasses} ${disabledClasses}`}
+          className={`${baseSelectClasses} ${theme === 'light' ? lightModeClasses : darkModeClasses} ${disabledClasses} ${errorClasses}`}
         >
           <option value="" disabled hidden className="text-gray-500">
             - Selecciona -

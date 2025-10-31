@@ -11,7 +11,45 @@ export const LogoUploader: React.FC<LogoUploaderProps> = ({ onLogoChange, initia
   const [logo, setLogo] = useState<string | null>(initialLogo || null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleLogoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Convierte a PNG si el formato no es soportado directamente por iText (por ejemplo WEBP)
+  const convertToPngIfNeeded = async (dataUri: string): Promise<string> => {
+    try {
+      const lower = dataUri.toLowerCase();
+      if (lower.startsWith('data:image/png;base64,') || lower.startsWith('data:image/svg+xml;base64,')) {
+        return dataUri; // ya soportado
+      }
+      // Renderizar en canvas y exportar a PNG
+      const img = new Image();
+      img.src = dataUri;
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('No se pudo cargar la imagen para convertir a PNG'));
+      });
+      const maxDim = 600; // limitar tamaño para evitar PNG excesivo
+      let { width, height } = img;
+      const scale = Math.min(1, maxDim / Math.max(width, height));
+      width = Math.max(1, Math.round(width * scale));
+      height = Math.max(1, Math.round(height * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas no disponible para conversión');
+      ctx.drawImage(img, 0, 0, width, height);
+      const pngDataUri = canvas.toDataURL('image/png');
+      // Validar tamaño resultante (<1MB)
+      const approxBytes = Math.ceil((pngDataUri.length * 3) / 4); // aproximación base64
+      if (approxBytes > 1024 * 1024) {
+        throw new Error('La imagen convertida a PNG supera 1MB. Usa una imagen más pequeña.');
+      }
+      return pngDataUri;
+    } catch (e) {
+      console.warn('Fallo convirtiendo a PNG, se usará el original:', e);
+      return dataUri; // fallback: enviamos original
+    }
+  };
+
+  const handleLogoChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     setError(null);
     
@@ -30,10 +68,15 @@ export const LogoUploader: React.FC<LogoUploaderProps> = ({ onLogoChange, initia
     }
     
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const base64 = e.target?.result as string;
-      setLogo(base64);
-      onLogoChange(base64);
+      try {
+        const normalized = await convertToPngIfNeeded(base64);
+        setLogo(normalized);
+        onLogoChange(normalized);
+      } catch (err: any) {
+        setError(err?.message || 'Error al procesar la imagen');
+      }
     };
     reader.readAsDataURL(file);
   };

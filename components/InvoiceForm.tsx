@@ -10,6 +10,7 @@ import { useEmpresa } from '../context/EmpresaContext';
 import { correoService } from '../services/correoService';
 import { configuracionCorreoService } from '../services/configuracionCorreoService';
 import { facturaService } from '../services/facturaService';
+import { ticketService, Ticket, TicketSearchFilters } from '../services/ticketService';
 import {
   PAIS_OPTIONS,
   REGIMEN_FISCAL_OPTIONS,
@@ -87,7 +88,10 @@ export const InvoiceForm: React.FC = () => {
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [facturas, setFacturas] = useState<Factura[]>([]);
   const [cargandoFacturas, setCargandoFacturas] = useState(false);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [cargandoTickets, setCargandoTickets] = useState(false);
   const [mostrarTabla, setMostrarTabla] = useState(false);
+  const [ticketSeleccionado, setTicketSeleccionado] = useState<Ticket | null>(null);
   const [paginaActual, setPaginaActual] = useState(1);
   const [elementosPorPagina] = useState(5);
   const [modalCorreo, setModalCorreo] = useState<{
@@ -172,11 +176,23 @@ export const InvoiceForm: React.FC = () => {
         
         const facturasFormateadas = data.facturas.map((factura: any) => ({
           ...factura,
-          fechaFactura: formatearFechaConMilisegundos(factura.fechaFactura || factura.fechaGeneracion),
+          // Mapear campos del backend nuevo a los usados en UI
+          fechaFactura: formatearFechaConMilisegundos(
+            factura.fechaFactura || factura.fechaGeneracion || factura.fechaTimbrado || factura.fechaEmision
+          ),
           fechaGeneracion: formatearFechaConMilisegundos(factura.fechaGeneracion),
           fechaTimbrado: formatearFechaConMilisegundos(factura.fechaTimbrado),
+          codigoFacturacion: factura.codigoFacturacion
+            || `${factura.serie || ''}${factura.folio || ''}`.trim()
+            || factura.uuid,
+          total: typeof factura.total === 'number'
+            ? factura.total
+            : (typeof factura.importe === 'number' ? factura.importe : 0),
+          estado: factura.estado || factura.estatusFacturacion || 'DESCONOCIDO',
+          rfc: factura.rfc || factura.rfcReceptor || factura.rfcEmisor || '',
+          razonSocial: factura.razonSocial || factura.nombreCliente || '',
           // Mantener fechas originales para ordenamiento
-          fechaOriginal: factura.fechaFactura || factura.fechaGeneracion || factura.fechaTimbrado
+          fechaOriginal: factura.fechaFactura || factura.fechaGeneracion || factura.fechaTimbrado || factura.fechaEmision
         }));
         
         // Verificar duplicaciones por UUID
@@ -229,11 +245,11 @@ export const InvoiceForm: React.FC = () => {
     }
   }, []);
 
-  // Cargar facturas al montar el componente
-  useEffect(() => {
-    console.log('🔄 useEffect ejecutado - cargando facturas');
-    cargarFacturas();
-  }, [cargarFacturas]);
+  // Cargar facturas sólo bajo demanda desde el botón; evitar carga automática al montar
+  // useEffect(() => {
+  //   console.log('🔄 useEffect ejecutado - cargando facturas');
+  //   cargarFacturas();
+  // }, [cargarFacturas]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -246,40 +262,33 @@ export const InvoiceForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Transformar los datos del frontend al formato que espera el backend
+      // Transformar los datos del frontend al formato que espera el backend (FacturaFrontendRequest)
       const facturaRequest = {
-        // Datos del emisor (empresa)
-        nombreEmisor: empresaInfo?.nombre || "EMPRESA EJEMPLO S.A. DE C.V.",
-        rfcEmisor: empresaInfo?.rfc || "EEJ920629TE3",
-        codigoPostalEmisor: "12345", // Código postal de la empresa
-        regimenFiscalEmisor: "601", // Régimen fiscal de la empresa
-        
-        // Datos del receptor (cliente)
-        nombreReceptor: `${formData.nombre} ${formData.paterno} ${formData.materno}`.trim(),
-        rfcReceptor: formData.rfc,
-        codigoPostalReceptor: "54321", // Código postal del cliente
-        regimenFiscalReceptor: formData.regimenFiscal,
-        
-        // Conceptos (crear un concepto básico basado en los datos del formulario)
-        conceptos: [
-          {
-            descripcion: `Servicio de facturación - ${formData.codigoFacturacion}`,
-            cantidad: 1.0,
-            unidad: "SERVICIO",
-            precioUnitario: 100.00, // Precio base
-            importe: 100.00
-          }
-        ],
-        
-        // Datos de pago
-        metodoPago: "PUE",
-        formaPago: "01",
-        usoCFDI: formData.usoCfdi
+        rfc: formData.rfc,
+        correoElectronico: formData.correoElectronico,
+        razonSocial: formData.razonSocial,
+        nombre: formData.nombre,
+        paterno: formData.paterno,
+        materno: formData.materno,
+        pais: formData.pais,
+        noRegistroIdentidadTributaria: formData.noRegistroIdentidadTributaria,
+        domicilioFiscal: formData.domicilioFiscal,
+        regimenFiscal: formData.regimenFiscal,
+        usoCfdi: formData.usoCfdi,
+        codigoFacturacion: formData.codigoFacturacion,
+        tienda: formData.tienda,
+        fecha: formData.fecha,
+        terminal: formData.terminal,
+        boleta: formData.boleta,
+        medioPago: formData.medioPago,
+        formaPago: formData.formaPago,
+        iepsDesglosado: formData.iepsDesglosado,
+        guardarEnMongo: true,
       };
 
-      console.log('📤 Enviando datos al backend:', facturaRequest);
+      console.log('📤 Enviando datos al backend (frontend):', facturaRequest);
 
-      const response = await fetch('http://localhost:8080/api/factura/generar', {
+      const response = await fetch('http://localhost:8080/api/factura/generar/frontend', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(facturaRequest),
@@ -293,44 +302,18 @@ export const InvoiceForm: React.FC = () => {
       const data = await response.json();
       console.log('📥 Respuesta del servidor:', data);
       
+      const uuid = data.uuid || data.datos?.folioFiscal || data.datosFactura?.uuid;
+
       if (data.exitoso) {
-        alert(`✅ ${data.mensaje}\nUUID: ${data.uuid}\nFactura guardada en base de datos`);
+        alert(`✅ ${data.mensaje}\nUUID: ${uuid}\nFactura guardada en base de datos`);
+        // Persistir el UUID en el formulario para acciones rápidas
+        setFormData(prev => ({ ...prev, uuid: uuid || prev.uuid }));
         
-        // Envío automático de correo con PDF adjunto si se proporcionó un correo electrónico
+        // Confirmación antes de enviar por correo
         if (formData.correoElectronico && formData.correoElectronico.trim()) {
-          try {
-            console.log('📧 Enviando correo automáticamente (directo) a:', formData.correoElectronico);
-            
-            // Obtener datos de la factura para construir variables (serie, folio)
-            let serieFactura = '';
-            let folioFactura = '';
-            try {
-              const facturaCompleta = await facturaService.obtenerFacturaPorUUID(data.uuid);
-              serieFactura = facturaCompleta.serie || '';
-              folioFactura = facturaCompleta.folio || '';
-            } catch (e) {
-              console.warn('⚠️ No fue posible obtener serie/folio por UUID, se continuará con valores por defecto:', e);
-            }
-
-            // Envío con PDF adjunto
-            const correoResponse = await correoService.enviarCorreoConPdfAdjunto({
-              uuidFactura: data.uuid,
-              correoReceptor: formData.correoElectronico,
-              asunto: `Factura ${serieFactura || 'A'}${folioFactura || '1'} - ${empresaInfo?.nombre || 'Empresa'}`,
-              mensaje: `Se ha generado su factura electrónica.\n\nGracias por su preferencia.`,
-
-              });
-            
-            if (correoResponse.success) {
-              console.log('✅ Correo enviado con PDF adjunto');
-              alert(`✅ Factura generada y correo con PDF adjunto enviado exitosamente a: ${formData.correoElectronico}`);
-            } else {
-              console.warn('⚠️ Error al enviar correo con PDF adjunto:', correoResponse.message);
-              alert(`✅ Factura generada exitosamente.\n⚠️ Error al enviar correo con PDF adjunto: ${correoResponse.message}`);
-            }
-          } catch (correoError) {
-            console.error('❌ Error al enviar correo con PDF adjunto:', correoError);
-            alert(`✅ Factura generada exitosamente.\n⚠️ Error al enviar correo con PDF adjunto. Puedes enviarlo manualmente desde la tabla de facturas.`);
+          const confirmar = window.confirm('¿Desea enviar los archivos al correo del receptor?');
+          if (confirmar) {
+            await enviarCorreoDirectoConUuid(uuid);
           }
         }
         
@@ -355,6 +338,52 @@ export const InvoiceForm: React.FC = () => {
     alert(`Boleta agregada: Código ${formData.codigoFacturacion}, Tienda ${formData.tienda}, Fecha ${formData.fecha}`);
   };
 
+  const handleBuscarTicket = async () => {
+    try {
+      setCargandoTickets(true);
+      const filtros: TicketSearchFilters = {
+        codigoTienda: formData.tienda,
+        terminalId: formData.terminal ? Number(formData.terminal) : undefined,
+        fecha: formData.fecha,
+        folio: formData.boleta ? Number(formData.boleta) : undefined,
+      };
+      const resultados = await ticketService.buscarTickets(filtros);
+      setTickets(resultados);
+      // Mostrar tabla solo si hay múltiples resultados
+      setMostrarTabla(resultados && resultados.length > 1);
+      if (!resultados || resultados.length === 0) {
+        alert('No se encontraron tickets con los filtros proporcionados.');
+      } else {
+        if (resultados.length === 1) {
+          setTicketSeleccionado(resultados[0]);
+          rellenarFormularioConTicket(resultados[0]);
+        } else {
+          setTicketSeleccionado(null);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error al consultar tickets:', error);
+      alert('Error al consultar tickets. Revisa la consola para más detalles.');
+    } finally {
+      setCargandoTickets(false);
+    }
+  };
+
+  // Rellena las secciones del formulario usando los datos del ticket encontrado
+  const rellenarFormularioConTicket = (t: Ticket) => {
+    setFormData(prev => ({
+      ...prev,
+      tienda: t.codigoTienda ?? prev.tienda,
+      fecha: t.fecha ?? prev.fecha,
+      terminal: t.terminalId != null ? String(t.terminalId) : prev.terminal,
+      boleta: t.folio != null ? String(t.folio) : prev.boleta,
+      // El backend devuelve formaPago tipo SAT (01, 03, 28...). Lo mapeamos a Medio de Pago.
+      medioPago: t.formaPago ?? prev.medioPago,
+      // Suponemos PUE por defecto si no hay valor explícito
+      formaPago: prev.formaPago || 'PUE',
+    }));
+  };
+
   const formatearMoneda = (valor: number) => {
     return new Intl.NumberFormat('es-MX', {
       style: 'currency',
@@ -365,6 +394,7 @@ export const InvoiceForm: React.FC = () => {
   const obtenerColorEstado = (estado: string) => {
     switch (estado) {
       case 'TIMBRADA':
+      case 'VIGENTE':
         return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
       case 'GENERADA':
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
@@ -377,40 +407,94 @@ export const InvoiceForm: React.FC = () => {
 
   const descargarXml = async (uuid: string, codigoFacturacion: string) => {
     try {
-      const response = await fetch(`http://localhost:8080/api/factura/descargar-xml/${uuid}`);
-      
-      if (response.ok) {
-        // Crear blob y descargar
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `FACTURA_${codigoFacturacion}.xml`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        
-        console.log(`✅ XML descargado: FACTURA_${codigoFacturacion}.xml`);
-      } else {
-        console.error('❌ Error al descargar XML:', response.statusText);
-        alert('Error al descargar el XML. Verifica que la factura tenga contenido XML.');
-      }
+      await facturaService.generarYDescargarXML(uuid);
     } catch (error) {
       console.error('❌ Error al descargar XML:', error);
       alert('Error al descargar el XML. Intenta nuevamente.');
     }
   };
 
-  // Funciones para el modal de correo
-  const abrirModalCorreo = (factura: Factura) => {
-    setModalCorreo({
-      isOpen: true,
-      facturaUuid: factura.uuid,
-      facturaInfo: factura.codigoFacturacion,
-      correoInicial: formData.correoElectronico || '',
-      rfcReceptor: factura.rfc || formData.rfc || ''
-    });
+  const descargarPdf = async (uuid: string) => {
+    try {
+      await facturaService.generarYDescargarPDF(uuid);
+    } catch (error) {
+      console.error('❌ Error al descargar PDF:', error);
+      alert(`Error al descargar PDF: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    }
+  };
+
+  // Enviar correo directo (sin modal) usando el email del formulario
+  const enviarCorreoDirectoConUuid = async (uuid: string) => {
+    const correo = (formData.correoElectronico || '').trim();
+    if (!correo || !correoService.validarEmail(correo)) {
+      alert('Ingresa un correo electrónico válido en el formulario.');
+      return;
+    }
+
+    let serieFactura = '';
+    let folioFactura = '';
+    try {
+      const facturaCompleta = await facturaService.obtenerFacturaPorUUID(uuid);
+      serieFactura = facturaCompleta.serie || '';
+      folioFactura = facturaCompleta.folio || '';
+    } catch {}
+
+    const asunto = `Factura ${serieFactura || 'A'}${folioFactura || '1'} - ${empresaInfo?.nombre || 'Empresa'}`;
+    const mensaje = `Estimado(a) cliente,\n\nSe ha generado su factura electrónica.\n\nGracias por su preferencia.`;
+
+    try {
+      const resp = await correoService.enviarCorreoConPdfAdjunto({
+        uuidFactura: uuid,
+        correoReceptor: correo,
+        asunto,
+        mensaje,
+      });
+      if (resp.success) {
+        alert(`✅ Correo enviado exitosamente a: ${correo}`);
+      } else {
+        alert(`⚠️ Error al enviar correo: ${resp.message || 'Desconocido'}`);
+      }
+    } catch (error) {
+      console.error('❌ Error al enviar correo:', error);
+      alert(`Error al enviar correo: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    }
+  };
+
+  // Acciones rápidas junto a Guardar/Cancelar usando el UUID activo
+  const descargarXmlActual = async () => {
+    const uuidActivo = (formData.uuid || '').trim();
+    if (!uuidActivo) {
+      alert('Primero guarda o consulta una factura para obtener el UUID.');
+      return;
+    }
+    await descargarXml(uuidActivo, formData.codigoFacturacion || 'Factura');
+  };
+
+  const descargarPdfActual = async () => {
+    const uuidActivo = (formData.uuid || '').trim();
+    if (!uuidActivo) {
+      alert('Primero guarda o consulta una factura para obtener el UUID.');
+      return;
+    }
+    await descargarPdf(uuidActivo);
+  };
+
+  const enviarCorreoActual = async () => {
+    const uuidActivo = (formData.uuid || '').trim();
+    if (!uuidActivo) {
+      alert('Primero guarda o consulta una factura para obtener el UUID.');
+      return;
+    }
+    await enviarCorreoDirectoConUuid(uuidActivo);
+  };
+
+  const enviarCorreoPorFactura = async (factura: Factura) => {
+    const uuidActivo = (factura.uuid || '').trim();
+    if (!uuidActivo) {
+      alert('El UUID de la factura es inválido.');
+      return;
+    }
+    await enviarCorreoDirectoConUuid(uuidActivo);
   };
 
   const cerrarModalCorreo = () => {
@@ -481,20 +565,104 @@ export const InvoiceForm: React.FC = () => {
           </div>
         </Card>
 
-        <Card title="Consultar Boleta">
+        {mostrarTabla && tickets.length > 1 && (
+          <Card title="Tickets encontrados">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tienda</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Terminal</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Folio</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IVA</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Forma Pago</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RFC</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estatus</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID Factura</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {tickets.map((t) => (
+                    <tr key={t.idTicket} className="cursor-pointer hover:bg-gray-50" onClick={() => { setTicketSeleccionado(t); rellenarFormularioConTicket(t); }}>
+                      <td className="px-4 py-2">{t.codigoTienda}</td>
+                      <td className="px-4 py-2">{new Date(t.fecha).toLocaleDateString()}</td>
+                      <td className="px-4 py-2">{t.terminalId ?? '-'}</td>
+                      <td className="px-4 py-2">{t.folio}</td>
+                      <td className="px-4 py-2">{t.subtotal?.toFixed(2)}</td>
+                      <td className="px-4 py-2">{t.iva?.toFixed(2)}</td>
+                      <td className="px-4 py-2">{t.total?.toFixed(2)}</td>
+                      <td className="px-4 py-2">{t.formaPago ?? '-'}</td>
+                      <td className="px-4 py-2">{t.nombreCliente ?? '-'}</td>
+                      <td className="px-4 py-2">{t.rfcCliente ?? '-'}</td>
+                      <td className="px-4 py-2">{t.status === 1 ? 'Activo' : 'Cancelado'}</td>
+                      <td className="px-4 py-2">{t.idFactura ?? '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+
+        <Card title="Consultar Ticket">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 items-end">
             <FormField name="codigoFacturacion" label="Código de Facturación" value={formData.codigoFacturacion} onChange={handleChange} />
             <SelectField name="tienda" label="Tienda" value={formData.tienda} onChange={handleChange} options={TIENDA_OPTIONS} />
             <FormField name="fecha" label="Fecha" type="date" value={formData.fecha} onChange={handleChange} />
             <FormField name="terminal" label="Terminal" value={formData.terminal} onChange={handleChange} />
-            <FormField name="boleta" label="Boleta" value={formData.boleta} onChange={handleChange} />
+            <FormField name="boleta" label="Ticket (Folio)" value={formData.boleta} onChange={handleChange} />
           </div>
           <div className="mt-6 flex justify-end">
-            <Button type="button" onClick={handleAgregarBoleta} variant="secondary">
-              Agregar
+            <Button type="button" onClick={handleBuscarTicket} variant="secondary" disabled={cargandoTickets}>
+              {cargandoTickets ? 'Buscando…' : 'Buscar Ticket'}
             </Button>
           </div>
         </Card>
+
+        {ticketSeleccionado && (
+          <Card title="Información del Ticket">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tienda</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Terminal</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Folio</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IVA</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Forma Pago</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RFC</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estatus</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID Factura</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  <tr>
+                    <td className="px-4 py-2">{ticketSeleccionado?.codigoTienda ?? '-'}</td>
+                    <td className="px-4 py-2">{ticketSeleccionado ? new Date(ticketSeleccionado.fecha).toLocaleDateString() : '-'}</td>
+                    <td className="px-4 py-2">{ticketSeleccionado?.terminalId ?? '-'}</td>
+                    <td className="px-4 py-2">{ticketSeleccionado?.folio ?? '-'}</td>
+                    <td className="px-4 py-2">{ticketSeleccionado?.subtotal != null ? ticketSeleccionado!.subtotal!.toFixed(2) : '-'}</td>
+                    <td className="px-4 py-2">{ticketSeleccionado?.iva != null ? ticketSeleccionado!.iva!.toFixed(2) : '-'}</td>
+                    <td className="px-4 py-2">{ticketSeleccionado?.total != null ? ticketSeleccionado!.total!.toFixed(2) : '-'}</td>
+                    <td className="px-4 py-2">{ticketSeleccionado?.formaPago ?? '-'}</td>
+                    <td className="px-4 py-2">{ticketSeleccionado?.nombreCliente ?? '-'}</td>
+                    <td className="px-4 py-2">{ticketSeleccionado?.rfcCliente ?? '-'}</td>
+                    <td className="px-4 py-2">{ticketSeleccionado?.status === 1 ? 'Activo' : 'Cancelado'}</td>
+                    <td className="px-4 py-2">{ticketSeleccionado?.idFactura ?? '-'}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
 
         <Card title="Forma de Pago">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -512,6 +680,15 @@ export const InvoiceForm: React.FC = () => {
         </Card>
 
         <div className="flex justify-end space-x-4 mt-8">
+          <Button type="button" onClick={descargarXmlActual} variant="secondary">
+            Descargar XML
+          </Button>
+          <Button type="button" onClick={descargarPdfActual} variant="secondary">
+            Descargar PDF
+          </Button>
+          <Button type="button" onClick={enviarCorreoActual} variant="secondary">
+            Enviar por Correo
+          </Button>
           <Button type="button" onClick={handleCancel} variant="neutral">
             Cancelar
           </Button>
@@ -649,7 +826,16 @@ export const InvoiceForm: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <Button
-                        onClick={() => abrirModalCorreo(factura)}
+                        onClick={() => descargarPdf(factura.uuid)}
+                        variant="secondary"
+                        className="text-xs px-2 py-1"
+                      >
+                        <ArrowDownTrayIcon className="h-4 w-4 mr-1" /> Descargar PDF
+                      </Button>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <Button
+                        onClick={() => enviarCorreoPorFactura(factura)}
                         variant="primary"
                         className="text-xs px-2 py-1"
                       >
@@ -756,6 +942,10 @@ export const InvoiceForm: React.FC = () => {
         correoInicial={modalCorreo.correoInicial}
         rfcReceptor={modalCorreo.rfcReceptor}
       />
+      {/* Modal eliminado: envío directo activo */}
     </div>
   );
 };
+
+// Dentro de handleSubmit, reemplazar envío automático por la confirmación
+// ... existing code ...

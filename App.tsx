@@ -17,7 +17,8 @@ import { DashboardPage } from './components/DashboardPage';
 
 // Facturacion Pages
 import { FacturacionInteresesPage } from './components/FacturacionInteresesPage';
-import { FacturacionCartaFacturaPage } from './components/FacturacionCartaFacturaPage';
+import { NotasCreditoPage } from './components/NotasCreditoPage';
+import { FacturacionCartaPortePage } from './components/FacturacionCartaPortePage';
 import { FacturacionGlobalPage } from './components/FacturacionGlobalPage';
 import { FacturacionMonederosPage } from './components/FacturacionMonederosPage';
 import { FacturacionCapturaLibrePage } from './components/FacturacionCapturaLibrePage';
@@ -638,7 +639,8 @@ const App: React.FC = () => {
     // Facturación
     if (activePage === 'Artículos') return <InvoiceForm />;
     if (activePage === 'Intereses') return <FacturacionInteresesPage />;
-    if (activePage === 'Carta Factura') return <FacturacionCartaFacturaPage />;
+    if (activePage === 'Notas de crédito') return <NotasCreditoPage />;
+    if (activePage === 'Carta Porte') return <FacturacionCartaPortePage />;
     if (activePage === 'Factura Global') return <FacturacionGlobalPage />;
     if (activePage === 'Monederos') return <FacturacionMonederosPage />;
     if (activePage === 'Captura Libre') return <FacturacionCapturaLibrePage />;

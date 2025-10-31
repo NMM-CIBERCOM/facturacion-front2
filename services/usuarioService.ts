@@ -23,6 +23,10 @@ export interface EmpleadoConsulta {
   estatusUsuario: string;
   fechaMod: string;
   usuarioMod: string;
+  correo?: string;
+  rfc?: string;
+  curp?: string;
+  salarioBase?: number;
 }
 
 export interface UsuarioRegistroResponse {
@@ -36,7 +40,7 @@ export interface UsuarioRegistroResponse {
   };
 }
 
-const API_BASE_URL = 'http://localhost:8080/api';
+import { API_BASE_URL } from './api';
 
 export const usuarioService = {
   async registrarUsuario(usuario: UsuarioRegistro): Promise<UsuarioRegistroResponse> {
@@ -111,7 +115,8 @@ export const usuarioService = {
 
   async consultarEmpleadosEspecificos(usuario: string): Promise<EmpleadoConsulta[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/usuarios/empleados?usuario=${encodeURIComponent(usuario)}`, {
+      // Backend espera el parámetro 'noUsuario' para filtrar por código de usuario
+      const response = await fetch(`${API_BASE_URL}/usuarios/empleados?noUsuario=${encodeURIComponent(usuario)}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

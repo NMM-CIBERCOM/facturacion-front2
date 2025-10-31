@@ -1,19 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { facturaService } from '../services/facturaService';
+import { apiUrl } from '../services/api';
+import { ThemeContext } from '../App';
 
 const TestPdfPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const { customColors, logoUrl } = useContext(ThemeContext);
 
   const generarPDFPrueba = async () => {
     setLoading(true);
     setMessage('Generando PDF de prueba...');
     
     try {
-      // Obtener configuración de logos
-      const logoConfig = await facturaService.obtenerConfiguracionLogos();
+      // Obtener configuración de logos del backend como fallback
+      const backendLogo = await facturaService.obtenerConfiguracionLogos();
       
-      if (!logoConfig.exitoso) {
+      if (!backendLogo.exitoso) {
         throw new Error('No se pudo obtener la configuración de logos');
       }
 
@@ -42,51 +45,43 @@ const TestPdfPage: React.FC = () => {
         usoCFDI: 'G01'
       };
 
+      // Preparar logoConfig priorizando colores del tema actual
+      const logoConfigFinal = {
+        logoUrl: logoUrl || backendLogo.logoUrl,
+        logoBase64: backendLogo.logoBase64,
+        customColors: customColors || backendLogo.customColors
+      };
+
       // Generar PDF
-      const response = await fetch('http://localhost:8080/api/factura/generar-pdf', {
+      const response = await fetch(apiUrl('/factura/generar-pdf'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           facturaData: facturaDataPrueba,
-          logoConfig: {
-            logoUrl: logoConfig.logoUrl,
-            logoBase64: logoConfig.logoBase64,
-            customColors: logoConfig.customColors
-          }
+          logoConfig: logoConfigFinal
         })
       });
-
+      
       if (!response.ok) {
-        throw new Error(`Error del servidor: ${response.status}`);
+        throw new Error('Error al generar PDF en el servidor');
       }
 
+      // Descargar el PDF
       const blob = await response.blob();
-      console.log('Blob creado:', blob.size, 'bytes, tipo:', blob.type);
-      
-      if (blob.size === 0) {
-        throw new Error('El PDF generado está vacío');
-      }
-      
-      if (!blob.type.includes('pdf')) {
-        console.warn('Tipo de contenido inesperado:', blob.type);
-      }
-      
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `PDF_Prueba_Logo_${Date.now()}.pdf`;
+      a.download = `Factura_${facturaDataPrueba.serie}-${facturaDataPrueba.folio}.pdf`;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
 
-      setMessage(`✅ PDF generado exitosamente con logo (${logoConfig.logoBase64?.length || 0} caracteres base64)`);
-      
+      setMessage('PDF generado y descargado correctamente.');
     } catch (error) {
-      console.error('Error generando PDF:', error);
-      setMessage(`❌ Error: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      setMessage(`Error: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     } finally {
       setLoading(false);
     }
@@ -97,10 +92,10 @@ const TestPdfPage: React.FC = () => {
     setMessage('Generando PDF para abrir en nueva pestaña...');
     
     try {
-      // Obtener configuración de logos
-      const logoConfig = await facturaService.obtenerConfiguracionLogos();
+      // Obtener configuración de logos del backend como fallback
+      const backendLogo = await facturaService.obtenerConfiguracionLogos();
       
-      if (!logoConfig.exitoso) {
+      if (!backendLogo.exitoso) {
         throw new Error('No se pudo obtener la configuración de logos');
       }
 
@@ -129,46 +124,35 @@ const TestPdfPage: React.FC = () => {
         usoCFDI: 'G01'
       };
 
+      // Preparar logoConfig priorizando colores del tema actual
+      const logoConfigFinal = {
+        logoUrl: logoUrl || backendLogo.logoUrl,
+        logoBase64: backendLogo.logoBase64,
+        customColors: customColors || backendLogo.customColors
+      };
+
       // Generar PDF
-      const response = await fetch('http://localhost:8080/api/factura/generar-pdf', {
+      const response = await fetch(apiUrl('/factura/generar-pdf'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           facturaData: facturaDataPrueba,
-          logoConfig: {
-            logoUrl: logoConfig.logoUrl,
-            logoBase64: logoConfig.logoBase64,
-            customColors: logoConfig.customColors
-          }
+          logoConfig: logoConfigFinal
         })
       });
-
+      
       if (!response.ok) {
-        throw new Error(`Error del servidor: ${response.status}`);
+        throw new Error('Error al generar PDF en el servidor');
       }
 
       const blob = await response.blob();
-      console.log('Blob creado para nueva pestaña:', blob.size, 'bytes, tipo:', blob.type);
-      
-      if (blob.size === 0) {
-        throw new Error('El PDF generado está vacío');
-      }
-      
       const url = window.URL.createObjectURL(blob);
       window.open(url, '_blank');
-      
-      // Limpiar la URL después de un tiempo
-      setTimeout(() => {
-        window.URL.revokeObjectURL(url);
-      }, 10000);
-
-      setMessage(`✅ PDF abierto en nueva pestaña (${blob.size} bytes)`);
-      
+      setMessage('PDF generado y abierto en nueva pestaña.');
     } catch (error) {
-      console.error('Error generando PDF:', error);
-      setMessage(`❌ Error: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      setMessage(`Error: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     } finally {
       setLoading(false);
     }
@@ -179,12 +163,12 @@ const TestPdfPage: React.FC = () => {
     setMessage('Probando endpoint de logo...');
     
     try {
-      const logoConfig = await facturaService.obtenerConfiguracionLogos();
+      const backendLogo = await facturaService.obtenerConfiguracionLogos();
       
-      if (logoConfig.exitoso) {
-        setMessage(`✅ Logo obtenido: ${logoConfig.logoBase64?.length || 0} caracteres, URL: ${logoConfig.logoUrl}`);
+      if (backendLogo.exitoso) {
+        setMessage(`✅ Logo obtenido: ${backendLogo.logoBase64?.length || 0} caracteres, URL: ${backendLogo.logoUrl}`);
       } else {
-        setMessage(`❌ Error obteniendo logo: ${logoConfig.error}`);
+        setMessage(`❌ Error obteniendo logo: ${backendLogo.error}`);
       }
     } catch (error) {
       setMessage(`❌ Error: ${error instanceof Error ? error.message : 'Error desconocido'}`);
@@ -194,67 +178,33 @@ const TestPdfPage: React.FC = () => {
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="bg-white rounded-lg shadow-lg p-6">
-        <h1 className="text-2xl font-bold text-gray-800 mb-6">🧪 Prueba de PDF con Logo</h1>
-        
-        <div className="space-y-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h2 className="text-lg font-semibold text-blue-800 mb-2">Prueba de Logo</h2>
-            <p className="text-blue-600 mb-4">Verifica que el endpoint de logos funcione correctamente</p>
-            <button
-              onClick={probarEndpointLogo}
-              disabled={loading}
-              className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white px-4 py-2 rounded-lg transition-colors"
-            >
-              {loading ? 'Probando...' : 'Probar Endpoint Logo'}
-            </button>
-          </div>
-
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <h2 className="text-lg font-semibold text-green-800 mb-2">Generar PDF de Prueba</h2>
-            <p className="text-green-600 mb-4">Genera un PDF completo con datos de prueba y logo</p>
-            <div className="space-y-2">
-              <button
-                onClick={generarPDFPrueba}
-                disabled={loading}
-                className="bg-green-500 hover:bg-green-600 disabled:bg-green-300 text-white px-4 py-2 rounded-lg transition-colors mr-2"
-              >
-                {loading ? 'Generando...' : 'Descargar PDF'}
-              </button>
-              <button
-                onClick={abrirPDFEnNuevaPestana}
-                disabled={loading}
-                className="bg-purple-500 hover:bg-purple-600 disabled:bg-purple-300 text-white px-4 py-2 rounded-lg transition-colors"
-              >
-                {loading ? 'Generando...' : 'Abrir en Nueva Pestaña'}
-              </button>
-            </div>
-          </div>
-
-          {message && (
-            <div className={`p-4 rounded-lg ${
-              message.includes('✅') 
-                ? 'bg-green-100 border border-green-200 text-green-800'
-                : message.includes('❌')
-                ? 'bg-red-100 border border-red-200 text-red-800'
-                : 'bg-yellow-100 border border-yellow-200 text-yellow-800'
-            }`}>
-              <p className="font-medium">{message}</p>
-            </div>
-          )}
-        </div>
-
-        <div className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-4">
-          <h3 className="text-md font-semibold text-gray-700 mb-2">Información Técnica</h3>
-          <ul className="text-sm text-gray-600 space-y-1">
-            <li>• Backend: http://localhost:8080</li>
-            <li>• Endpoint PDF: /api/factura/generar-pdf</li>
-            <li>• Endpoint Logo: /api/logos/configuracion</li>
-            <li>• Formato: SVG en Base64</li>
-          </ul>
-        </div>
+    <div className="p-4 space-y-4">
+      <div className="space-x-2">
+        <button
+          onClick={generarPDFPrueba}
+          disabled={loading}
+          className="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark"
+        >
+          Generar y descargar PDF
+        </button>
+        <button
+          onClick={abrirPDFEnNuevaPestana}
+          disabled={loading}
+          className="px-4 py-2 bg-secondary text-white rounded hover:bg-secondary-dark"
+        >
+          Abrir PDF en nueva pestaña
+        </button>
+        <button
+          onClick={probarEndpointLogo}
+          disabled={loading}
+          className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+        >
+          Probar endpoint de logo
+        </button>
       </div>
+      {message && (
+        <div className="mt-2 text-sm text-gray-700">{message}</div>
+      )}
     </div>
   );
 };

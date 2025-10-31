@@ -15,6 +15,7 @@ interface RfcFieldProps {
   className?: string;
   disabled?: boolean;
   onSearchClick?: () => void;
+  error?: boolean;
 }
 
 export const RfcField: React.FC<RfcFieldProps> = ({
@@ -26,12 +27,14 @@ export const RfcField: React.FC<RfcFieldProps> = ({
   className = '',
   disabled = false,
   onSearchClick,
+  error = false,
 }) => {
   const { theme } = useContext(ThemeContext);
   const baseInputClasses = "px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 sm:text-sm transition-colors duration-200";
   const lightModeClasses = "border-gray-300 placeholder-gray-400 focus:ring-primary focus:border-primary bg-white text-gray-900";
   const darkModeClasses = "dark:border-gray-600 dark:placeholder-gray-500 dark:focus:ring-secondary dark:focus:border-secondary dark:bg-gray-700 dark:text-gray-100";
   const disabledClasses = "disabled:bg-gray-100 disabled:dark:bg-gray-800 disabled:text-gray-500 disabled:dark:text-gray-400 disabled:cursor-not-allowed";
+  const errorClasses = error ? "border-red-600 focus:ring-red-600 focus:border-red-600" : "";
 
   return (
     <div className={`mb-1 ${className}`}>
@@ -49,7 +52,7 @@ export const RfcField: React.FC<RfcFieldProps> = ({
           placeholder="Iniciales"
           required={required}
           disabled={disabled}
-          className={`${baseInputClasses} ${theme === 'light' ? lightModeClasses : darkModeClasses} ${disabledClasses} flex-1 w-1/3`}
+          className={`${baseInputClasses} ${theme === 'light' ? lightModeClasses : darkModeClasses} ${disabledClasses} ${errorClasses} flex-1 w-1/3`}
           maxLength={4}
         />
         <input
@@ -61,7 +64,7 @@ export const RfcField: React.FC<RfcFieldProps> = ({
           placeholder="AAMMDD"
           required={required}
           disabled={disabled}
-          className={`${baseInputClasses} ${theme === 'light' ? lightModeClasses : darkModeClasses} ${disabledClasses} flex-1 w-1/3`}
+          className={`${baseInputClasses} ${theme === 'light' ? lightModeClasses : darkModeClasses} ${disabledClasses} ${errorClasses} flex-1 w-1/3`}
           maxLength={6}
         />
         <input
@@ -73,7 +76,7 @@ export const RfcField: React.FC<RfcFieldProps> = ({
           placeholder="Homoclave"
           required={required}
           disabled={disabled}
-          className={`${baseInputClasses} ${theme === 'light' ? lightModeClasses : darkModeClasses} ${disabledClasses} flex-1 w-1/3`}
+          className={`${baseInputClasses} ${theme === 'light' ? lightModeClasses : darkModeClasses} ${disabledClasses} ${errorClasses} flex-1 w-1/3`}
           maxLength={3}
         />
         {onSearchClick && (
