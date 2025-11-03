@@ -5,6 +5,8 @@ import { SelectField } from './SelectField';
 import { Button } from './Button';
 import { ALMACEN_OPTIONS, MOTIVO_SUSTITUCION_OPTIONS, TIENDA_OPTIONS } from '../constants';
 import { facturaService } from '../services/facturaService';
+import { apiUrl, pacUrl } from '../services/api';
+import { ticketService } from '../services/ticketService';
 import { ArrowDownTrayIcon } from './icons/ArrowDownTrayIcon';
 
 interface ConsultaFacturasFormData {
@@ -82,12 +84,20 @@ export const ConsultasFacturasPage: React.FC = () => {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [perfilUsuario] = useState<string>('OPERADOR');
-  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
+  const [refreshInterval, setRefreshInterval] = useState<ReturnType<typeof setInterval> | null>(null);
   const [actualizando, setActualizando] = useState(false);
   const [facturasSeleccionadas, setFacturasSeleccionadas] = useState<Set<string>>(new Set());
   const [descargandoPDF, setDescargandoPDF] = useState<string | null>(null);
   const [descargandoZIP, setDescargandoZIP] = useState(false);
   const [descargandoXML, setDescargandoXML] = useState<string | null>(null);
+  const [relacionesPorUuid, setRelacionesPorUuid] = useState<Record<string, {
+    tickets: number;
+    detalles: number;
+    cartaPorte: boolean;
+    notasCredito: number;
+    loading?: boolean;
+    error?: string;
+  }>>({});
   
   // Limpiar el intervalo cuando el componente se desmonte
   useEffect(() => {
@@ -187,21 +197,18 @@ export const ConsultasFacturasPage: React.FC = () => {
     startAutoRefresh();
   };
   
-  // Función para refrescar los datos de facturas
+  // Función para refrescar los datos de facturas (UUID únicamente)
   const refreshFacturas = async () => {
     if (!mostrarResultados || !formData) return;
     
     setActualizando(true);
     try {
       const requestData = {
-        ...formData,
+        uuid: formData.uuid.trim(),
         perfilUsuario: perfilUsuario,
-        fechaInicio: formData.fechaInicio && formData.fechaInicio.trim() ? new Date(formData.fechaInicio).toISOString().split('T')[0] : null,
-        fechaFin: formData.fechaFin && formData.fechaFin.trim() ? new Date(formData.fechaFin).toISOString().split('T')[0] : null,
-        fechaTienda: formData.fechaTienda && formData.fechaTienda.trim() ? new Date(formData.fechaTienda).toISOString().split('T')[0] : null
       };
 
-      const response = await fetch('http://localhost:8080/api/consulta-facturas/buscar', {
+      const response = await fetch(apiUrl('/consulta-facturas/buscar'), {
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' }, 
         body: JSON.stringify(requestData)
@@ -209,6 +216,15 @@ export const ConsultasFacturasPage: React.FC = () => {
 
       const data: ConsultaFacturaResponse = await response.json();
       if (data.exitoso) {
+        // Log de diagnóstico: verificar las claves reales que llegan del backend
+        try {
+          const first = (data.facturas || [])[0];
+          if (first) {
+            // Evitar logs ruidosos si ya se registró antes
+            console.debug('[ConsultaFacturas] refreshFacturas primer registro:', first);
+            console.debug('[ConsultaFacturas] claves recibidas:', Object.keys(first || {}));
+          }
+        } catch {}
         setResultados(data.facturas || []);
       }
     } catch (err) {
@@ -238,7 +254,7 @@ export const ConsultasFacturasPage: React.FC = () => {
 
   const consultarEstatusPac = async (uuid: string): Promise<string | null> => {
     try {
-      const resp = await fetch(`http://localhost:8085/api/pac/status/${uuid}`);
+      const resp = await fetch(pacUrl(`/pac/status/${uuid}`));
       if (!resp.ok) return null;
       const data = await resp.json();
       return data?.status || null;
@@ -255,7 +271,7 @@ export const ConsultasFacturasPage: React.FC = () => {
       setResultados(prev => prev.map(f => {
         if (f.uuid !== uuid) return f;
         if (status === 'CANCELADA') {
-          return { ...f, estatusFacturacion: 'Cancelada', estatusSat: 'Cancelada', permiteCancelacion: false };
+          return { ...f, estatusFacturacion: '2', estatusSat: 'Cancelada', permiteCancelacion: false };
         }
         // RECHAZADA u otro
         return { ...f, estatusFacturacion: f.estatusFacturacion, estatusSat: f.estatusSat, permiteCancelacion: true };
@@ -263,6 +279,142 @@ export const ConsultasFacturasPage: React.FC = () => {
       clearInterval(interval);
     }, 3000);
   };
+
+  // Carga relaciones para una factura específica
+  const cargarRelacionesParaFactura = async (factura: Factura) => {
+    const uuid = factura.uuid;
+    // Marcar loading
+    setRelacionesPorUuid(prev => ({
+      ...prev,
+      [uuid]: { ...(prev[uuid] || { tickets: 0, detalles: 0, cartaPorte: false, notasCredito: 0 }), loading: true, error: undefined },
+    }));
+
+    try {
+      // 1) Notas de crédito relacionadas por UUID origen
+      let notasCredito = 0;
+      try {
+        const resp = await fetch(apiUrl(`/credit-notes/search?uuidFacturaOrigen=${encodeURIComponent(uuid)}`));
+        const data = await resp.json().catch(() => null);
+        if (resp.ok) {
+          const lista = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : (Array.isArray(data?.resultados) ? data.resultados : []));
+          notasCredito = Array.isArray(lista) ? lista.length : 0;
+        } else {
+          // Fallback con otro nombre de parámetro si el primero no está soportado
+          const resp2 = await fetch(apiUrl(`/credit-notes/search?uuidFactura=${encodeURIComponent(uuid)}`));
+          const data2 = await resp2.json().catch(() => null);
+          const lista2 = Array.isArray(data2) ? data2 : (Array.isArray(data2?.data) ? data2.data : (Array.isArray(data2?.resultados) ? data2.resultados : []));
+          notasCredito = Array.isArray(lista2) ? lista2.length : 0;
+        }
+      } catch (_) {
+        notasCredito = 0;
+      }
+
+      // 2) Tickets y Detalles: preferir búsqueda por ID_FACTURA (resuelto por UUID)
+      let tickets = 0;
+      let detalles = 0;
+      try {
+        // Intentar resolver ID_FACTURA por UUID
+        let idFactura: number | undefined = undefined;
+        try {
+          const idResp = await fetch(apiUrl(`/factura/id-factura/${encodeURIComponent(uuid)}`));
+          const idData = await idResp.json().catch(() => null);
+          const idVal = idData?.idFactura ?? idData?.data?.idFactura;
+          const parsedId = parseInt(String(idVal), 10);
+          if (!isNaN(parsedId) && parsedId > 0) idFactura = parsedId;
+        } catch { /* noop */ }
+
+        if (idFactura && idFactura > 0) {
+          const encontrados = await ticketService.buscarTicketsPorIdFactura(idFactura);
+          tickets = Array.isArray(encontrados) ? encontrados.length : 0;
+          const detallesArr = await ticketService.buscarDetallesPorIdFactura(idFactura);
+          detalles = Array.isArray(detallesArr) ? detallesArr.length : 0;
+        } else {
+          // Fallback: columnas Oracle (tienda/terminal/boleta) para buscar tickets
+          const colResp = await fetch(apiUrl(`/factura/oracle/columns/${encodeURIComponent(uuid)}`));
+          const colData = await colResp.json().catch(() => null);
+          let codigoTienda: string | undefined = colData?.tienda || colData?.tiendaOrigen || factura.tienda;
+          let terminalId: number | undefined = undefined;
+          let folio: number | undefined = undefined;
+          // Terminal puede venir como string o número
+          const t = colData?.terminal || colData?.terminalBol || colData?.tr || colData?.terminalId;
+          if (t !== undefined && t !== null) {
+            const parsed = parseInt(String(t), 10);
+            terminalId = isNaN(parsed) ? undefined : parsed;
+          }
+          const b = colData?.boleta || colData?.boletaBol || colData?.folio || factura.folio;
+          if (b !== undefined && b !== null) {
+            const parsedB = parseInt(String(b), 10);
+            folio = isNaN(parsedB) ? undefined : parsedB;
+          }
+
+          const fecha = (() => {
+            try {
+              return new Date(factura.fechaEmision).toISOString().split('T')[0];
+            } catch { return undefined; }
+          })();
+
+          const encontrados = await ticketService.buscarTickets({ codigoTienda, terminalId, folio, fecha });
+          tickets = Array.isArray(encontrados) ? encontrados.length : 0;
+
+          // Para evitar demasiadas llamadas, contamos detalles de hasta 3 tickets
+          const maxDetallesTickets = (encontrados || []).slice(0, 3);
+          for (const tk of maxDetallesTickets) {
+            if (!tk?.idTicket) continue;
+            try {
+              const detResp = await fetch(apiUrl(`/tickets/${encodeURIComponent(String(tk.idTicket))}/detalles`));
+              const detData = await detResp.json().catch(() => null);
+              const arr = Array.isArray(detData) ? detData : (Array.isArray(detData?.data) ? detData.data : (Array.isArray(detData?.detalles) ? detData.detalles : []));
+              detalles += Array.isArray(arr) ? arr.length : 0;
+            } catch (_) {
+              // Ignorar errores por ticket individual
+            }
+          }
+        }
+      } catch (_) {
+        tickets = 0; detalles = 0;
+      }
+
+      // 3) Carta Porte: detectar complementos en XML del CFDI
+      let cartaPorte = false;
+      try {
+        const datosFactura = await facturaService.obtenerFacturaPorUUID(uuid);
+        const xml = datosFactura?.xmlContent || '';
+        if (xml && typeof xml === 'string') {
+          const hasCp = /CartaPorte/i.test(xml) || /cartaporte/i.test(xml) || /cce20:ComplementoCartaPorte/i.test(xml);
+          cartaPorte = !!hasCp;
+        } else {
+          // Si no hay xml en backend principal, intentar PAC
+          const cfdi = await facturaService.consultarCfdiPorUUID({ uuid, tipo: 'I' });
+          // No expone XML, pero si basicos/relacionados. Como heurística: si tipoRelacion indica CP o existen uuids relacionados de tipo transporte
+          const tipoRel = (cfdi?.relacionados?.tipoRelacion || '').toUpperCase();
+          cartaPorte = tipoRel.includes('CARTA') || tipoRel.includes('CP');
+        }
+      } catch (_) {
+        cartaPorte = false;
+      }
+
+      setRelacionesPorUuid(prev => ({
+        ...prev,
+        [uuid]: { tickets, detalles, cartaPorte, notasCredito, loading: false }
+      }));
+    } catch (err) {
+      setRelacionesPorUuid(prev => ({
+        ...prev,
+        [uuid]: { ...(prev[uuid] || { tickets: 0, detalles: 0, cartaPorte: false, notasCredito: 0 }), loading: false, error: 'Error cargando relaciones' }
+      }));
+    }
+  };
+
+  // Disparar carga de relaciones cada vez que cambian los resultados
+  useEffect(() => {
+    if (!mostrarResultados || resultados.length === 0) return;
+    const uuidsPendientes = resultados.map(f => f.uuid).filter(uuid => !relacionesPorUuid[uuid] || relacionesPorUuid[uuid].loading === undefined);
+    uuidsPendientes.forEach(uuid => {
+      const f = resultados.find(x => x.uuid === uuid);
+      if (f) cargarRelacionesParaFactura(f);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resultados, mostrarResultados]);
 
   const submitCancel = async () => {
     if (!cancelModal.uuid) return;
@@ -281,7 +433,7 @@ export const ConsultasFacturasPage: React.FC = () => {
       if (cancelModal.motivo === '01') {
         payload.uuidSustituto = (cancelModal.uuidSustituto || '').trim();
       }
-      const resp = await fetch('http://localhost:8080/api/consulta-facturas/cancelar', {
+      const resp = await fetch(apiUrl('/consulta-facturas/cancelar'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -300,9 +452,10 @@ export const ConsultasFacturasPage: React.FC = () => {
           closeCancelModal();
         } else {
           // EN_PROCESO o desconocido: marcar en proceso y comenzar polling
+          // Marcar estado en proceso usando código/descripcion coherentes
           setResultados(prev => prev.map(f =>
             f.uuid === uuid
-              ? { ...f, estatusFacturacion: 'En proceso', estatusSat: 'En proceso', permiteCancelacion: false }
+              ? { ...f, estatusFacturacion: '1', estatusSat: 'En proceso de cancelación', permiteCancelacion: false }
               : f
           ));
           closeCancelModal();
@@ -322,30 +475,11 @@ export const ConsultasFacturasPage: React.FC = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
     if (error) setError(null);
   };
-
+  
   const validarFormulario = (): { valido: boolean; mensaje?: string } => {
-    const tieneCampo = 
-      formData.rfcReceptor.trim() ||
-      formData.nombreCliente.trim() ||
-      formData.apellidoPaterno.trim() ||
-      formData.razonSocial.trim() ||
-      (formData.almacen && formData.almacen !== 'todos') ||
-      formData.usuario.trim() ||
-      formData.serie.trim() ||
-      (formData.fechaInicio && formData.fechaFin);
-
-    if (!tieneCampo) {
-      return { valido: false, mensaje: "Es necesario seleccionar RFC receptor o Nombre y Apellido Paterno o Razón Social o Almacén o Usuario o Serie" };
+    if (!formData.uuid.trim()) {
+      return { valido: false, mensaje: "Ingrese un UUID para realizar la consulta" };
     }
-
-    if (formData.fechaInicio && formData.fechaFin) {
-      const fechaInicio = new Date(formData.fechaInicio);
-      const fechaFin = new Date(formData.fechaFin);
-      const dias = Math.ceil((fechaFin.getTime() - fechaInicio.getTime()) / (1000 * 60 * 60 * 24));
-      if (dias < 0) return { valido: false, mensaje: "La fecha de inicio no puede ser posterior a la fecha fin" };
-      if (dias > 365) return { valido: false, mensaje: "El rango máximo permitido es de 365 días. Reintente" };
-    }
-
     return { valido: true };
   };
 
@@ -359,19 +493,24 @@ export const ConsultasFacturasPage: React.FC = () => {
 
     try {
       const requestData = {
-        ...formData,
+        uuid: formData.uuid.trim(),
         perfilUsuario: perfilUsuario,
-        fechaInicio: formData.fechaInicio && formData.fechaInicio.trim() ? new Date(formData.fechaInicio).toISOString().split('T')[0] : null,
-        fechaFin: formData.fechaFin && formData.fechaFin.trim() ? new Date(formData.fechaFin).toISOString().split('T')[0] : null,
-        fechaTienda: formData.fechaTienda && formData.fechaTienda.trim() ? new Date(formData.fechaTienda).toISOString().split('T')[0] : null
       };
 
-      const response = await fetch('http://localhost:8080/api/consulta-facturas/buscar', {
+      const response = await fetch(apiUrl('/consulta-facturas/buscar'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestData)
       });
 
       const data: ConsultaFacturaResponse = await response.json();
       if (data.exitoso) {
+        // Log de diagnóstico: verificar las claves reales que llegan del backend
+        try {
+          const first = (data.facturas || [])[0];
+          if (first) {
+            console.debug('[ConsultaFacturas] handleSubmit primer registro:', first);
+            console.debug('[ConsultaFacturas] claves recibidas:', Object.keys(first || {}));
+          }
+        } catch {}
         setResultados(data.facturas || []);
         setMostrarResultados(true);
         setError(null);
@@ -394,6 +533,116 @@ export const ConsultasFacturasPage: React.FC = () => {
 
   const formatearFecha = (fecha: string) => {
     try { return new Date(fecha).toLocaleDateString('es-MX'); } catch { return fecha; }
+  };
+
+  // Catálogo de estados de factura (mapea código -> descripción)
+  const ESTADO_FACTURA_CATALOGO: Record<string, string> = {
+    '66': 'POR TIMBRAR',
+    '0': 'EMITIDA',
+    '1': 'EN PROCESO DE CANCELACION',
+    '2': 'CANCELADA EN SAT',
+    '3': 'DE PASO',
+    '4': 'EN PROCESO DE EMISION',
+    '99': 'FACTURA TEMPORAL',
+    '67': 'EN ESPERA DE CANCELACION BOLETA QUE SUSTITUYE',
+  };
+
+  // Normaliza strings (quita espacios extra y pone mayúsculas uniformes para comparación)
+  const normalize = (s?: string) => (s || '').toString().trim();
+
+  // Normalizador de descripciones: quita acentos, une espacios y estandariza
+  const normalizeDesc = (s?: string) => {
+    const raw = (s || '').toString().trim().toUpperCase();
+    // Reemplazar acentos comunes y separadores
+    const sinAcentos = raw
+      .replace(/[ÁÀÂÄ]/g, 'A')
+      .replace(/[ÉÈÊË]/g, 'E')
+      .replace(/[ÍÌÎÏ]/g, 'I')
+      .replace(/[ÓÒÔÖ]/g, 'O')
+      .replace(/[ÚÙÛÜ]/g, 'U')
+      .replace(/[Ñ]/g, 'N')
+      .replace(/[_-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return sinAcentos;
+  };
+
+  // Construye "código - descripción" para estatus de facturación
+  const formatFacturaEstatus = (estatusFacturacion?: string, fallbackDesc?: string) => {
+    const raw = normalize(estatusFacturacion);
+    const descFallback = normalize(fallbackDesc);
+
+    // 1) Si viene código exacto conocido
+    if (raw && ESTADO_FACTURA_CATALOGO[raw]) {
+      return `${raw} - ${ESTADO_FACTURA_CATALOGO[raw]}`;
+    }
+
+    // 2) Si viene código con formatos raros (ej. "4.0", "04", " 4 ")
+    const digitsOnly = raw.replace(/[^0-9]/g, '');
+    if (digitsOnly && ESTADO_FACTURA_CATALOGO[digitsOnly]) {
+      return `${digitsOnly} - ${ESTADO_FACTURA_CATALOGO[digitsOnly]}`;
+    }
+
+    // 3) Si viene descripción, intentar mapear variantes comunes
+    const descNorm = normalizeDesc(raw);
+    const descMap: Record<string, string> = {
+      'POR TIMBRAR': '66',
+      'EMITIDA': '0',
+      'ACTIVA': '0',
+      'VIGENTE': '0',
+      'EN PROCESO DE CANCELACION': '1',
+      'CANCELADA EN SAT': '2',
+      'DE PASO': '3',
+      'EN PROCESO DE EMISION': '4',
+      'EN PROCESO EMISION': '4',
+      'FACTURA TEMPORAL': '99',
+      'EN ESPERA DE CANCELACION BOLETA QUE SUSTITUYE': '67',
+    };
+    const mappedCode = descMap[descNorm];
+    if (mappedCode && ESTADO_FACTURA_CATALOGO[mappedCode]) {
+      return `${mappedCode} - ${ESTADO_FACTURA_CATALOGO[mappedCode]}`;
+    }
+
+    // 4) Intento inverso estricto contra catálogo (por si ya viene igual)
+    const strictEntry = Object.entries(ESTADO_FACTURA_CATALOGO)
+      .find(([, d]) => normalizeDesc(d) === descNorm);
+    if (strictEntry) {
+      const [code, desc] = strictEntry;
+      return `${code} - ${desc}`;
+    }
+
+    // 5) Último recurso: combinar raw con fallback (por ejemplo, SAT trae la descripción)
+    if (raw && descFallback) return `${raw} - ${descFallback}`;
+    return raw || descFallback || '-';
+  };
+
+  // Determina si la factura debería permitir cancelación desde UI
+  const permiteCancelarUI = (f: Factura) => {
+    // Si backend ya lo permite, respetar
+    if (f.permiteCancelacion) return true;
+
+    // Normalizaciones para comparar distintas variantes
+    const efRaw = normalize(f.estatusFacturacion);
+    const esRaw = normalize(f.estatusSat);
+    const efNorm = normalizeDesc(efRaw);
+    const esNorm = normalizeDesc(esRaw);
+    const efDigits = efRaw.replace(/[^0-9]/g, '');
+    const esDigits = esRaw.replace(/[^0-9]/g, '');
+
+    const contienePermitidos = (s: string) => {
+      const n = normalizeDesc(s);
+      return ['EMITIDA', 'ACTIVA', 'VIGENTE'].some(t => n.includes(t));
+    };
+
+    const efPermite = contienePermitidos(efNorm) || efDigits === '0';
+    const esPermite = contienePermitidos(esNorm) || esDigits === '0';
+
+    // No permitir si está en proceso de cancelación ya
+    const enProcesoCancel = efNorm.includes('EN PROCESO DE CANCELACION') || esNorm.includes('EN PROCESO DE CANCELACION');
+    if (enProcesoCancel) return false;
+
+    // Permitir si ambos estatus indican emitida/activa/vigente
+    return efPermite && esPermite;
   };
 
   return (
@@ -484,6 +733,10 @@ export const ConsultasFacturasPage: React.FC = () => {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Estatus SAT</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Tienda</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Almacén</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Tickets</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Detalles</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Carta Porte</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Notas Crédito</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Acciones</th>
                     </tr>
                   </thead>
@@ -507,22 +760,64 @@ export const ConsultasFacturasPage: React.FC = () => {
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{factura.folio}</td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{formatearFecha(factura.fechaEmision)}</td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{formatearMoneda(factura.importe)}</td>
+                        {/* Estatus Facturación: mostrar "código - descripción" y soportar claves alternativas */}
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">
-                          <span className={`px-2 py-1 rounded-full text-xs ${
-                            factura.estatusFacturacion === 'Vigente' || factura.estatusFacturacion === 'Activa' || factura.estatusFacturacion === 'Emitida'
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
-                              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                          }`}>{factura.estatusFacturacion}</span>
+                          {(() => {
+                            // Soportar posibles claves en distintas convenciones (camelCase y MAYÚSCULAS)
+                            const f: any = factura as any;
+                            const estatusValue: string = (
+                              f?.estatusFacturacion ??
+                              f?.estatusFactura ??
+                              f?.estado ??
+                              f?.ESTATUS_FACTURACION ??
+                              f?.ESTATUS_FACTURA ??
+                              f?.ESTADO ??
+                              ''
+                            );
+                            const satValue: string = f?.estatusSat ?? f?.ESTATUS_SAT ?? f?.STATUS_SAT ?? '';
+                            return formatFacturaEstatus(estatusValue, satValue);
+                          })()}
                         </td>
+                        {/* Estatus SAT: mostrar descripción tal cual */}
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">
-                          <span className={`px-2 py-1 rounded-full text-xs ${
-                            factura.estatusSat === 'Vigente' || factura.estatusSat === 'Activa' || factura.estatusSat === 'Emitida'
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
-                              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                          }`}>{factura.estatusSat}</span>
+                          {normalize(factura.estatusSat) || '-'}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{factura.tienda}</td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{factura.almacen}</td>
+                        {/* Tickets */}
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">
+                          {relacionesPorUuid[factura.uuid]?.loading ? (
+                            <span className="inline-flex items-center text-blue-600"><span className="mr-1 h-3 w-3 rounded-full border-2 border-blue-600 border-t-transparent animate-spin"/>Cargando</span>
+                          ) : (
+                            relacionesPorUuid[factura.uuid]?.tickets ?? '-'
+                          )}
+                        </td>
+                        {/* Detalles */}
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">
+                          {relacionesPorUuid[factura.uuid]?.loading ? (
+                            <span className="inline-flex items-center text-blue-600"><span className="mr-1 h-3 w-3 rounded-full border-2 border-blue-600 border-t-transparent animate-spin"/>Cargando</span>
+                          ) : (
+                            relacionesPorUuid[factura.uuid]?.detalles ?? '-'
+                          )}
+                        </td>
+                        {/* Carta Porte */}
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">
+                          {relacionesPorUuid[factura.uuid]?.loading ? (
+                            <span className="inline-flex items-center text-blue-600"><span className="mr-1 h-3 w-3 rounded-full border-2 border-blue-600 border-t-transparent animate-spin"/>Cargando</span>
+                          ) : (
+                            <span className={`px-2 py-1 rounded-full text-xs ${relacionesPorUuid[factura.uuid]?.cartaPorte ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'}`}>
+                              {relacionesPorUuid[factura.uuid]?.cartaPorte ? 'Sí' : 'No'}
+                            </span>
+                          )}
+                        </td>
+                        {/* Notas de crédito */}
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">
+                          {relacionesPorUuid[factura.uuid]?.loading ? (
+                            <span className="inline-flex items-center text-blue-600"><span className="mr-1 h-3 w-3 rounded-full border-2 border-blue-600 border-t-transparent animate-spin"/>Cargando</span>
+                          ) : (
+                            relacionesPorUuid[factura.uuid]?.notasCredito ?? '-'
+                          )}
+                        </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">
                           <div className="flex items-center space-x-2">
                             {/* Botón PDF */}
@@ -568,7 +863,7 @@ export const ConsultasFacturasPage: React.FC = () => {
                             </button>
                             
                             {/* Botón Cancelar */}
-                            {factura.permiteCancelacion ? (
+                            {permiteCancelarUI(factura) ? (
                               <Button variant="secondary" size="sm" onClick={() => openCancelModal(factura)}>Cancelar</Button>
                             ) : (
                               <span className="text-xs text-gray-500 cursor-help" title={factura.motivoNoCancelacion || 'No permite cancelación'}>No cancelable</span>

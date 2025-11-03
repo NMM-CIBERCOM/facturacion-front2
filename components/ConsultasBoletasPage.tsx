@@ -5,116 +5,30 @@ import { SelectField } from './SelectField';
 import { Button } from './Button';
 import { FileInputField } from './FileInputField';
 import { TIENDA_OPTIONS } from '../constants';
+import { ticketService, Ticket, TicketDetalle } from '../services/ticketService';
 
 interface ConsultaIndividualFormData {
   tienda: string;
   fecha: string;
-  terminal: string;
-  boleta: string;
-  codigoFacturacion: string;
+  terminal: string; // opcional, numérico si aplica
+  folio: string;
 }
-
-interface Boleta {
-  id: number;
-  tienda: string;
-  fecha: string;
-  terminal: string;
-  boleta: string;
-  codigoFacturacion: string;
-  total: number;
-  estatus: string;
-  cliente: string;
-  articulos: number;
-  hora: string;
-  cajero: string;
-}
-
-const boletasMuestra: Boleta[] = [
-  {
-    id: 1,
-    tienda: 'T001',
-    fecha: '2023-10-15',
-    terminal: 'TERM01',
-    boleta: 'B001',
-    codigoFacturacion: 'CF001',
-    total: 1250.50,
-    estatus: 'Disponible',
-    cliente: 'Cliente General',
-    articulos: 5,
-    hora: '10:30',
-    cajero: 'Juan Pérez'
-  },
-  {
-    id: 2,
-    tienda: 'T001',
-    fecha: '2023-10-15',
-    terminal: 'TERM01',
-    boleta: 'B002',
-    codigoFacturacion: 'CF002',
-    total: 3450.75,
-    estatus: 'Facturada',
-    cliente: 'María Rodríguez',
-    articulos: 8,
-    hora: '11:45',
-    cajero: 'Juan Pérez'
-  },
-  {
-    id: 3,
-    tienda: 'T002',
-    fecha: '2023-10-16',
-    terminal: 'TERM03',
-    boleta: 'B003',
-    codigoFacturacion: 'CF003',
-    total: 5678.90,
-    estatus: 'Disponible',
-    cliente: 'Cliente General',
-    articulos: 12,
-    hora: '09:15',
-    cajero: 'Ana López'
-  },
-  {
-    id: 4,
-    tienda: 'T002',
-    fecha: '2023-10-16',
-    terminal: 'TERM04',
-    boleta: 'B004',
-    codigoFacturacion: 'CF004',
-    total: 1234.56,
-    estatus: 'Cancelada',
-    cliente: 'Pedro Sánchez',
-    articulos: 3,
-    hora: '14:20',
-    cajero: 'Carlos Gómez'
-  },
-  {
-    id: 5,
-    tienda: 'T003',
-    fecha: '2023-10-17',
-    terminal: 'TERM05',
-    boleta: 'B005',
-    codigoFacturacion: 'CF005',
-    total: 9876.54,
-    estatus: 'Disponible',
-    cliente: 'Empresa Ejemplo SA de CV',
-    articulos: 20,
-    hora: '16:30',
-    cajero: 'Laura Martínez'
-  }
-];
 
 const initialIndividualFormData: ConsultaIndividualFormData = {
   tienda: TIENDA_OPTIONS[0]?.value || '',
   fecha: new Date().toISOString().split('T')[0],
   terminal: '',
-  boleta: '',
-  codigoFacturacion: '',
+  folio: '',
 };
 
 export const ConsultasBoletasPage: React.FC = () => {
   const [individualFormData, setIndividualFormData] = useState<ConsultaIndividualFormData>(initialIndividualFormData);
   const [massFile, setMassFile] = useState<File | null>(null);
-  const [resultados, setResultados] = useState<Boleta[]>([]);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [detallesPorTicket, setDetallesPorTicket] = useState<Record<number, TicketDetalle[]>>({});
   const [mostrarResultados, setMostrarResultados] = useState(false);
+  const [buscando, setBuscando] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleIndividualChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -125,62 +39,33 @@ export const ConsultasBoletasPage: React.FC = () => {
     setMassFile(file);
   };
 
-  const handleIndividualSubmit = (e: React.FormEvent) => {
+  const handleIndividualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Consultando Boleta Individual:', individualFormData);
-    
-    // Filtrar boletas según los criterios de búsqueda
-    let resultadosFiltrados = [...boletasMuestra];
-    
-    // Aplicar filtros basados en los campos del formulario que tengan valor
-    if (individualFormData.tienda && individualFormData.tienda !== 'todas') {
-      resultadosFiltrados = resultadosFiltrados.filter(boleta => 
-        boleta.tienda === individualFormData.tienda
-      );
+    setErrorMsg(null);
+    setBuscando(true);
+    setMostrarResultados(false);
+    try {
+      const folioNum = parseInt(individualFormData.folio, 10);
+      if (isNaN(folioNum)) {
+        setErrorMsg('Ingresa un folio de ticket válido (numérico).');
+        setBuscando(false);
+        return;
+      }
+      const terminalNum = individualFormData.terminal ? parseInt(individualFormData.terminal, 10) : undefined;
+      const filtros = {
+        codigoTienda: individualFormData.tienda && individualFormData.tienda !== 'Todas' ? individualFormData.tienda : undefined,
+        fecha: individualFormData.fecha || undefined,
+        terminalId: terminalNum && !isNaN(terminalNum) ? terminalNum : undefined,
+        folio: folioNum,
+      };
+      const lista = await ticketService.buscarTickets(filtros);
+      setTickets(lista);
+      setMostrarResultados(true);
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Error al consultar tickets');
+    } finally {
+      setBuscando(false);
     }
-    
-    if (individualFormData.fecha) {
-      resultadosFiltrados = resultadosFiltrados.filter(boleta => 
-        boleta.fecha === individualFormData.fecha
-      );
-    }
-    
-    if (individualFormData.terminal) {
-      resultadosFiltrados = resultadosFiltrados.filter(boleta => 
-        boleta.terminal.toLowerCase().includes(individualFormData.terminal.toLowerCase())
-      );
-    }
-    
-    if (individualFormData.boleta) {
-      resultadosFiltrados = resultadosFiltrados.filter(boleta => 
-        boleta.boleta.toLowerCase().includes(individualFormData.boleta.toLowerCase())
-      );
-    }
-    
-    if (individualFormData.codigoFacturacion) {
-      resultadosFiltrados = resultadosFiltrados.filter(boleta => 
-        boleta.codigoFacturacion.toLowerCase().includes(individualFormData.codigoFacturacion.toLowerCase())
-      );
-    }
-    
-    // Casos especiales para demostración
-    // Si se busca específicamente la boleta B001
-    if (individualFormData.boleta === 'B001') {
-      resultadosFiltrados = boletasMuestra.filter(b => b.boleta === 'B001');
-    }
-    
-    // Si se busca específicamente la terminal TERM01
-    if (individualFormData.terminal === 'TERM01') {
-      resultadosFiltrados = boletasMuestra.filter(b => b.terminal === 'TERM01');
-    }
-    
-    // Si se busca específicamente la tienda T001
-    if (individualFormData.tienda === 'T001') {
-      resultadosFiltrados = boletasMuestra.filter(b => b.tienda === 'T001');
-    }
-    
-    setResultados(resultadosFiltrados);
-    setMostrarResultados(true);
   };
 
   const handleMassSubmit = (e: React.FormEvent) => {
@@ -195,7 +80,7 @@ export const ConsultasBoletasPage: React.FC = () => {
     }
   };
   
-  const fileHelpText = "El archivo debe ser .xlsx o .csv y contener los datos de las boletas a consultar.";
+  const fileHelpText = "El archivo debe ser .xlsx o .csv y contener los datos de los tickets a consultar.";
 
   const formatearMoneda = (valor: number) => {
     return new Intl.NumberFormat('es-MX', {
@@ -208,25 +93,27 @@ export const ConsultasBoletasPage: React.FC = () => {
     <div className="space-y-8">
       <Card>
         <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">
-          --Ingresa los datos para consulta:--
+          --Ingresa los datos para consulta de tickets--
         </h3>
         <form onSubmit={handleIndividualSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-x-6 gap-y-2 items-end">
             <SelectField label="Tienda:" name="tienda" value={individualFormData.tienda} onChange={handleIndividualChange} options={TIENDA_OPTIONS} className="lg:col-span-1" />
             <FormField label="Fecha:" name="fecha" type="date" value={individualFormData.fecha} onChange={handleIndividualChange} className="lg:col-span-1" />
-            <FormField label="Terminal:" name="terminal" value={individualFormData.terminal} onChange={handleIndividualChange} className="lg:col-span-1" />
-            <FormField label="Boleta:" name="boleta" value={individualFormData.boleta} onChange={handleIndividualChange} className="lg:col-span-1" />
+            <FormField label="Terminal (ID opcional):" name="terminal" value={individualFormData.terminal} onChange={handleIndividualChange} className="lg:col-span-1" />
+            <FormField label="Folio de ticket:" name="folio" value={individualFormData.folio} onChange={handleIndividualChange} className="lg:col-span-1" />
             <div></div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-x-6 gap-y-2 items-end">
-            <FormField label="Código de facturación:" name="codigoFacturacion" value={individualFormData.codigoFacturacion} onChange={handleIndividualChange} className="lg:col-span-2" />
-            <div className="lg:col-span-2"></div>
+            <div className="lg:col-span-4"></div>
             <div className="flex justify-start lg:justify-end pt-1">
                 <Button type="submit" variant="primary">
-                    Consultar
+                    {buscando ? 'Consultando...' : 'Consultar'}
                 </Button>
             </div>
           </div>
+          {errorMsg && (
+            <div className="text-red-600 dark:text-red-400 text-sm mt-2">{errorMsg}</div>
+          )}
         </form>
       </Card>
 
@@ -252,7 +139,7 @@ export const ConsultasBoletasPage: React.FC = () => {
 
       {!mostrarResultados ? (
         <div className="mt-6 p-4 border border-dashed border-gray-300 dark:border-gray-600 rounded-md min-h-[200px] flex items-center justify-center text-gray-400 dark:text-gray-500">
-          Los resultados de la consulta de boletas aparecerán aquí.
+          Los resultados de la consulta de tickets aparecerán aquí.
         </div>
       ) : (
         <Card className="mt-6">
@@ -260,9 +147,9 @@ export const ConsultasBoletasPage: React.FC = () => {
             Resultados de la búsqueda
           </h3>
           
-          {resultados.length === 0 ? (
+          {tickets.length === 0 ? (
             <div className="p-4 text-center text-gray-500 dark:text-gray-400">
-              No se encontraron boletas que coincidan con los criterios de búsqueda.
+              No se encontraron tickets que coincidan con los criterios de búsqueda.
             </div>
           ) : (
             <>
@@ -272,50 +159,97 @@ export const ConsultasBoletasPage: React.FC = () => {
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Tienda</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Fecha</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Hora</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Terminal</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Boleta</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Código Fact.</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Folio</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Cliente</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Artículos</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Subtotal</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">IVA</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Total</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Estatus</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Cajero</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {resultados.map((boleta) => (
-                      <tr key={boleta.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{boleta.tienda}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{boleta.fecha}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{boleta.hora}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{boleta.terminal}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{boleta.boleta}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{boleta.codigoFacturacion}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200 truncate max-w-xs" title={boleta.cliente}>
-                          {boleta.cliente}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{boleta.articulos}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{formatearMoneda(boleta.total)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">
-                          <span className={`px-2 py-1 rounded-full text-xs ${
-                            boleta.estatus === 'Disponible' 
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
-                              : boleta.estatus === 'Facturada'
-                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                          }`}>
-                            {boleta.estatus}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{boleta.cajero}</td>
-                      </tr>
+                    {tickets.map((t) => (
+                      <React.Fragment key={t.idTicket ?? `${t.codigoTienda}-${t.folio}`}>
+                        <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{t.codigoTienda || ''}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{t.fecha || ''}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{t.terminalId ?? ''}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{t.folio ?? ''}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200 truncate max-w-xs" title={t.nombreCliente || t.rfcCliente || ''}>
+                            {t.nombreCliente || t.rfcCliente || ''}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{formatearMoneda(t.subtotal ?? 0)}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{formatearMoneda(t.iva ?? 0)}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">{formatearMoneda(t.total ?? 0)}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">
+                            <span className={`px-2 py-1 rounded-full text-xs ${
+                              t.status === 1 
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
+                                : t.status === 0
+                                  ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                  : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                            }`}>
+                              {t.status === 1 ? 'Activo' : t.status === 0 ? 'Cancelado' : 'Desconocido'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm">
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              onClick={async () => {
+                                if (!t.idTicket) return;
+                                const detalles = await ticketService.buscarDetallesPorIdTicket(t.idTicket);
+                                setDetallesPorTicket(prev => ({ ...prev, [t.idTicket!]: detalles }));
+                              }}
+                            >
+                              Ver detalles
+                            </Button>
+                          </td>
+                        </tr>
+                        {/* Detalles */}
+                        {t.idTicket && Array.isArray(detallesPorTicket[t.idTicket]) && detallesPorTicket[t.idTicket]?.length > 0 && (
+                          <tr>
+                            <td colSpan={10} className="px-4 py-3">
+                              <div className="table-wrap">
+                                <table className="min-w-full border">
+                                  <thead>
+                                    <tr className="bg-gray-50 dark:bg-gray-700">
+                                      <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Descripción</th>
+                                      <th className="px-2 py-1 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Cantidad</th>
+                                      <th className="px-2 py-1 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Unidad</th>
+                                      <th className="px-2 py-1 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Precio</th>
+                                      <th className="px-2 py-1 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Subtotal</th>
+                                      <th className="px-2 py-1 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">IVA</th>
+                                      <th className="px-2 py-1 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Total</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {detallesPorTicket[t.idTicket].map((d) => (
+                                      <tr key={d.idDetalle} className="border-t">
+                                        <td className="px-2 py-1">{d.descripcion ?? ''}</td>
+                                        <td className="px-2 py-1 text-center">{d.cantidad ?? ''}</td>
+                                        <td className="px-2 py-1 text-center">{d.unidad ?? ''}</td>
+                                        <td className="px-2 py-1 text-right">{formatearMoneda(d.precioUnitario ?? 0)}</td>
+                                        <td className="px-2 py-1 text-right">{formatearMoneda(d.subtotal ?? 0)}</td>
+                                        <td className="px-2 py-1 text-right">{formatearMoneda(d.ivaImporte ?? 0)}</td>
+                                        <td className="px-2 py-1 text-right">{formatearMoneda(d.total ?? 0)}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     ))}
                   </tbody>
                 </table>
               </div>
               <div className="mt-4 text-sm text-gray-600 dark:text-gray-400">
-                Mostrando {resultados.length} boletas
+                Mostrando {tickets.length} tickets
               </div>
             </>
           )}

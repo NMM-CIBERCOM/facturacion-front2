@@ -29,7 +29,7 @@ import {
 import { useTiendasOptions } from '../hooks/useTiendasOptions';
 import { useJustificacionesOptions } from '../hooks/useJustificacionesOptions';
 import { conceptoService } from '../services/conceptoService';
-import { apiUrl } from '../services/api';
+import { apiUrl, pacUrl } from '../services/api';
 
 interface Concepto {
   sku: string;
@@ -138,6 +138,8 @@ export const FacturacionCapturaLibrePage: React.FC = () => {
   const [consultaCfdi, setConsultaCfdi] = useState<CfdiConsultaResponse | null>(null);
   const [consultaError, setConsultaError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [timbradoStatus, setTimbradoStatus] = useState<string | null>(null);
+  const [timbradoIntervalId, setTimbradoIntervalId] = useState<number | null>(null);
   const [guardandoBD, setGuardandoBD] = useState<boolean>(false);
 
   useEffect(() => {
@@ -480,6 +482,11 @@ export const FacturacionCapturaLibrePage: React.FC = () => {
       const uuid: string = data?.uuid || data?.datosFactura?.folioFiscal;
       setFormData(prev => ({ ...prev, uuid: uuid || prev.uuid }));
       setSuccessMessage(`Factura generada correctamente. UUID: ${uuid || 'N/A'}`);
+      if (uuid) {
+        // Mostrar estado en proceso y comenzar polling de timbrado
+        setTimbradoStatus('4 - EN PROCESO DE EMISION');
+        iniciarPollingTimbrado(uuid);
+      }
       alert(`Factura exitosa. UUID: ${uuid || 'N/A'}`);
       const deseaEnviar = window.confirm('¿Desea enviar el PDF al correo del receptor?');
       if (deseaEnviar) {
@@ -511,6 +518,47 @@ export const FacturacionCapturaLibrePage: React.FC = () => {
     } catch (error: any) {
       alert(error?.message || 'Error de red al generar factura');
     }
+  };
+
+  // Consulta estado de timbrado en PAC
+  const consultarEstatusTimbrado = async (uuid: string): Promise<{ codigo: string; descripcion: string } | null> => {
+    try {
+      const resp = await fetch(pacUrl(`/pac/stamp/status/${encodeURIComponent(uuid)}`));
+      if (!resp.ok) return null;
+      const data = await resp.json().catch(() => null);
+      const codigo = String(data?.status || data?.codigo || '');
+      const descripcion = String(data?.descripcion || data?.statusDescripcion || '');
+      if (!codigo) return null;
+      return { codigo, descripcion };
+    } catch {
+      return null;
+    }
+  };
+
+  // Inicia polling cada 3s hasta EMITIDA (0)
+  const iniciarPollingTimbrado = (uuid: string) => {
+    if (timbradoIntervalId) {
+      window.clearInterval(timbradoIntervalId);
+      setTimbradoIntervalId(null);
+    }
+    const id = window.setInterval(async () => {
+      const est = await consultarEstatusTimbrado(uuid);
+      if (!est) return;
+      if (est.codigo === '0') {
+        setTimbradoStatus('0 - EMITIDA');
+        window.clearInterval(id);
+        setTimbradoIntervalId(null);
+      } else if (est.codigo === '4') {
+        setTimbradoStatus('4 - EN PROCESO DE EMISION');
+      } else if (est.codigo === '2') {
+        setTimbradoStatus('2 - CANCELADA EN SAT');
+        window.clearInterval(id);
+        setTimbradoIntervalId(null);
+      } else if (est.codigo === '66') {
+        setTimbradoStatus('66 - POR TIMBRAR');
+      }
+    }, 3000);
+    setTimbradoIntervalId(id);
   };
 
   const handleGuardarEnBD = async () => {
@@ -700,6 +748,11 @@ export const FacturacionCapturaLibrePage: React.FC = () => {
       {successMessage && (
         <div className="p-3 rounded bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100">
           {successMessage}
+        </div>
+      )}
+      {formData.uuid && (
+        <div className="p-2 rounded bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-100">
+          Estado de timbrado: {timbradoStatus || 'Desconocido'}
         </div>
       )}
       <DatosFiscalesSection

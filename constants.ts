@@ -61,7 +61,7 @@ export const NAV_ITEMS: NavItem[] = [
     children: [
       { label: 'Facturas', path: 'consultas-facturas', icon: DocumentTextIcon },
       { label: 'SKU', path: 'consultas-sku', icon: CubeIcon },
-      { label: 'Boletas', path: 'consultas-boletas', icon: DocumentTextIcon },
+      { label: 'Tickets', path: 'consultas-tickets', icon: DocumentTextIcon },
       { label: 'Reportes', path: 'consultas-reportes', icon: ChartBarIcon },
       { label: 'REPs Sustituidos', path: 'consultas-reps-sustituidos', icon: DocumentTextIcon },
     ],
@@ -94,6 +94,32 @@ export const NAV_ITEMS: NavItem[] = [
       { label: 'Control de cambios', path: 'reportes-control-cambios', icon: FaHistory },
       { label: 'Conciliación', path: 'reportes-conciliacion', icon: FaChartBar },
       { label: 'REPs Sustituidos (Fiscal)', path: 'reportes-fiscales-reps-sustituidos', icon: DocumentTextIcon }, 
+      { label: 'Reporte de Consulta Monederos', path: 'reportes-consulta-monederos', icon: GiftIcon },
+      { label: 'Reporte de Ventas Máquina Corporativas Serely Polu', path: 'reportes-ventas-maquina-corporativas', icon: FaChartBar },
+      { label: 'Régimen de Facturación No Misma Boleta', path: 'reportes-regimen-facturacion-no-misma-boleta', icon: DocumentTextIcon },
+      { label: 'Doble Facturación Pendiente por Defencia', path: 'reportes-doble-facturacion-pendiente', icon: FaExclamationTriangle },
+      { label: 'Sustitución en Proceso', path: 'reportes-sustitucion-en-proceso', icon: FaSyncAlt },
+      { label: 'Cancelación Sustitución de Facturación', path: 'reportes-cancelacion-sustitucion-facturacion', icon: StopIcon },
+      { label: 'Saldo a Favor de Clientes', path: 'reportes-saldo-favor-clientes', icon: CurrencyDollarIcon },
+      { label: 'Orden de Módulos y Facturación', path: 'reportes-orden-modulos-facturacion', icon: WrenchScrewdriverIcon },
+      { label: 'Consulta de Usuarios', path: 'reportes-consulta-usuarios', icon: FaUsers },
+      { label: 'Consulta Tiendas de Total de Facturas Diarias', path: 'reportes-consulta-tiendas-facturas-diarias', icon: FaStore },
+      { label: 'Validación por Importe Intereses', path: 'reportes-validacion-importe-intereses', icon: CurrencyDollarIcon },
+      { label: 'Conciliación Cambio de Sistema de Facturación', path: 'reportes-conciliacion-cambio-sistema', icon: FaSyncAlt },
+      { label: 'Control de Complementos de Pago (REP) Generados por Ventas Corporativas', path: 'reportes-control-complementos-pago-rep', icon: FaExchangeAlt },
+      { label: 'Reporte por Factura de Mercancía de Monederos', path: 'reportes-factura-mercancia-monederos', icon: GiftIcon },
+      { label: 'Ventas Corporativas vs SAT', path: 'reportes-ventas-corporativas-vs-sat', icon: FaChartBar },
+      { label: 'Captura Libre Complemento de Pago (REP)', path: 'reportes-captura-libre-complemento-pago', icon: ChevronDoubleRightIcon },
+      { label: 'Conciliación Sistema de Facturación de Boletas vs SAT', path: 'reportes-conciliacion-boletas-vs-sat', icon: FaSyncAlt },
+      { label: 'Reporte de Trazabilidad de Boletas Canceladas', path: 'reportes-trazabilidad-boletas-canceladas', icon: FaHistory },
+      { label: 'Estatus Actualizar SAT de CFDI por Petición', path: 'reportes-estatus-actualizar-sat-cfdi', icon: FaSyncAlt },
+    ],
+  },
+  {
+    label: 'Registro CFDI',
+    icon: DocumentTextIcon,
+    children: [
+      { label: 'Registro de Constancias', path: 'registro-cfdi', icon: DocumentTextIcon },
     ],
   },
   {
@@ -116,7 +142,8 @@ export const NAV_ITEMS: NavItem[] = [
     children: [
       { label: 'Temas', path: 'configuracion-temas', icon: PaintBrushIcon },
       { label: 'Empresa', path: 'configuracion-empresa', icon: FaStore },
-      { label: 'Mensajes de Correo', path: 'configuracion-correo', icon: FaEnvelope }
+      { label: 'Mensajes de Correo', path: 'configuracion-correo', icon: FaEnvelope },
+      { label: 'Configuración de Menús', path: 'configuracion-menus', icon: CogIcon }
     ]
   }
 ];

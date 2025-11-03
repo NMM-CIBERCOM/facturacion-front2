@@ -5,6 +5,7 @@ import { Button } from './Button';
 import { DatosFiscalesSection } from './DatosFiscalesSection';
 import { PAIS_OPTIONS, REGIMEN_FISCAL_OPTIONS, USO_CFDI_OPTIONS } from '../constants';
 import { facturaService } from '../services/facturaService';
+import { pacUrl } from '../services/api';
 import { ensureSessionDefaults, getLastPeriodoIntereses, getSessionCodigoTienda, getSessionIdTienda, getSessionIdUsuario, setLastPeriodoIntereses, setSessionIdReceptor } from '../services/sessionService';
 
 interface InteresesFormData {
@@ -70,6 +71,8 @@ export const FacturacionInteresesPage: React.FC = () => {
   } | null>(null);
   const [facturarFinanciero, setFacturarFinanciero] = useState<boolean>(true);
   const [facturarMoratorio, setFacturarMoratorio] = useState<boolean>(true);
+  const [timbradoStatus, setTimbradoStatus] = useState<string | null>(null);
+  const [timbradoIntervalId, setTimbradoIntervalId] = useState<number | null>(null);
 
   // Al montar: asegurar sesión y prellenar último periodo usado
   useEffect(() => {
@@ -367,6 +370,10 @@ export const FacturacionInteresesPage: React.FC = () => {
         ].filter(Boolean).join(' | ');
         setAlertType('success');
         setAlertMessage(`${resp.mensaje}${detalles ? ' — ' + detalles : ''}`);
+        if (resp.uuid) {
+          setTimbradoStatus('4 - EN PROCESO DE EMISION');
+          iniciarPollingTimbrado(resp.uuid);
+        }
       } else {
         setAlertType('error');
         setAlertMessage(resp.mensaje || 'Error al emitir intereses');
@@ -380,8 +387,63 @@ export const FacturacionInteresesPage: React.FC = () => {
     }
   };
 
+  // Consulta estado de timbrado en PAC
+  const consultarEstatusTimbrado = async (uuid: string): Promise<{ codigo: string; descripcion: string } | null> => {
+    try {
+      const resp = await fetch(pacUrl(`/pac/stamp/status/${encodeURIComponent(uuid)}`));
+      if (!resp.ok) return null;
+      const data = await resp.json().catch(() => null);
+      const codigo = String(data?.status || data?.codigo || '');
+      const descripcion = String(data?.descripcion || data?.statusDescripcion || '');
+      if (!codigo) return null;
+      return { codigo, descripcion };
+    } catch {
+      return null;
+    }
+  };
+
+  // Inicia polling cada 3s hasta EMITIDA (0)
+  const iniciarPollingTimbrado = (uuid: string) => {
+    if (timbradoIntervalId) {
+      window.clearInterval(timbradoIntervalId);
+      setTimbradoIntervalId(null);
+    }
+    const id = window.setInterval(async () => {
+      const est = await consultarEstatusTimbrado(uuid);
+      if (!est) return;
+      if (est.codigo === '0') {
+        setTimbradoStatus('0 - EMITIDA');
+        window.clearInterval(id);
+        setTimbradoIntervalId(null);
+      } else if (est.codigo === '4') {
+        setTimbradoStatus('4 - EN PROCESO DE EMISION');
+      } else if (est.codigo === '2') {
+        setTimbradoStatus('2 - CANCELADA EN SAT');
+        window.clearInterval(id);
+        setTimbradoIntervalId(null);
+      } else if (est.codigo === '66') {
+        setTimbradoStatus('66 - POR TIMBRAR');
+      }
+    }, 3000);
+    setTimbradoIntervalId(id);
+  };
+
+  // Limpieza de intervalos al desmontar
+  useEffect(() => {
+    return () => {
+      if (timbradoIntervalId) {
+        window.clearInterval(timbradoIntervalId);
+      }
+    };
+  }, [timbradoIntervalId]);
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {timbradoStatus && (
+        <div className="p-2 rounded bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-100">
+          Estado de timbrado: {timbradoStatus}
+        </div>
+      )}
       <DatosFiscalesSection
         formData={formData}
         handleChange={handleChange}

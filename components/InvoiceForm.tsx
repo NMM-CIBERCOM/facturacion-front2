@@ -19,6 +19,7 @@ import {
   MEDIO_PAGO_OPTIONS,
   FORMA_PAGO_OPTIONS
 } from '../constants';
+import { pacUrl } from '../services/api';
 
 interface FormData {
   rfc: string;
@@ -40,6 +41,7 @@ interface FormData {
   medioPago: string;
   formaPago: string;
   iepsDesglosado: boolean;
+  uuid: string;
 }
 
 interface Factura {
@@ -82,11 +84,14 @@ const initialFormData: FormData = {
   medioPago: MEDIO_PAGO_OPTIONS[0].value,
   formaPago: FORMA_PAGO_OPTIONS[0].value,
   iepsDesglosado: false,
+  uuid: '',
 };
 
 export const InvoiceForm: React.FC = () => {
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [facturas, setFacturas] = useState<Factura[]>([]);
+  const [timbradoStatus, setTimbradoStatus] = useState<string | null>(null);
+  const [timbradoIntervalId, setTimbradoIntervalId] = useState<number | null>(null);
   const [cargandoFacturas, setCargandoFacturas] = useState(false);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [cargandoTickets, setCargandoTickets] = useState(false);
@@ -308,6 +313,10 @@ export const InvoiceForm: React.FC = () => {
         alert(`✅ ${data.mensaje}\nUUID: ${uuid}\nFactura guardada en base de datos`);
         // Persistir el UUID en el formulario para acciones rápidas
         setFormData(prev => ({ ...prev, uuid: uuid || prev.uuid }));
+        if (uuid) {
+          setTimbradoStatus('4 - EN PROCESO DE EMISION');
+          iniciarPollingTimbrado(uuid);
+        }
         
         // Confirmación antes de enviar por correo
         if (formData.correoElectronico && formData.correoElectronico.trim()) {
@@ -328,6 +337,56 @@ export const InvoiceForm: React.FC = () => {
       alert(`Hubo un error al enviar el formulario: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     }
   };
+
+  // Consulta estado de timbrado en PAC
+  const consultarEstatusTimbrado = async (uuid: string): Promise<{ codigo: string; descripcion: string } | null> => {
+    try {
+      const resp = await fetch(pacUrl(`/pac/stamp/status/${encodeURIComponent(uuid)}`));
+      if (!resp.ok) return null;
+      const data = await resp.json().catch(() => null);
+      const codigo = String(data?.status || data?.codigo || '');
+      const descripcion = String(data?.descripcion || data?.statusDescripcion || '');
+      if (!codigo) return null;
+      return { codigo, descripcion };
+    } catch {
+      return null;
+    }
+  };
+
+  // Inicia polling cada 3s hasta EMITIDA (0)
+  const iniciarPollingTimbrado = (uuid: string) => {
+    if (timbradoIntervalId) {
+      window.clearInterval(timbradoIntervalId);
+      setTimbradoIntervalId(null);
+    }
+    const id = window.setInterval(async () => {
+      const est = await consultarEstatusTimbrado(uuid);
+      if (!est) return;
+      if (est.codigo === '0') {
+        setTimbradoStatus('0 - EMITIDA');
+        window.clearInterval(id);
+        setTimbradoIntervalId(null);
+      } else if (est.codigo === '4') {
+        setTimbradoStatus('4 - EN PROCESO DE EMISION');
+      } else if (est.codigo === '2') {
+        setTimbradoStatus('2 - CANCELADA EN SAT');
+        window.clearInterval(id);
+        setTimbradoIntervalId(null);
+      } else if (est.codigo === '66') {
+        setTimbradoStatus('66 - POR TIMBRAR');
+      }
+    }, 3000);
+    setTimbradoIntervalId(id);
+  };
+
+  // Limpieza de intervalos al desmontar
+  useEffect(() => {
+    return () => {
+      if (timbradoIntervalId) {
+        window.clearInterval(timbradoIntervalId);
+      }
+    };
+  }, [timbradoIntervalId]);
 
   const handleCancel = () => {
     setFormData(initialFormData);
@@ -549,6 +608,11 @@ export const InvoiceForm: React.FC = () => {
   return (
     <div className="space-y-8">
       <form onSubmit={handleSubmit} className="space-y-8">
+        {formData.uuid && (
+          <div className="p-2 rounded bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-100">
+            Estado de timbrado: {timbradoStatus || 'Desconocido'}
+          </div>
+        )}
         <Card title="Datos Fiscales">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <FormField name="rfc" label="RFC *" value={formData.rfc} onChange={handleChange} required />

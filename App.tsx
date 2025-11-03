@@ -136,6 +136,17 @@ const App: React.FC = () => {
   });
 
   const [profileSelected, setProfileSelected] = useState<string | null>(() => {
+    const perfilData = localStorage.getItem('perfil');
+    if (perfilData) {
+      try {
+        const perfil = JSON.parse(perfilData);
+        if (perfil && perfil.nombrePerfil) {
+          return perfil.nombrePerfil;
+        }
+      } catch {
+        // ignore JSON parse error
+      }
+    }
     return localStorage.getItem('profileSelected');
   });
 
@@ -147,6 +158,18 @@ const App: React.FC = () => {
       const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
       setTheme(prefersDark ? 'dark' : 'light');
     }
+    // Inicializar favicon usando el mismo logo del sistema
+    const updateFavicon = () => {
+      let favicon = document.querySelector('link[rel="icon"]') as HTMLLinkElement;
+      if (!favicon) {
+        favicon = document.createElement('link');
+        favicon.rel = 'icon';
+        document.head.appendChild(favicon);
+      }
+      const storedLogo = localStorage.getItem('logoUrl');
+      favicon.href = storedLogo || '/images/cibercom-logo.svg';
+    };
+    updateFavicon();
   }, []);
 
   useEffect(() => {
@@ -171,6 +194,17 @@ const App: React.FC = () => {
 
   useEffect(() => {
     localStorage.setItem('logoUrl', logoUrl);
+    // Actualizar favicon cuando cambia el logo del sistema
+    const updateFavicon = () => {
+      let favicon = document.querySelector('link[rel="icon"]') as HTMLLinkElement;
+      if (!favicon) {
+        favicon = document.createElement('link');
+        favicon.rel = 'icon';
+        document.head.appendChild(favicon);
+      }
+      favicon.href = logoUrl;
+    };
+    updateFavicon();
   }, [logoUrl]);
 
   useEffect(() => {
@@ -287,23 +321,119 @@ const App: React.FC = () => {
     localStorage.setItem('profileSelected', profile);
   };
 
+  // Estados y lógica para menú dinámico desde backend
+  const [menuConfig, setMenuConfig] = useState<any[]>([]);
+  const [pantallasConfig, setPantallasConfig] = useState<any[]>([]);
+
+  useEffect(() => {
+    // Log de cambios de estado (debug)
+    if (menuConfig) {
+      console.log('*** menuConfig actualizado ***', menuConfig.length);
+    }
+  }, [menuConfig]);
+
+  useEffect(() => {
+    if (pantallasConfig) {
+      console.log('*** pantallasConfig actualizado ***', pantallasConfig.length);
+    }
+  }, [pantallasConfig]);
+
+  const cargarConfiguracionMenus = async () => {
+    if (!profileSelected) return;
+    try {
+      const perfilData = localStorage.getItem('perfil');
+      if (!perfilData) return;
+      const perfil = JSON.parse(perfilData);
+      const idPerfil = perfil.idPerfil;
+
+      const urlPestanas = `http://localhost:8080/api/menu-config/perfil/${idPerfil}`;
+      const respPestanas = await fetch(urlPestanas);
+      if (respPestanas.ok) {
+        const data = await respPestanas.json();
+        const pestañasPrincipales = data.filter((item: any) => !item.menuPath);
+        setMenuConfig(pestañasPrincipales);
+      } else {
+        setMenuConfig([]);
+      }
+
+      const urlPantallas = `http://localhost:8080/api/menu-config/pantallas/${idPerfil}`;
+      const respPantallas = await fetch(urlPantallas);
+      if (respPantallas.ok) {
+        const pantallas = await respPantallas.json();
+        setPantallasConfig(pantallas);
+      } else {
+        setPantallasConfig([]);
+      }
+    } catch (e) {
+      console.error('Error al cargar configuración de menús', e);
+      setMenuConfig([]);
+      setPantallasConfig([]);
+    }
+  };
+
+  // Mantener profileSelected sincronizado desde localStorage
+  useEffect(() => {
+    if (isAuthenticated) {
+      const perfilData = localStorage.getItem('perfil');
+      if (perfilData) {
+        try {
+          const perfil = JSON.parse(perfilData);
+          if (perfil?.nombrePerfil && perfil.nombrePerfil !== profileSelected) {
+            setProfileSelected(perfil.nombrePerfil);
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }, [isAuthenticated, profileSelected]);
+
+  useEffect(() => {
+    if (isAuthenticated && profileSelected) {
+      cargarConfiguracionMenus();
+    }
+  }, [isAuthenticated, profileSelected]);
+
   const getFilteredNavItems = () => {
-    if (profileSelected === "Administrador") {
-      return NAV_ITEMS; // Muestra todo
+    // Fallback por defecto según perfil
+    const fallbackByPerfil = () => {
+      // Verificar admin por ID de perfil
+      const perfilData = localStorage.getItem('perfil');
+      const isAdmin = perfilData ? (() => { try { return JSON.parse(perfilData).idPerfil === 3; } catch { return false; } })() : false;
+      if (isAdmin || profileSelected === 'Administrador' || profileSelected?.toLowerCase().includes('admin')) {
+        return NAV_ITEMS;
+      }
+      if (profileSelected === 'Operador de Credito' || profileSelected?.toLowerCase().includes('operador')) {
+        return NAV_ITEMS.filter(item => item.label === 'Dashboard' || ['Facturación', 'Consultas', 'Reportes Facturación Fiscal', 'Registro CFDI'].includes(item.label));
+      }
+      if (profileSelected === 'Jefe de Credito' || profileSelected?.toLowerCase().includes('jefe')) {
+        return NAV_ITEMS.filter(item => item.label === 'Dashboard' || ['Facturación', 'Consultas', 'Reportes Facturación Fiscal', 'Administración', 'Registro CFDI'].includes(item.label));
+      }
+      return NAV_ITEMS;
+    };
+
+    // Si no hay configuración dinámica, usar fallback
+    if (menuConfig.length === 0 && pantallasConfig.length === 0) {
+      return fallbackByPerfil();
     }
-    // Para operadores y jefes de crédito, solo mostrar secciones clave
-    if (profileSelected === "Operador de Credito") {
-      return NAV_ITEMS.filter(item =>
-        ["Facturación", "Consultas", "Reportes Facturación Fiscal"].includes(item.label)
-      );
-    }
-    if (profileSelected === "Jefe de Credito") {
-      return NAV_ITEMS.filter(item =>
-        ["Facturación", "Consultas", "Reportes Facturación Fiscal", "Administración"].includes(item.label)
-      );
-    }
-    // Por defecto, muestra todo
-    return NAV_ITEMS;
+
+    const visibleTop = new Set(
+      menuConfig.filter((c: any) => c.isVisible).map((c: any) => c.menuLabel)
+    );
+    const visibleScreens = new Set(
+      pantallasConfig.filter((p: any) => p.isVisible).map((p: any) => p.menuLabel)
+    );
+
+    const filtered = NAV_ITEMS.map(item => {
+      const includeTop = visibleTop.has(item.label);
+      const children = item.children ? item.children.filter(ch => visibleScreens.has(ch.label)) : undefined;
+      if (includeTop || (children && children.length > 0)) {
+        return { ...item, children };
+      }
+      return null;
+    }).filter(Boolean) as typeof NAV_ITEMS;
+
+    return filtered.length > 0 ? filtered : fallbackByPerfil();
   };
 
   if (!isAuthenticated) {
@@ -340,7 +470,7 @@ const App: React.FC = () => {
     // Consultas
     if (activePage === 'Facturas') return <ConsultasFacturasPage />;
     if (activePage === 'SKU') return <ConsultasSkuPage />;
-    if (activePage === 'Boletas') return <ConsultasBoletasPage />;
+    if (activePage === 'Tickets') return <ConsultasBoletasPage />;
     if (activePage === 'Reportes') return <ConsultasReportesPage />;
     if (activePage === 'REPs Sustituidos') return <ConsultasRepsSustituidosPage />;
 

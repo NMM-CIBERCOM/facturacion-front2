@@ -15,7 +15,7 @@ import { apiUrl } from '../services/api';
 
 // Base URL para endpoints de notas de crédito (no usan /api)
 const CREDIT_NOTES_BASE_URL: string = (
-  (import.meta as any)?.env?.VITE_CREDIT_NOTES_BASE_URL || 'http://localhost:8081'
+  (import.meta as any)?.env?.VITE_CREDIT_NOTES_BASE_URL || 'http://localhost:8080'
 ).replace(/\/+$/,'');
 interface ConceptoForm {
   descripcion: string;
@@ -96,30 +96,10 @@ export const NotasCreditoPage: React.FC = () => {
   });
 
   // Helper: obtener uuid de nota de crédito desde backend por UUID de factura origen
-  const obtenerUuidNotaCredito = async (uuidFacturaOrigen?: string) => {
-    try {
-      if (!uuidFacturaOrigen || !uuidFacturaOrigen.trim()) return undefined as undefined | { uuidNc: string; serie?: string; folio?: string };
-      const resp = await fetch(`${CREDIT_NOTES_BASE_URL}/credit-notes/search?uuidFactura=${encodeURIComponent(uuidFacturaOrigen.trim())}`);
-      if (!resp.ok) return undefined;
-      const lista = await resp.json();
-      if (!Array.isArray(lista) || lista.length === 0) return undefined;
-      // Ordenar por fecha_emision descendente si está disponible
-      const ordenada = lista
-        .slice()
-        .sort((a, b) => {
-          const fa = new Date(a.fecha_emision || a.fechaEmision || 0).getTime();
-          const fb = new Date(b.fecha_emision || b.fechaEmision || 0).getTime();
-          return fb - fa;
-        });
-      const primera = ordenada[0];
-      return {
-        uuidNc: (primera.uuid_nc || primera.uuidNc || '').toString(),
-        serie: primera.serie,
-        folio: primera.folio,
-      };
-    } catch {
-      return undefined;
-    }
+  // Deshabilitado en Oracle: el endpoint /credit-notes/search usa tablas no disponibles (JPA),
+  // provoca ORA-00942. Devolvemos undefined para evitar el 500 y usamos defaults locales.
+  const obtenerUuidNotaCredito = async (_uuidFacturaOrigen?: string) => {
+    return undefined as undefined | { uuidNc: string; serie?: string; folio?: string };
   };
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -213,6 +193,7 @@ export const NotasCreditoPage: React.FC = () => {
         formaPago: formData.formaPago,
         metodoPago: formData.metodoPago,
       };
+      console.log('[NC] Payload guardar/timbrar:', payload);
       const resp = await fetch(`${CREDIT_NOTES_BASE_URL}/credit-notes/guardar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -222,10 +203,38 @@ export const NotasCreditoPage: React.FC = () => {
         throw new Error('No se pudo guardar la nota de crédito en BD');
       }
       const data = await resp.json();
+      console.log('[NC] Respuesta guardar:', data);
       if (!data?.ok) {
         const errs = (data?.errors || []) as string[];
         const msg = errs.length ? errs.join(' | ') : 'Guardado incompleto';
         throw new Error(msg);
+      }
+      // Si el backend generó uuidNc, propagarlo al payload y a notaData para timbrar con el mismo UUID
+      if (data?.uuidNc) {
+        payload.uuidNc = data.uuidNc;
+        notaData.uuid = data.uuidNc;
+        console.log('[NC] UUID_NC del guardado propagado al timbrado:', data.uuidNc);
+      }
+
+      // Timbrar en PAC inmediatamente después de guardar
+      const respTimbrar = await fetch(`${CREDIT_NOTES_BASE_URL}/credit-notes/timbrar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!respTimbrar.ok) {
+        throw new Error('Guardado correcto, pero fallo timbrado en PAC');
+      }
+      const dataTimbrar = await respTimbrar.json();
+      console.log('[NC] Respuesta timbrar:', dataTimbrar);
+      if (!dataTimbrar?.ok) {
+        const msg = String(dataTimbrar?.message || 'Timbrado rechazado por PAC');
+        throw new Error(msg);
+      }
+      // Actualizar UUID timbrado si el backend lo devuelve
+      if (dataTimbrar?.uuid) {
+        notaData.uuid = dataTimbrar.uuid;
+        console.log('[NC] UUID timbrado actualizado en notaData:', notaData.uuid);
       }
       return true;
     } catch (e) {
@@ -285,7 +294,15 @@ export const NotasCreditoPage: React.FC = () => {
       setGenerando(true);
       const ok = await guardarNotaCreditoEnBD(notaData, rfcReceptor);
       if (ok) {
-        setMensaje({ tipo: 'success', texto: 'Nota de crédito guardada correctamente' });
+        setMensaje({ tipo: 'success', texto: 'Nota de crédito guardada y timbrada correctamente' });
+        // Mostrar alerta con UUID timbrado (si disponible)
+        alert(`✅ Factura emitida y timbrada exitosamente\nUUID: ${notaData.uuid || 'SIN-UUID'}`);
+        // Preguntar envío por correo como en otras vistas
+        const enviar = window.confirm('¿Desea enviar la factura al correo?');
+        if (enviar) {
+          // Reutilizar flujo existente de envío
+          await handleEnviarCorreo();
+        }
       } else {
         setMensaje({ tipo: 'error', texto: 'No se pudo guardar la nota de crédito' });
       }
