@@ -170,9 +170,26 @@ const RegistroCFDIPage: React.FC = () => {
         body: formData,
       });
 
-      if (!response.ok) throw new Error("Error al subir los archivos");
+      if (!response.ok) {
+        // Intentar obtener el mensaje de error del servidor
+        let errorMessage = "Error al subir los archivos";
+        try {
+          const errorData = await response.text();
+          if (errorData) {
+            errorMessage = errorData;
+          }
+        } catch (e) {
+          // Si no se puede leer el mensaje, usar el mensaje por defecto
+          errorMessage = `Error ${response.status}: ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
 
       const rawFacturas: FacturaInfo[] = await response.json();
+
+      if (!Array.isArray(rawFacturas)) {
+        throw new Error("El servidor no devolvió un formato válido");
+      }
 
       const facturasConEditing = rawFacturas.map(factura => ({
         ...factura,
@@ -182,9 +199,17 @@ const RegistroCFDIPage: React.FC = () => {
       setFacturasInfo(facturasConEditing);
       console.log("Facturas procesadas:", facturasConEditing);
 
+      // Mostrar mensaje de éxito
+      if (facturasConEditing.length > 0) {
+        alert(`✅ Se procesaron ${facturasConEditing.length} archivo(s) correctamente.`);
+      } else {
+        alert("⚠️ Se procesaron los archivos pero no se encontraron datos válidos.");
+      }
+
     } catch (error) {
       console.error("Error durante la carga:", error);
-      alert("Hubo un error al subir los archivos.");
+      const errorMessage = error instanceof Error ? error.message : "Error desconocido al subir los archivos";
+      alert(`❌ Hubo un error al subir los archivos:\n\n${errorMessage}\n\nPor favor, verifica que:\n- Los archivos sean PDFs válidos\n- El backend esté corriendo\n- Los archivos contengan constancias fiscales válidas`);
     } finally {
       setIsUploading(false);
     }
