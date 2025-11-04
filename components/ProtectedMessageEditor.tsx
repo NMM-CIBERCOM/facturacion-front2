@@ -72,43 +72,15 @@ export const ProtectedMessageEditor: React.FC<ProtectedMessageEditorProps> = ({
 
   // Guardar configuración cuando cambie
   const guardarConfiguracionFormato = async (newConfig: FormatConfig) => {
-    try {
-      // Crear directamente el objeto con valores seguros a partir del estado de la UI
-      const rawSize = Number(newConfig.fontSize);
-      const safeFontSize = Number.isFinite(rawSize) && rawSize > 0 ? rawSize : 14;
-      if (!Number.isFinite(rawSize) || rawSize <= 0) {
-        console.warn('fontSize inválido en UI, usando 14 por defecto:', newConfig.fontSize);
-      }
-      const formatoConfig: FormatoCorreoConfig = {
-        tipoFuente: newConfig.fontFamily || 'Arial',
-        tamanoFuente: safeFontSize,
-        esCursiva: Boolean(newConfig.isItalic),
-        esSubrayado: Boolean(newConfig.isUnderlined),
-        colorTexto: '#000000',
-        activo: true
-      };
-      
-      // Validar que los datos sean correctos antes de enviar
-      if (!formatoConfig.tipoFuente || formatoConfig.tipoFuente.trim() === '') {
-        console.error('El tipo de fuente no puede estar vacío');
-        return;
-      }
-      
-      console.log('Enviando configuración:', formatoConfig);
-      try {
-        const resultado = await formatoCorreoService.guardarConfiguracionFormato(formatoConfig);
-        
-        if (!resultado.exitoso) {
-          console.error('Error al guardar configuración:', resultado.mensaje);
-        } else {
-          console.log('Configuración guardada correctamente');
-        }
-      } catch (error) {
-        console.error('Error al guardar configuración:', error);
-      }
-    } catch (error) {
-      console.error('Error al guardar configuración de formato:', error);
-    }
+    // No persistimos en backend en cada cambio; sólo actualizamos estado local.
+    const rawSize = Number(newConfig.fontSize);
+    const safeFontSize = Number.isFinite(rawSize) && rawSize > 0 ? rawSize : 14;
+    setFormatConfig({
+      fontFamily: newConfig.fontFamily || 'Arial',
+      fontSize: safeFontSize,
+      isItalic: Boolean(newConfig.isItalic),
+      isUnderlined: Boolean(newConfig.isUnderlined)
+    });
   };
 
   // Variables dinámicas que deben protegerse

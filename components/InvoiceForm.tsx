@@ -762,7 +762,8 @@ export const InvoiceForm: React.FC = () => {
         </div>
       </form>
 
-      {/* Tabla de Facturas Guardadas */}
+      {/* Tabla de Facturas Guardadas - OCULTA */}
+      {false && (
       <Card title="Facturas Guardadas en Base de Datos" className="mt-6">
         <div className="mb-4">
           <Button 
@@ -996,6 +997,7 @@ export const InvoiceForm: React.FC = () => {
           </div>
         )}
       </Card>
+      )}
 
       {/* Modal de Envío de Correo */}
       <EnviarCorreoModal

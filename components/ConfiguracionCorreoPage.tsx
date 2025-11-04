@@ -168,44 +168,18 @@ export const ConfiguracionCorreoPage: React.FC = () => {
     setMensaje(null);
   
     try {
-      // 1) Persistir formato (fuente, tamaño, cursiva, subrayado) primero
-      let formatoGuardadoId = formatoCorreo.id;
-      const formatoPayload = {
-        id: formatoCorreo.id,
-        tipoFuente: formatoCorreo.tipoFuente,
-        tamanoFuente: formatoCorreo.tamanoFuente,
-        esCursiva: formatoCorreo.esCursiva,
-        esSubrayado: formatoCorreo.esSubrayado,
-        colorTexto: formatoCorreo.colorTexto,
-        activo: true
-      } as any;
-
-      try {
-        const respFormato = formatoGuardadoId
-          ? await formatoCorreoService.actualizarConfiguracionFormato(formatoPayload)
-          : await formatoCorreoService.guardarConfiguracionFormato(formatoPayload);
-
-        if (respFormato?.exitoso && respFormato.configuracion?.id) {
-          formatoGuardadoId = respFormato.configuracion.id;
-          setFormatoCorreo(prev => ({ ...prev, id: formatoGuardadoId! }));
-        }
-      } catch (e) {
-        console.error('Error al persistir formato en guardado general:', e);
-      }
-    
-      // 2) Guardar configuración de mensaje (enviar solo la parte personalizada)
+      // Guardar configuración de mensaje (enviar formato y la parte personalizada en una sola llamada)
       const mensajePersonalizadoSolo = (configuracion.mensajePersonalizado || '').trim();
       const responseMensaje = await configuracionCorreoService.guardarConfiguracionMensaje({
         asunto: configuracion.asunto,
         mensaje: mensajePersonalizadoSolo,
         esPersonalizado: mensajePersonalizadoSolo.length > 0,
         formatoCorreo: {
-          ...formatoCorreo,
-          id: formatoGuardadoId
+          ...formatoCorreo
         }
       });
   
-      // 3) Persistir logo actual en backend para PDF
+      // Persistir logo actual en backend para PDF
       try {
         await logoService.guardarLogoBackend(logo || '');
       } catch (e) {
@@ -219,7 +193,7 @@ export const ConfiguracionCorreoPage: React.FC = () => {
           mensajePersonalizado: mensajePersonalizadoSolo,
           esPersonalizado: mensajePersonalizadoSolo.length > 0 
         });
-        setFormatoOriginal({ ...formatoCorreo, id: formatoGuardadoId });
+        setFormatoOriginal({ ...formatoCorreo });
         setMensaje({ tipo: 'success', texto: 'Configuraciones guardadas correctamente' });
         setTimeout(() => setMensaje(null), 3000);
       } else {
@@ -360,31 +334,6 @@ export const ConfiguracionCorreoPage: React.FC = () => {
                     tipoFuente: e.target.value
                   };
                   setFormatoCorreo(nuevo);
-                  const persistPromise = nuevo.id
-                    ? formatoCorreoService.actualizarConfiguracionFormato({
-                        id: nuevo.id,
-                        tipoFuente: nuevo.tipoFuente,
-                        tamanoFuente: nuevo.tamanoFuente,
-                        esCursiva: nuevo.esCursiva,
-                        esSubrayado: nuevo.esSubrayado,
-                        colorTexto: nuevo.colorTexto,
-                        activo: true
-                      })
-                    : formatoCorreoService.guardarConfiguracionFormato({
-                        tipoFuente: nuevo.tipoFuente,
-                        tamanoFuente: nuevo.tamanoFuente,
-                        esCursiva: nuevo.esCursiva,
-                        esSubrayado: nuevo.esSubrayado,
-                        colorTexto: nuevo.colorTexto,
-                        activo: true
-                      });
-                  persistPromise
-                    .then(resp => {
-                      if (resp?.exitoso && resp.configuracion?.id) {
-                        setFormatoCorreo(prev => ({ ...prev, id: resp.configuracion!.id }));
-                      }
-                    })
-                    .catch(err => console.error('Error al guardar tipo de fuente:', err));
                 }}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
               >
@@ -413,31 +362,6 @@ export const ConfiguracionCorreoPage: React.FC = () => {
                     tamanoFuente: tamanoSeguro
                   };
                   setFormatoCorreo(nuevo);
-                  const persistPromise = nuevo.id
-                    ? formatoCorreoService.actualizarConfiguracionFormato({
-                        id: nuevo.id,
-                        tipoFuente: nuevo.tipoFuente,
-                        tamanoFuente: nuevo.tamanoFuente,
-                        esCursiva: nuevo.esCursiva,
-                        esSubrayado: nuevo.esSubrayado,
-                        colorTexto: nuevo.colorTexto,
-                        activo: true
-                      })
-                    : formatoCorreoService.guardarConfiguracionFormato({
-                        tipoFuente: nuevo.tipoFuente,
-                        tamanoFuente: nuevo.tamanoFuente,
-                        esCursiva: nuevo.esCursiva,
-                        esSubrayado: nuevo.esSubrayado,
-                        colorTexto: nuevo.colorTexto,
-                        activo: true
-                      });
-                  persistPromise
-                    .then(resp => {
-                      if (resp?.exitoso && resp.configuracion?.id) {
-                        setFormatoCorreo(prev => ({ ...prev, id: resp.configuracion!.id }));
-                      }
-                    })
-                    .catch(err => console.error('Error al guardar tamaño de fuente:', err));
                 }}
                 className="w-24 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
               />
@@ -462,31 +386,6 @@ export const ConfiguracionCorreoPage: React.FC = () => {
                         esCursiva: e.target.checked
                       };
                       setFormatoCorreo(nuevo);
-                      const persistPromise = nuevo.id
-                        ? formatoCorreoService.actualizarConfiguracionFormato({
-                            id: nuevo.id,
-                            tipoFuente: nuevo.tipoFuente,
-                            tamanoFuente: nuevo.tamanoFuente,
-                            esCursiva: nuevo.esCursiva,
-                            esSubrayado: nuevo.esSubrayado,
-                            colorTexto: nuevo.colorTexto,
-                            activo: true
-                          })
-                        : formatoCorreoService.guardarConfiguracionFormato({
-                            tipoFuente: nuevo.tipoFuente,
-                            tamanoFuente: nuevo.tamanoFuente,
-                            esCursiva: nuevo.esCursiva,
-                            esSubrayado: nuevo.esSubrayado,
-                            colorTexto: nuevo.colorTexto,
-                            activo: true
-                          });
-                      persistPromise
-                        .then(resp => {
-                          if (resp?.exitoso && resp.configuracion?.id) {
-                            setFormatoCorreo(prev => ({ ...prev, id: resp.configuracion!.id }));
-                          }
-                        })
-                        .catch(err => console.error('Error al guardar cursiva:', err));
                     }}
                     className="form-checkbox h-4 w-4 text-blue-600 transition duration-150 ease-in-out"
                   />
@@ -503,31 +402,6 @@ export const ConfiguracionCorreoPage: React.FC = () => {
                         esSubrayado: e.target.checked
                       };
                       setFormatoCorreo(nuevo);
-                      const persistPromise = nuevo.id
-                        ? formatoCorreoService.actualizarConfiguracionFormato({
-                            id: nuevo.id,
-                            tipoFuente: nuevo.tipoFuente,
-                            tamanoFuente: nuevo.tamanoFuente,
-                            esCursiva: nuevo.esCursiva,
-                            esSubrayado: nuevo.esSubrayado,
-                            colorTexto: nuevo.colorTexto,
-                            activo: true
-                          })
-                        : formatoCorreoService.guardarConfiguracionFormato({
-                            tipoFuente: nuevo.tipoFuente,
-                            tamanoFuente: nuevo.tamanoFuente,
-                            esCursiva: nuevo.esCursiva,
-                            esSubrayado: nuevo.esSubrayado,
-                            colorTexto: nuevo.colorTexto,
-                            activo: true
-                          });
-                      persistPromise
-                        .then(resp => {
-                          if (resp?.exitoso && resp.configuracion?.id) {
-                            setFormatoCorreo(prev => ({ ...prev, id: resp.configuracion!.id }));
-                          }
-                        })
-                        .catch(err => console.error('Error al guardar subrayado:', err));
                     }}
                     className="form-checkbox h-4 w-4 text-blue-600 transition duration-150 ease-in-out"
                   />
@@ -553,31 +427,6 @@ export const ConfiguracionCorreoPage: React.FC = () => {
                       colorTexto: e.target.value
                     };
                     setFormatoCorreo(nuevo);
-                    const persistPromise = nuevo.id
-                      ? formatoCorreoService.actualizarConfiguracionFormato({
-                          id: nuevo.id,
-                          tipoFuente: nuevo.tipoFuente,
-                          tamanoFuente: nuevo.tamanoFuente,
-                          esCursiva: nuevo.esCursiva,
-                          esSubrayado: nuevo.esSubrayado,
-                          colorTexto: nuevo.colorTexto,
-                          activo: true
-                        })
-                      : formatoCorreoService.guardarConfiguracionFormato({
-                          tipoFuente: nuevo.tipoFuente,
-                          tamanoFuente: nuevo.tamanoFuente,
-                          esCursiva: nuevo.esCursiva,
-                          esSubrayado: nuevo.esSubrayado,
-                          colorTexto: nuevo.colorTexto,
-                          activo: true
-                        });
-                    persistPromise
-                      .then(resp => {
-                        if (resp?.exitoso && resp.configuracion?.id) {
-                          setFormatoCorreo(prev => ({ ...prev, id: resp.configuracion!.id }));
-                        }
-                      })
-                      .catch(err => console.error('Error al guardar color de texto:', err));
                   }}
                   className="w-16 h-10 p-1 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700"
                 />

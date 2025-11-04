@@ -390,3 +390,6 @@ console.error('Error al consultar facturas:', err);
 El componente está diseñado para ser robusto, fácil de usar y mantener, siguiendo las mejores prácticas de React y TypeScript.
 
 
+
+
+
