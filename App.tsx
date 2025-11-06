@@ -313,6 +313,12 @@ const App: React.FC = () => {
         if (window.innerWidth >= 768) {
           setIsSidebarOpen(true);
         }
+        
+        // Autorefresh después de login exitoso
+        setTimeout(() => {
+          window.location.reload();
+        }, 100);
+        
         return true;
       } else {
         console.error('Login failed:', data.message);
@@ -368,6 +374,12 @@ const App: React.FC = () => {
         if (window.innerWidth >= 768) {
           setIsSidebarOpen(true);
         }
+        
+        // Autorefresh después de verificación 2FA exitosa
+        setTimeout(() => {
+          window.location.reload();
+        }, 100);
+        
         return true;
       } else {
         console.error('2FA verification failed:', data.message);
@@ -385,15 +397,33 @@ const App: React.FC = () => {
   }, []);
 
   const handleLogout = useCallback(() => {
+    // Guardar preferencias del usuario antes de limpiar
+    const theme = localStorage.getItem('theme');
+    const customColors = localStorage.getItem('customColors');
+    const logoUrl = localStorage.getItem('logoUrl');
+    
+    // Limpiar datos de autenticación
     localStorage.removeItem('isAuthenticated');
     localStorage.removeItem('profileSelected');
     localStorage.removeItem('username');
     localStorage.removeItem('nombreEmpleado');
     localStorage.removeItem('perfil');
+    localStorage.removeItem('menuConfigUpdated');
+    
+    // Restaurar preferencias después de limpiar
+    if (theme) localStorage.setItem('theme', theme);
+    if (customColors) localStorage.setItem('customColors', customColors);
+    if (logoUrl) localStorage.setItem('logoUrl', logoUrl);
+    
     setIsAuthenticated(false);
     setProfileSelected(null);
     setActivePage('Dashboard');
     setActivePageIcon(() => HomeIcon);
+    
+    // Autorefresh después de logout
+    setTimeout(() => {
+      window.location.reload();
+    }, 100);
   }, []);
 
   // Sincronizar profileSelected desde localStorage/perfil al estar autenticado
@@ -460,7 +490,89 @@ const App: React.FC = () => {
       const respScreens = await fetch(urlPantallas);
       if (respScreens.ok) {
         const screens = await respScreens.json();
-        setPantallasConfig(screens);
+        
+        // Mapeo de pantallas a sus pestañas padre (basado en ConfiguracionMenusPage.tsx)
+        const mapeoPestañas: { [key: string]: string } = {
+          // Facturación
+          'Artículos': 'Facturación',
+          'Intereses': 'Facturación',
+          'Carta Factura': 'Facturación',
+          'Global': 'Facturación',
+          'Monederos': 'Facturación',
+          'Captura Libre': 'Facturación',
+          'Cancelación Masiva': 'Facturación',
+          'Nóminas': 'Facturación',
+          // Consultas
+          'Facturas': 'Consultas',
+          'SKU': 'Consultas',
+          'Boletas': 'Consultas',
+          'Tickets': 'Consultas',
+          // Administración
+          'Empleados': 'Administración',
+          'Tiendas': 'Administración',
+          'Períodos Perfil': 'Administración',
+          'Períodos Plataforma': 'Administración',
+          'Kioscos': 'Administración',
+          'Excepciones': 'Administración',
+          'Secciones': 'Administración',
+          // Reportes Facturación Fiscal
+          'Boletas No Auditadas': 'Reportes Facturación Fiscal',
+          'Reporte Ingreso-Facturación': 'Reportes Facturación Fiscal',
+          'Integración Factura Global': 'Reportes Facturación Fiscal',
+          'Integración Clientes': 'Reportes Facturación Fiscal',
+          'Facturación clientes posterior a Global': 'Reportes Facturación Fiscal',
+          'Integración Sustitución CFDI': 'Reportes Facturación Fiscal',
+          'Control de emisión de REP': 'Reportes Facturación Fiscal',
+          'Reportes REPgcp': 'Reportes Facturación Fiscal',
+          'Control de cambios': 'Reportes Facturación Fiscal',
+          'Conciliación': 'Reportes Facturación Fiscal',
+          'REPs Sustituidos (Fiscal)': 'Reportes Facturación Fiscal',
+          'Reporte de Consulta Monederos': 'Reportes Facturación Fiscal',
+          'Reporte de Ventas Máquina Corporativas Serely Polu': 'Reportes Facturación Fiscal',
+          'Régimen de Facturación No Misma Boleta': 'Reportes Facturación Fiscal',
+          'Doble Facturación Pendiente por Defencia': 'Reportes Facturación Fiscal',
+          'Sustitución en Proceso': 'Reportes Facturación Fiscal',
+          'Cancelación Sustitución de Facturación': 'Reportes Facturación Fiscal',
+          'Saldo a Favor de Clientes': 'Reportes Facturación Fiscal',
+          'Orden de Módulos y Facturación': 'Reportes Facturación Fiscal',
+          'Consulta de Usuarios': 'Reportes Facturación Fiscal',
+          'Consulta Tiendas de Total de Facturas Diarias': 'Reportes Facturación Fiscal',
+          'Validación por Importe Intereses': 'Reportes Facturación Fiscal',
+          'Conciliación Cambio de Sistema de Facturación': 'Reportes Facturación Fiscal',
+          'Control de Complementos de Pago (REP) Generados por Ventas Corporativas': 'Reportes Facturación Fiscal',
+          'Reporte por Factura de Mercancía de Monederos': 'Reportes Facturación Fiscal',
+          'Ventas Corporativas vs SAT': 'Reportes Facturación Fiscal',
+          'Captura Libre Complemento de Pago (REP)': 'Reportes Facturación Fiscal',
+          'Conciliación Sistema de Facturación de Boletas vs SAT': 'Reportes Facturación Fiscal',
+          'Reporte de Trazabilidad de Boletas Canceladas': 'Reportes Facturación Fiscal',
+          'Estatus Actualizar SAT de CFDI por Petición': 'Reportes Facturación Fiscal',
+          // Registro CFDI
+          'Registro de Constancias': 'Registro CFDI',
+          // Monitor
+          'Gráficas': 'Monitor',
+          'Bitácora': 'Monitor',
+          'Disponibilidad': 'Monitor',
+          'Logs': 'Monitor',
+          'Permisos': 'Monitor',
+          'Decodificador': 'Monitor',
+          // Configuración
+          'Configuración de Correo': 'Configuración',
+          'Configuración de Empresa': 'Configuración',
+          'Configuración de Temas': 'Configuración',
+          'Configuración de Menús': 'Configuración',
+          'Mensajes de Correo': 'Configuración',
+          'Empresa': 'Configuración',
+          'Temas': 'Configuración',
+        };
+        
+        // Agregar parentLabel a cada pantalla
+        const screensConParent = screens.map((screen: any) => ({
+          ...screen,
+          parentLabel: mapeoPestañas[screen.menuLabel] || null
+        }));
+        
+        console.log('📋 Pantallas cargadas con parentLabel:', screensConParent);
+        setPantallasConfig(screensConParent);
       } else {
         console.warn('Error al cargar pantallas:', respScreens.status);
         setPantallasConfig([]);
@@ -479,6 +591,32 @@ const App: React.FC = () => {
     }
   }, [isAuthenticated, profileSelected]);
 
+  // Mapeo de nombres de BD a nombres de NAV_ITEMS
+  // Este mapeo es necesario porque los nombres en la BD pueden diferir de los nombres en NAV_ITEMS
+  const mapeoPantallas: { [key: string]: string } = {
+    'Intereses': 'Notas de crédito',
+    'Carta Factura': 'Carta Porte',
+    'Global': 'Factura Global',
+    'Monederos': 'Monederos',
+    'Captura Libre': 'Captura Libre',
+    'Cancelación Masiva': 'Cancelación Masiva',
+    'Artículos': 'Artículos',
+    'Nóminas': 'Nóminas',
+    'Boletas': 'Tickets', // Mapeo de Boletas (BD) a Tickets (NAV_ITEMS)
+    'Tickets': 'Tickets',
+    'Facturas': 'Facturas',
+    'SKU': 'SKU',
+    'Reportes': 'Reportes',
+    'REPs Sustituidos': 'REPs Sustituidos',
+    // Mapeo para Configuración
+    'Configuración de Correo': 'Mensajes de Correo',
+    'Configuración de Empresa': 'Empresa',
+    'Configuración de Temas': 'Temas',
+    'Configuración de Menús': 'Configuración de Menús',
+    'Mensajes de Correo': 'Mensajes de Correo',
+    'Empresa': 'Empresa',
+    'Temas': 'Temas',
+  };
 
   const getFilteredNavItems = () => {
     // Si no hay configuración cargada, usar la lógica actual por perfil
@@ -504,45 +642,91 @@ const App: React.FC = () => {
       .filter((c: any) => c.isVisible)
       .map((c: any) => c.menuLabel);
 
-    const pantallasVisibles = pantallasConfig
-      .filter((p: any) => p.isVisible)
-      .map((p: any) => p.menuLabel);
+    // Asegurar que "Configuración" solo esté disponible para Administrador
+    // Esto permite que los administradores siempre puedan acceder a la configuración de menús
+    if (profileSelected === 'Administrador' && !menuLabelsVisibles.includes('Configuración')) {
+      menuLabelsVisibles.push('Configuración');
+      console.log('✅ Agregando "Configuración" a menús visibles (solo para Administrador)');
+    }
+
+    // Crear un mapa de pantallas visibles (mapeando nombres de BD a nombres de NAV_ITEMS)
+    const pantallasVisiblesSet = new Set(
+      pantallasConfig
+        .filter((p: any) => p.isVisible)
+        .map((p: any) => {
+          // Mapear nombre de BD a nombre de NAV_ITEMS
+          return mapeoPantallas[p.menuLabel] || p.menuLabel;
+        })
+    );
+
+    // Crear un mapa de todas las pantallas configuradas (mapeando nombres de BD a nombres de NAV_ITEMS)
+    const todasPantallasConfiguradasSet = new Set(
+      pantallasConfig.map((p: any) => {
+        // Mapear nombre de BD a nombre de NAV_ITEMS
+        return mapeoPantallas[p.menuLabel] || p.menuLabel;
+      })
+    );
+
+    console.log('🔍 Debug filtrado:', {
+      pantallasConfig: pantallasConfig.map((p: any) => `${p.menuLabel} (${p.isVisible ? 'visible' : 'oculta'})`),
+      pantallasVisibles: Array.from(pantallasVisiblesSet),
+      todasPantallasConfiguradas: Array.from(todasPantallasConfiguradasSet),
+      menuLabelsVisibles: menuLabelsVisibles,
+    });
 
     // Filtrar pestañas y pantallas
     const filtrados = NAV_ITEMS
       .filter(item => menuLabelsVisibles.includes(item.label))
       .map(item => {
         if (item.children && Array.isArray(item.children)) {
-          // Obtener todas las pantallas configuradas para esta pestaña (independientemente de visibilidad)
-          const todasPantallasConfiguradas = pantallasConfig.map((p: any) => p.menuLabel);
+          // Obtener todas las pantallas configuradas para esta pestaña específica
+          // Buscar por parentLabel
+          const pantallasDeEstaPestaña = pantallasConfig.filter((p: any) => 
+            p.parentLabel === item.label
+          );
           
-          // Si hay configuración de pantallas en BD
-          if (pantallasVisibles.length > 0 || todasPantallasConfiguradas.length > 0) {
-            const hijos = item.children.filter(ch => {
-              // Si la pantalla está configurada en BD, usar su configuración de visibilidad
-              if (todasPantallasConfiguradas.includes(ch.label)) {
-                return pantallasVisibles.includes(ch.label);
-              }
-              // Si NO está configurada en BD, mostrarla por defecto (visible)
-              console.log(`Pantalla "${ch.label}" no está en BD, mostrándola por defecto`);
-              return true;
-            });
-            
-            // Debug: Log para Facturación
-            if (item.label === 'Facturación') {
-              console.log('=== FILTRADO FACTURACIÓN ===');
-              console.log('Pantallas en BD:', todasPantallasConfiguradas);
-              console.log('Pantallas visibles:', pantallasVisibles);
-              console.log('Pantallas originales:', item.children.map((c: any) => c.label));
-              console.log('Pantallas filtradas:', hijos.map((c: any) => c.label));
+          const hayConfiguracionParaEstaPestaña = pantallasDeEstaPestaña.length > 0;
+          
+          // Excepciones especiales: siempre mostrar estas pantallas
+          const pantallasSiempreVisibles = ['Tickets', 'Mensajes de Correo', 'Empresa', 'Temas', 'Configuración de Menús'];
+          
+          // Filtrar hijos basándose en la configuración
+          const hijos = item.children.filter(ch => {
+            // Solo mostrar "Configuración de Menús" para Administrador
+            if (ch.label === 'Configuración de Menús') {
+              const esAdmin = profileSelected === 'Administrador';
+              console.log(`Pantalla "${ch.label}": ${esAdmin ? 'VISIBLE (solo Administrador)' : 'OCULTA (no es Administrador)'}`);
+              return esAdmin;
             }
             
-            return { ...item, children: hijos };
-          } else {
-            // Si no hay configuración de pantallas en BD, mostrar todas las pantallas por defecto
-            console.log(`No hay configuración de pantallas en BD para "${item.label}", mostrando todas por defecto`);
-            return { ...item, children: item.children };
-          }
+            // Si hay configuración específica para esta pestaña en BD
+            if (hayConfiguracionParaEstaPestaña) {
+              // Si la pantalla está configurada en BD, usar su configuración de visibilidad
+              if (todasPantallasConfiguradasSet.has(ch.label)) {
+                // Solo mostrar si está visible
+                const esVisible = pantallasVisiblesSet.has(ch.label);
+                console.log(`Pantalla "${ch.label}": ${esVisible ? 'VISIBLE' : 'OCULTA'}`);
+                return esVisible;
+              }
+              // Excepciones: siempre mostrar estas pantallas aunque no estén configuradas
+              if (pantallasSiempreVisibles.includes(ch.label)) {
+                console.log(`Pantalla "${ch.label}": SIEMPRE VISIBLE (excepción)`);
+                return true;
+              }
+              // Si NO está configurada en BD pero hay configuración para esta pestaña, ocultarla
+              console.log(`Pantalla "${ch.label}": NO CONFIGURADA EN BD para pestaña "${item.label}", OCULTANDO`);
+              return false;
+            } else {
+              // Si NO hay configuración para esta pestaña, mostrar todas por defecto
+              // Esto asegura que pantallas como las de Configuración se muestren si no están configuradas
+              console.log(`Pantalla "${ch.label}": NO HAY CONFIGURACIÓN para pestaña "${item.label}", mostrando por defecto`);
+              return true;
+            }
+          });
+          
+          console.log(`Pestaña "${item.label}": ${item.children.length} originales -> ${hijos.length} filtradas (config: ${hayConfiguracionParaEstaPestaña})`);
+          
+          return { ...item, children: hijos };
         }
         return item;
       });

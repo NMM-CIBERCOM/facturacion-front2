@@ -3,6 +3,13 @@ import { FaGripVertical, FaSpinner, FaCog, FaTimes, FaEye, FaEyeSlash } from 're
 import { ThemeContext } from '../App';
 import { Card } from './Card';
 
+// Mapeo de nombres de BD a nombres de UI para consistencia
+const mapeoPantallasUI: { [key: string]: string } = {
+  'Boletas': 'Tickets',
+  'Tickets': 'Tickets',
+  // Otros mapeos si es necesario
+};
+
 interface MenuConfig {
   idConfig: number;
   idPerfil: number;
@@ -197,9 +204,28 @@ const ConfiguracionMenusPage: React.FC = () => {
   };
 
   const toggleVisibilidadPantalla = async (idConfig: number, isVisible: boolean) => {
+    // Prevenir múltiples clics mientras se está guardando
+    if (isSaving) {
+      console.log('⏸️ Ya hay una operación en curso, ignorando clic');
+      return;
+    }
+    
     try {
       setIsSaving(true);
       setMensaje(null); // Limpiar mensajes previos
+      
+      // Log para debug - CRÍTICO para verificar el valor que se envía
+      console.log(`🔄 ACTUALIZANDO VISIBILIDAD - ID_CONFIG: ${idConfig}, isVisible: ${isVisible} (tipo: ${typeof isVisible})`);
+      console.log(`📤 Valor booleano que se enviará: ${isVisible}`);
+      console.log(`📤 Valor como string: ${String(isVisible)}`);
+      
+      // Asegurar que isVisible sea un booleano explícito
+      const isVisibleBoolean = Boolean(isVisible);
+      console.log(`📤 Valor booleano explícito: ${isVisibleBoolean}`);
+      
+      const requestBody = { isVisible: isVisibleBoolean };
+      const requestBodyString = JSON.stringify(requestBody);
+      console.log(`📤 Request body completo: ${requestBodyString}`);
       
       const response = await fetch(`http://localhost:8080/api/menu-config/pantalla-visibilidad/${idConfig}`, {
         method: 'PUT',
@@ -207,50 +233,71 @@ const ConfiguracionMenusPage: React.FC = () => {
           'Content-Type': 'application/json',
           'X-Usuario': 'admin'
         },
-        body: JSON.stringify({ isVisible })
+        body: requestBodyString
       });
+
+      console.log(`📡 Respuesta HTTP - Status: ${response.status} ${response.statusText}`);
 
       if (!response.ok) {
         let errorMessage = 'Error al actualizar visibilidad de pantalla';
         try {
           const errorData = await response.json();
           errorMessage = errorData.message || errorData.error || errorMessage;
+          console.error('❌ Error del backend:', errorData);
         } catch {
           errorMessage = `Error ${response.status}: ${response.statusText}`;
+          console.error('❌ Error al parsear respuesta de error:', errorMessage);
         }
         throw new Error(errorMessage);
       }
 
       const data = await response.json();
+      console.log('📥 Respuesta completa del backend:', JSON.stringify(data, null, 2));
+      
       if (data.success) {
-        // Actualizar el estado local
-        setPantallasConfig(prev => 
-          prev.map(config => 
+        console.log(`✅ ÉXITO - ID_CONFIG: ${idConfig}, isVisible enviado: ${isVisibleBoolean}, isVisibleInt en BD: ${data.isVisibleInt}`);
+        
+        // Actualizar el estado local INMEDIATAMENTE
+        setPantallasConfig(prev => {
+          const updated = prev.map(config => 
             config.idConfig === idConfig 
-              ? { ...config, isVisible } 
+              ? { ...config, isVisible: isVisibleBoolean } 
               : config
-          )
-        );
+          );
+          const updatedItem = updated.find(c => c.idConfig === idConfig);
+          console.log('🔄 Estado local actualizado:', updatedItem);
+          return updated;
+        });
         
-        // Recargar configuraciones para asegurar sincronización
-        if (perfilSeleccionado) {
-          await cargarConfiguraciones(perfilSeleccionado);
-        }
+        // Disparar evento para que App.tsx recargue la configuración
+        window.dispatchEvent(new CustomEvent('menuConfigUpdated'));
+        localStorage.setItem('menuConfigUpdated', Date.now().toString());
         
-        setMensaje({ tipo: 'success', texto: 'Visibilidad de pantalla actualizada correctamente' });
+        setMensaje({ tipo: 'success', texto: `Visibilidad actualizada: ${isVisibleBoolean ? 'Visible' : 'Oculto'}` });
         
         // Limpiar mensaje de éxito después de 3 segundos
         setTimeout(() => {
           setMensaje(null);
         }, 3000);
+        
+        // Recargar configuraciones en segundo plano (sin bloquear)
+        if (perfilSeleccionado) {
+          setTimeout(() => {
+            cargarConfiguraciones(perfilSeleccionado, false).catch(error => {
+              console.error('Error al recargar configuraciones:', error);
+            });
+          }, 500);
+        }
       } else {
+        console.error(`❌ FALLO - ID_CONFIG: ${idConfig}, mensaje: ${data.message}`);
         setMensaje({ tipo: 'error', texto: data.message || 'Error al actualizar visibilidad de pantalla' });
       }
     } catch (error) {
-      console.error('Error al actualizar visibilidad de pantalla:', error);
+      console.error('❌ EXCEPCIÓN al actualizar visibilidad:', error);
       const errorMessage = error instanceof Error ? error.message : 'Error al actualizar la visibilidad de la pantalla';
       setMensaje({ tipo: 'error', texto: errorMessage });
     } finally {
+      console.log('🔓 Finalizando - estableciendo isSaving en false');
       setIsSaving(false);
     }
   };
@@ -302,7 +349,7 @@ const ConfiguracionMenusPage: React.FC = () => {
     // Mapear nombres de pestañas a sus pantallas correspondientes
     const mapeoPestañas: { [key: string]: string[] } = {
       'Facturación': ['Artículos', 'Intereses', 'Carta Factura', 'Global', 'Monederos', 'Captura Libre', 'Cancelación Masiva', 'Nóminas'],
-      'Consultas': ['Facturas', 'SKU', 'Boletas'],
+      'Consultas': ['Facturas', 'SKU', 'Boletas', 'Tickets'], // Incluir tanto 'Boletas' como 'Tickets' para compatibilidad
       'Administración': ['Empleados', 'Tiendas', 'Períodos Perfil', 'Períodos Plataforma', 'Kioscos', 'Excepciones', 'Secciones'],
       'Reportes Facturación Fiscal': [
         // 11 pantallas originales
@@ -600,7 +647,7 @@ const ConfiguracionMenusPage: React.FC = () => {
                             </div>
                             <div className="flex-1">
                               <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                {pantalla.menuLabel}
+                                {mapeoPantallasUI[pantalla.menuLabel] || pantalla.menuLabel}
                               </h4>
                               <p className="text-xs text-gray-500 dark:text-gray-400">
                                 Ruta: {pantalla.menuPath}
