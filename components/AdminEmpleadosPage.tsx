@@ -106,14 +106,24 @@ export const AdminEmpleadosPage: React.FC = () => {
   const cargarEmpleadosEspecificos = async (usuario: string) => {
     setIsLoadingEmpleados(true);
     try {
+      console.log(`🔍 Buscando empleado con código: "${usuario}"`);
       const empleadosData = await usuarioService.consultarEmpleadosEspecificos(usuario);
+      console.log(`📊 Empleados encontrados:`, empleadosData);
       setEmpleados(empleadosData);
       
       if (empleadosData.length === 0) {
-        alert(`No se encontraron empleados que coincidan con "${usuario}"`);
+        console.warn(`⚠️ No se encontraron empleados que coincidan con "${usuario}"`);
+        // No mostrar alert si es una búsqueda automática después de crear usuario
+        // Solo mostrar si es una búsqueda manual
+        const esBusquedaManual = userSearch.usuario === usuario;
+        if (esBusquedaManual) {
+          alert(`No se encontraron empleados que coincidan con "${usuario}"`);
+        }
+      } else {
+        console.log(`✅ Se encontraron ${empleadosData.length} empleado(s)`);
       }
     } catch (error) {
-      console.error('Error al buscar empleados:', error);
+      console.error('❌ Error al buscar empleados:', error);
       alert('Error al buscar empleados. Por favor intenta nuevamente.');
     } finally {
       setIsLoadingEmpleados(false);
@@ -224,10 +234,37 @@ export const AdminEmpleadosPage: React.FC = () => {
       if (response.success) {
         alert(`Usuario ${newUser.noUsuario} creado exitosamente`);
         handleCloseModal();
-        // Recargar empleados si hay una búsqueda activa
-        if (userSearch.usuario && userSearch.usuario.trim() !== '') {
-          cargarEmpleadosEspecificos(userSearch.usuario.trim());
-        }
+        
+        // Actualizar el campo de búsqueda con el nuevo usuario
+        setUserSearch({ usuario: newUser.noUsuario });
+        
+        // Buscar automáticamente el usuario recién creado para mostrarlo en la tabla
+        // Usar un delay y retry para asegurar que el usuario esté disponible en BD
+        console.log(`🔄 Buscando usuario recién creado: ${newUser.noUsuario}`);
+        
+        const buscarUsuarioConRetry = async (intento: number = 1) => {
+          const empleadosData = await usuarioService.consultarEmpleadosEspecificos(newUser.noUsuario);
+          
+          if (empleadosData.length > 0) {
+            console.log(`✅ Usuario encontrado en intento ${intento}`);
+            setEmpleados(empleadosData);
+          } else if (intento < 3) {
+            // Reintentar hasta 3 veces con delay incremental
+            console.log(`⚠️ Usuario no encontrado, reintentando... (intento ${intento + 1}/3)`);
+            setTimeout(() => {
+              buscarUsuarioConRetry(intento + 1);
+            }, 500 * intento);
+          } else {
+            console.warn(`⚠️ Usuario no encontrado después de ${intento} intentos. Puede que necesite refrescar manualmente.`);
+            // Mostrar mensaje al usuario
+            alert(`Usuario creado exitosamente. Si no aparece en la tabla, por favor busca manualmente con el código: ${newUser.noUsuario}`);
+          }
+        };
+        
+        // Iniciar búsqueda después de un pequeño delay
+        setTimeout(() => {
+          buscarUsuarioConRetry(1);
+        }, 500);
       } else {
         setSubmitError(response.message || 'Error al crear usuario');
       }
