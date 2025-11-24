@@ -6,7 +6,128 @@ export interface EmpresaInfo {
   rfc: string;
 }
 
+export type TipoTransporte = '01' | '02' | '03' | '04';
+
+export interface CartaPorteDomicilioForm {
+  calle?: string;
+  numeroExterior?: string;
+  numeroInterior?: string;
+  colonia?: string;
+  localidad?: string;
+  referencia?: string;
+  municipio?: string;
+  estado: string;
+  pais: string;
+  codigoPostal: string;
+}
+
+export interface CartaPorteUbicacionForm {
+  tipoUbicacion: 'Origen' | 'Destino' | 'Intermedia';
+  idUbicacion?: string;
+  rfcRemitenteDestinatario: string;
+  nombreRemitenteDestinatario?: string;
+  numRegIdTrib?: string;
+  residenciaFiscal?: string;
+  numEstacion?: string;
+  nombreEstacion?: string;
+  navegacionTrafico?: string;
+  fechaHoraSalidaLlegada: string;
+  tipoEstacion?: string;
+  distanciaRecorrida?: string;
+  domicilio?: CartaPorteDomicilioForm | null;
+}
+
+export interface CartaPorteMercanciaForm {
+  bienesTransp: string;
+  descripcion: string;
+  cantidad: string;
+  claveUnidad: string;
+  unidad?: string;
+  pesoEnKg: string;
+  valorMercancia?: string;
+  moneda?: string;
+  claveSTCC?: string;
+  materialPeligroso?: string;
+  cveMaterialPeligroso?: string;
+  embalaje?: string;
+  descripEmbalaje?: string;
+}
+
+export interface CartaPorteAutotransporteForm {
+  permSct: string;
+  numPermisoSct: string;
+  identificacionVehicular: {
+    configVehicular: string;
+    pesoBrutoVehicular: string;
+    placaVm: string;
+    anioModeloVm: string;
+  };
+  seguros: {
+    aseguraRespCivil: string;
+    polizaRespCivil: string;
+    aseguraMedAmbiente?: string;
+    polizaMedAmbiente?: string;
+    aseguraCarga?: string;
+    polizaCarga?: string;
+    primaSeguro?: string;
+  };
+  remolques: Array<{ subTipoRem: string; placa: string }>;
+}
+
+export interface CartaPorteDerechoDePasoForm {
+  tipoDerechoDePaso: string;
+  kilometrajePagado: string;
+}
+
+export interface CartaPorteCarroForm {
+  tipoCarro: string;
+  matriculaCarro: string;
+  guiaCarro: string;
+  toneladasNetasCarro: string;
+}
+
+export interface CartaPorteTransporteFerroviarioForm {
+  tipoDeServicio: string;
+  tipoDeTrafico: string;
+  nombreAseg?: string;
+  numPolizaSeguro?: string;
+  derechosDePaso: CartaPorteDerechoDePasoForm[];
+  carros: CartaPorteCarroForm[];
+}
+
+export interface CartaPorteFiguraForm {
+  tipoFigura: string;
+  rfcFigura?: string;
+  numLicencia?: string;
+  nombreFigura: string;
+  numRegIdTribFigura?: string;
+  residenciaFiscalFigura?: string;
+  partesTransporte: Array<{ parteTransporte: string }>;
+  domicilio?: CartaPorteDomicilioForm | null;
+}
+
+export interface CartaPorteComplementForm {
+  version: '3.1';
+  transpInternac: 'No' | 'Si';
+  totalDistRec: string;
+  regimenesAduaneros: Array<{ regimenAduanero: string }>;
+  ubicaciones: CartaPorteUbicacionForm[];
+  mercancias: {
+    pesoBrutoTotal: string;
+    unidadPeso: string;
+    pesoNetoTotal?: string;
+    numTotalMercancias: string;
+    mercancias: CartaPorteMercanciaForm[];
+    autotransporte?: CartaPorteAutotransporteForm;
+    transporteFerroviario?: CartaPorteTransporteFerroviarioForm;
+  };
+  figuraTransporte: {
+    tiposFigura: CartaPorteFiguraForm[];
+  };
+}
+
 export interface CartaPorteFormData {
+  versionCartaPorte: '3.1';
   rfcIniciales: string;
   rfcFecha: string;
   rfcHomoclave: string;
@@ -21,57 +142,37 @@ export interface CartaPorteFormData {
   regimenFiscal: string;
   usoCfdi: string;
   descripcion: string;
-  fechaInformacion: string; // YYYYMMDD
+  fechaInformacion: string;
   numeroSerie: string;
   precio: string;
   personaAutoriza: string;
   puesto: string;
-  tipoTransporte: string;
-  permisoSCT: string;
-  numeroPermisoSCT: string;
-  placasVehiculo: string;
-  configVehicular: string;
-  nombreTransportista: string;
-  rfcTransportista: string;
-  bienesTransportados: string;
-  origen: string;
-  destino: string;
-  fechaSalida: string; // ISO date-time
-  fechaLlegada: string; // ISO date-time
+  tipoTransporte: TipoTransporte;
+  tipoPersona: 'fisica' | 'moral' | null;
+  complemento: CartaPorteComplementForm;
 }
 
 export function buildFacturaDataFromCartaPorte(form: CartaPorteFormData, empresa?: EmpresaInfo): Record<string, any> {
   const rfcReceptor = `${(form.rfcIniciales || '').toUpperCase()}${form.rfcFecha || ''}${(form.rfcHomoclave || '').toUpperCase()}`;
-  const razonSocialReceptor = form.razonSocial?.trim() || [form.nombre, form.paterno, form.materno].filter(Boolean).join(' ').trim();
+  const razonSocialReceptor =
+    form.razonSocial?.trim() || [form.nombre, form.paterno, form.materno].filter(Boolean).join(' ').trim();
 
   const precio = Number(form.precio || 0);
   const cantidad = 1;
   const valorUnitario = +(precio || 0).toFixed(2);
   const importe = +(cantidad * valorUnitario).toFixed(2);
-  const iva = +((importe) * 0.16).toFixed(2);
+  const iva = +importe * 0.16;
   const subtotal = importe;
   const total = +(subtotal + iva).toFixed(2);
 
   const ahoraIso = new Date().toISOString();
   const uuid = `CP-${Date.now()}`;
 
-  // Concepto principal (usado por el generador de iText)
-  const conceptos = [
-    {
-      cantidad: String(cantidad),
-      descripcion: form.descripcion || 'Carta Porte',
-      valorUnitario: String(valorUnitario.toFixed(2)),
-      importe: String(subtotal.toFixed(2)),
-      iva: String(iva.toFixed(2)),
-      // Campos adicionales útiles para el complemento
-      claveProdServ: '25101500',
-      noIdentificacion: form.numeroSerie || 'CP001',
-      unidad: 'PIEZA',
-    },
-  ];
+  const primeraMercancia = form.complemento.mercancias.mercancias[0];
+  const primerOrigen = form.complemento.ubicaciones.find((u) => u.tipoUbicacion === 'Origen');
+  const primerDestino = form.complemento.ubicaciones.find((u) => u.tipoUbicacion === 'Destino');
 
   return {
-    // Encabezado y emisor/receptor
     uuid,
     serie: 'CP',
     folio: form.numeroSerie || 'CP001',
@@ -80,48 +181,45 @@ export function buildFacturaDataFromCartaPorte(form: CartaPorteFormData, empresa
     nombreEmisor: empresa?.nombre || 'EMISOR CARTA PORTE',
     rfcReceptor,
     nombreReceptor: razonSocialReceptor || 'RECEPTOR',
-    subtotal: String(subtotal.toFixed(2)),
-    iva: String(iva.toFixed(2)),
-    total: String(total.toFixed(2)),
+    subtotal: subtotal.toFixed(2),
+    iva: (subtotal * 0.16).toFixed(2),
+    total: total.toFixed(2),
     metodoPago: 'PUE',
     formaPago: '99',
     usoCfdi: form.usoCfdi || 'G03',
     tipoComprobante: 'T',
     lugarExpedicion: form.domicilioFiscal || '76120',
     moneda: 'MXN',
-
-    // Conceptos compatibles con el generador de iText
-    conceptos,
-
-    // Complemento Carta Porte (renderizado por backend)
+    conceptos: [
+      {
+        cantidad: String(cantidad),
+        descripcion: form.descripcion || 'Carta Porte',
+        valorUnitario: valorUnitario.toFixed(2),
+        importe: subtotal.toFixed(2),
+        iva: (subtotal * 0.16).toFixed(2),
+        claveProdServ: primeraMercancia?.bienesTransp || '78101801',
+        noIdentificacion: form.numeroSerie || 'CP001',
+        unidad: primeraMercancia?.claveUnidad || 'H87',
+      },
+    ],
     complementoCartaPorte: {
       tipoTransporte: form.tipoTransporte,
-      permisoSCT: form.permisoSCT,
-      numeroPermisoSCT: form.numeroPermisoSCT,
-      placasVehiculo: form.placasVehiculo,
-      configVehicular: form.configVehicular,
-      operadorNombre: form.nombreTransportista,
-      operadorRfc: form.rfcTransportista,
-      bienesTransportados: form.bienesTransportados,
-      origen: form.origen,
-      destino: form.destino,
-      fechaSalida: form.fechaSalida,
-      fechaLlegada: form.fechaLlegada,
-      fechaInformacion: form.fechaInformacion,
+      origen: primerOrigen?.rfcRemitenteDestinatario || '',
+      destino: primerDestino?.rfcRemitenteDestinatario || '',
+      fechaSalida: primerOrigen?.fechaHoraSalidaLlegada || '',
+      fechaLlegada: primerDestino?.fechaHoraSalidaLlegada || '',
       personaAutoriza: form.personaAutoriza,
       puesto: form.puesto,
       mercancia: {
-        descripcion: form.descripcion,
-        claveProdServ: '25101500',
-        cantidad: String(cantidad),
-        unidad: 'PIEZA',
-        peso: '120 kg', // si el formulario no lo captura, lo podemos construir en "Cargar ejemplo"
-        valor: String(subtotal.toFixed(2)),
+        descripcion: primeraMercancia?.descripcion || form.descripcion,
+        claveProdServ: primeraMercancia?.bienesTransp || '78101801',
+        cantidad: primeraMercancia?.cantidad || '1',
+        unidad: primeraMercancia?.claveUnidad || 'H87',
+        peso: `${primeraMercancia?.pesoEnKg || '0'} kg`,
+        valor: subtotal.toFixed(2),
         numeroSerie: form.numeroSerie || '',
       },
     },
-
-    // Campos fiscales opcionales
     xmlTimbrado: "<?xml version='1.0' encoding='UTF-8'?><cfdi:Comprobante></cfdi:Comprobante>",
     cadenaOriginal: `||1.1|${uuid}|${ahoraIso}||`,
     selloDigital: 'ABC123DEF456',
@@ -131,17 +229,81 @@ export function buildFacturaDataFromCartaPorte(form: CartaPorteFormData, empresa
   };
 }
 
+const ensureDateTime = (value?: string) => {
+  if (!value) return value;
+  return value.length === 16 ? `${value}:00` : value;
+};
+
+const sanitizeDomicilio = (domicilio?: CartaPorteDomicilioForm | null) => {
+  if (!domicilio) return domicilio ?? null;
+  const { estado, pais, codigoPostal } = domicilio;
+  if (!estado || !pais || !codigoPostal) {
+    return null;
+  }
+  return domicilio;
+};
+
+const normalizeTipoEstacion = (value?: string): string | undefined => {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  if (/^\d+$/.test(trimmed)) {
+    return trimmed.padStart(2, '0').slice(-2);
+  }
+  return trimmed.toUpperCase();
+};
+
+export function normalizeCartaPortePayload(form: CartaPorteFormData): CartaPorteFormData {
+  const tieneFerro = Boolean(form.complemento.mercancias.transporteFerroviario);
+  const rfcCompleto = `${(form.rfcIniciales || '').toUpperCase()}${form.rfcFecha || ''}${(form.rfcHomoclave || '').toUpperCase()}`;
+  let tipoDetectado: 'fisica' | 'moral' | null = null;
+  if (rfcCompleto.length === 12) tipoDetectado = 'moral';
+  if (rfcCompleto.length === 13) tipoDetectado = 'fisica';
+  const tipoPersonaFinal = form.tipoPersona || tipoDetectado;
+  const esAutotransporte = form.tipoTransporte === '01';
+  return {
+    ...form,
+    tipoPersona: tipoPersonaFinal,
+    rfcIniciales: form.rfcIniciales.trim().toUpperCase(),
+    rfcHomoclave: form.rfcHomoclave.trim().toUpperCase(),
+    numeroSerie: form.numeroSerie.trim(),
+    complemento: {
+      ...form.complemento,
+      ubicaciones: form.complemento.ubicaciones.map((ubicacion) => {
+        const tipoEstacion = normalizeTipoEstacion(ubicacion.tipoEstacion);
+        const esEstacionIntermedia = tipoEstacion === '02';
+        const domicilioSanitizado = sanitizeDomicilio(ubicacion.domicilio);
+        const domicilioFinal = tieneFerro && esEstacionIntermedia ? null : domicilioSanitizado;
+
+        const normalizada: CartaPorteUbicacionForm = {
+          ...ubicacion,
+          tipoEstacion: esAutotransporte ? undefined : tipoEstacion,
+          fechaHoraSalidaLlegada: ensureDateTime(ubicacion.fechaHoraSalidaLlegada) || '',
+          domicilio: esAutotransporte ? domicilioSanitizado : domicilioFinal,
+        };
+        return normalizada;
+      }),
+      mercancias: {
+        ...form.complemento.mercancias,
+        mercancias: form.complemento.mercancias.mercancias.map((m) => ({
+          ...m,
+          cantidad: m.cantidad || '1',
+          claveUnidad: m.claveUnidad || 'H87',
+          pesoEnKg: m.pesoEnKg || '0',
+        })),
+      },
+    },
+  };
+}
+
 export async function generarYDescargarPDFCartaPorte(form: CartaPorteFormData, empresa?: EmpresaInfo): Promise<void> {
-  // Obtener logo y colores
+  const normalizado = normalizeCartaPortePayload(form);
   const logoConfig = await facturaService.obtenerConfiguracionLogos();
   if (!logoConfig.exitoso) {
     throw new Error('No se pudo obtener configuración de logos');
   }
 
-  // Construir datos compatibles con generador iText del backend
-  const facturaData = buildFacturaDataFromCartaPorte(form, empresa);
-
-  // Invocar backend para generar PDF
+  const facturaData = buildFacturaDataFromCartaPorte(normalizado, empresa);
   const resp = await fetch(apiUrl('/factura/generar-pdf'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -170,4 +332,19 @@ export async function generarYDescargarPDFCartaPorte(form: CartaPorteFormData, e
   a.click();
   window.URL.revokeObjectURL(url);
   document.body.removeChild(a);
+}
+
+export async function descargarXmlCartaPorte(form: CartaPorteFormData): Promise<string> {
+  const normalizado = normalizeCartaPortePayload(form);
+  const resp = await fetch(apiUrl('/carta-porte/preview-xml'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(normalizado),
+  });
+  if (!resp.ok) {
+    const txt = await resp.text().catch(() => '');
+    throw new Error(`Error al generar XML (HTTP ${resp.status}) ${txt}`);
+  }
+  const data = await resp.json();
+  return data.xml as string;
 }

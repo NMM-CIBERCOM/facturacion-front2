@@ -13,6 +13,13 @@ export interface NominaFormPayload {
   tipoNomina: string; // O/E
   usoCfdi: string; // CN01
   correoElectronico: string;
+  domicilioFiscalReceptor?: string; // Código postal del receptor
+  // CRÍTICO NOM44: Campos requeridos cuando existe RegistroPatronal
+  numSeguridadSocial?: string;
+  fechaInicioRelLaboral?: string; // YYYY-MM-DD
+  antiguedad?: string; // Formato PnYnMnDn (ej: P1Y2M15D)
+  riesgoPuesto?: string; // Clave de riesgo del puesto
+  salarioDiarioIntegrado?: string; // decimal string
 }
 
 export interface NominaSaveResponse {
@@ -52,6 +59,13 @@ export async function guardarNomina(
     tipoNomina: form.tipoNomina,
     usoCfdi: form.usoCfdi || 'CN01',
     correoElectronico: form.correoElectronico,
+    domicilioFiscalReceptor: form.domicilioFiscalReceptor || '',
+    // CRÍTICO NOM44: Campos requeridos cuando existe RegistroPatronal
+    numSeguridadSocial: form.numSeguridadSocial || '',
+    fechaInicioRelLaboral: form.fechaInicioRelLaboral || '',
+    antiguedad: form.antiguedad || '',
+    riesgoPuesto: form.riesgoPuesto || '',
+    salarioDiarioIntegrado: form.salarioDiarioIntegrado || '',
     usuarioCreacion: 'frontend',
   };
 

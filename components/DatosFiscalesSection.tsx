@@ -36,6 +36,9 @@ interface DatosFiscalesSectionProps {
   isUsoCfdiDisabled?: boolean;
   // Errores por campo para mostrar mensajes en rojo
   fieldErrors?: Partial<Record<'rfc' | 'correoElectronico' | 'razonSocial' | 'nombre' | 'paterno' | 'materno' | 'domicilioFiscal' | 'regimenFiscal' | 'usoCfdi', string>>;
+  // Control de visibilidad basado en tipo de persona (física o moral)
+  mostrarRazonSocial?: boolean;
+  mostrarNombreCompleto?: boolean;
 }
 
 export const DatosFiscalesSection: React.FC<DatosFiscalesSectionProps> = ({
@@ -52,6 +55,8 @@ export const DatosFiscalesSection: React.FC<DatosFiscalesSectionProps> = ({
   isRegimenFiscalDisabled = false,
   isUsoCfdiDisabled = false,
   fieldErrors = {},
+  mostrarRazonSocial = true,
+  mostrarNombreCompleto = true,
 }) => {
   return (
     <>
@@ -85,12 +90,18 @@ export const DatosFiscalesSection: React.FC<DatosFiscalesSectionProps> = ({
             <p className="text-red-600 text-xs mt-1">{fieldErrors.correoElectronico}</p>
           </div>
         )}
+        {mostrarRazonSocial && (
+          <>
         <FormField label="Razón Social:" name="razonSocial" value={formData.razonSocial} onChange={handleChange} required={isRazonSocialRequired} error={Boolean(fieldErrors.razonSocial)} />
         {fieldErrors.razonSocial && (
           <div className="md:col-span-1 lg:col-span-1">
             <p className="text-red-600 text-xs mt-1">{fieldErrors.razonSocial}</p>
           </div>
         )}
+          </>
+        )}
+        {mostrarNombreCompleto && (
+          <>
         <FormField label="Nombre:" name="nombre" value={formData.nombre} onChange={handleChange} />
         {fieldErrors.nombre && (
           <div className="md:col-span-1 lg:col-span-1">
@@ -108,6 +119,8 @@ export const DatosFiscalesSection: React.FC<DatosFiscalesSectionProps> = ({
           <div className="md:col-span-1 lg:col-span-1">
             <p className="text-red-600 text-xs mt-1">{fieldErrors.materno}</p>
           </div>
+            )}
+          </>
         )}
         <SelectField label="País:" name="pais" value={formData.pais} onChange={handleChange} options={PAIS_OPTIONS} />
         <FormField label="No. Registro Identidad Tributaria:" name="noRegistroIdentidadTributaria" value={formData.noRegistroIdentidadTributaria} onChange={handleChange} />

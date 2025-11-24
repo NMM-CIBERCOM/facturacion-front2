@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useRef, useEffect } from 'react';
 import { Card } from './Card';
 import { FormField } from './FormField';
 import { SelectField } from './SelectField';
@@ -46,6 +46,54 @@ interface NotaCreditoFormData {
   formaPago: string;
 }
 
+interface NotaCreditoConceptoData {
+  descripcion: string;
+  cantidad: number;
+  unidad: string;
+  precioUnitario: number;
+  importe: number;
+  claveProdServ: string;
+}
+
+interface NotaCreditoData {
+  uuid?: string;
+  serie: string;
+  folio: string;
+  fechaEmision: string;
+  rfcEmisor: string;
+  nombreEmisor: string;
+  rfcReceptor: string;
+  nombreReceptor: string;
+  domicilioFiscalReceptor: string;
+  usoCfdi: string;
+  regimenFiscal: string;
+  formaPago: string;
+  metodoPago: string;
+  subtotal: number;
+  iva: number;
+  ivaTasa: number;
+  importe: number;
+  conceptos: NotaCreditoConceptoData[];
+  referenciaFactura?: string;
+  motivo?: string;
+  lugarExpedicion?: string;
+}
+
+interface TimbradoResult {
+  ok: boolean;
+  uuid?: string;
+  serie?: string;
+  folio?: string;
+  xmlTimbrado?: string;
+  message?: string;
+  error?: string;
+}
+
+const IVA_TASA_DEFAULT = 0.16;
+const CLAVE_PROD_SERV_DEFAULT = '84111506';
+const DEFAULT_LUGAR_EXPEDICION = '00000';
+const CP_REGEX = /\b\d{5}\b/;
+
 const initialFormData: NotaCreditoFormData = {
   rfcIniciales: '',
   rfcFecha: '',
@@ -68,6 +116,16 @@ const initialFormData: NotaCreditoFormData = {
   formaPago: '01',
 };
 
+const stringToBase64 = (input?: string) => {
+  if (!input) return undefined;
+  try {
+    return btoa(unescape(encodeURIComponent(input)));
+  } catch (error) {
+    console.warn('No se pudo convertir a Base64', error);
+    return undefined;
+  }
+};
+
 export const NotasCreditoPage: React.FC = () => {
   const { empresaInfo } = useEmpresa();
   const { customColors, logoUrl } = useContext(ThemeContext);
@@ -84,6 +142,57 @@ export const NotasCreditoPage: React.FC = () => {
   const [generando, setGenerando] = useState(false);
   const [mensaje, setMensaje] = useState<{ tipo: 'success' | 'error'; texto: string } | null>(null);
   const [enviandoCorreo, setEnviandoCorreo] = useState(false);
+  const [tipoPersona, setTipoPersona] = useState<'fisica' | 'moral' | null>(null);
+  const tipoPersonaAnteriorRef = useRef<'fisica' | 'moral' | null>(null);
+
+  // Funciones para determinar el tipo de persona según el RFC
+  const esPersonaMoral = (rfc: string): boolean => {
+    return rfc.length === 12;
+  };
+
+  const esPersonaFisica = (rfc: string): boolean => {
+    return rfc.length === 13;
+  };
+
+  // Construir RFC desde las partes
+  const buildRfc = (iniciales: string, fecha: string, homoclave: string): string => {
+    return `${iniciales}${fecha}${homoclave}`.toUpperCase().trim();
+  };
+
+  // Detectar tipo de persona cuando cambia el RFC
+  useEffect(() => {
+    const rfc = buildRfc(formData.rfcIniciales, formData.rfcFecha, formData.rfcHomoclave);
+    let nuevoTipo: 'fisica' | 'moral' | null = null;
+    
+    if (rfc && rfc.length >= 12) {
+      if (esPersonaMoral(rfc)) {
+        nuevoTipo = 'moral';
+      } else if (esPersonaFisica(rfc)) {
+        nuevoTipo = 'fisica';
+      }
+    }
+    
+    // Solo actualizar si el tipo cambió
+    if (nuevoTipo !== tipoPersonaAnteriorRef.current) {
+      tipoPersonaAnteriorRef.current = nuevoTipo;
+      setTipoPersona(nuevoTipo);
+      
+      // Limpiar campos según el nuevo tipo
+      if (nuevoTipo === 'moral') {
+        setFormData(prev => ({
+          ...prev,
+          nombre: '',
+          paterno: '',
+          materno: '',
+        }));
+      } else if (nuevoTipo === 'fisica') {
+        setFormData(prev => ({
+          ...prev,
+          razonSocial: '',
+        }));
+      }
+    }
+  }, [formData.rfcIniciales, formData.rfcFecha, formData.rfcHomoclave]);
 
   const blobToBase64 = (blob: Blob) => new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -133,11 +242,34 @@ export const NotasCreditoPage: React.FC = () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const rfcRegex = /^[A-Z&Ñ]{3,4}[0-9]{6}[A-Z0-9]{3}$/;
     const errors: any = {};
-    if (!emailRegex.test(formData.correoElectronico || '')) errors.correoElectronico = 'Email inválido';
+    const correo = formData.correoElectronico?.trim() || '';
+    const razonSocial = formData.razonSocial?.trim() || '';
+    const domicilio = formData.domicilioFiscal?.trim() || '';
+    const nombre = formData.nombre?.trim() || '';
+    const paterno = formData.paterno?.trim() || '';
+    const usoCfdi = formData.usoCfdi?.trim() || '';
+    const regimenFiscal = formData.regimenFiscal?.trim() || '';
+
+    if (!emailRegex.test(correo)) errors.correoElectronico = 'Email inválido';
     if (!rfcRegex.test((rfcCompleto || '').toUpperCase())) errors.rfc = 'RFC inválido';
-    ['razonSocial', 'domicilioFiscal', 'regimenFiscal', 'usoCfdi'].forEach((k) => {
-      if (!(formData as any)[k]) errors[k] = 'Campo requerido';
-    });
+
+    if (tipoPersona !== 'fisica' && !razonSocial) {
+      errors.razonSocial = 'Campo requerido';
+    }
+
+    if (tipoPersona === 'fisica') {
+      if (!nombre) errors.nombre = 'Campo requerido';
+      if (!paterno) errors.paterno = 'Campo requerido';
+    }
+
+    if (!domicilio) {
+      errors.domicilioFiscal = 'Campo requerido';
+    } else if (!CP_REGEX.test(domicilio)) {
+      errors.domicilioFiscal = 'Incluye un CP válido (5 dígitos)';
+    }
+    if (!regimenFiscal) errors.regimenFiscal = 'Campo requerido';
+    if (!usoCfdi) errors.usoCfdi = 'Campo requerido';
+
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -151,160 +283,315 @@ export const NotasCreditoPage: React.FC = () => {
     return { subtotal, iva, total };
   };
 
-  const crearXMLNotaCredito = (notaData: any) => {
-    const fecha = new Date(notaData.fechaEmision).toISOString();
-    const conceptosXML = notaData.conceptos.map((c: any) =>
-      `<cfdi:Concepto ClaveProdServ="01010101" Cantidad="${c.cantidad}" ClaveUnidad="${c.unidad || 'E48'}" Descripcion="${c.descripcion}" ValorUnitario="${c.precioUnitario.toFixed(2)}" Importe="${c.importe.toFixed(2)}"/>`
-    ).join('');
-    return `<?xml version="1.0" encoding="UTF-8"?>\n<cfdi:Comprobante Version="4.0" Serie="${notaData.serie}" Folio="${notaData.folio}" Fecha="${fecha}" SubTotal="${notaData.subtotal.toFixed(2)}" Total="${notaData.importe.toFixed(2)}" Moneda="MXN" TipoDeComprobante="E" LugarExpedicion="12345" xmlns:cfdi="http://www.sat.gob.mx/cfd/4">\n  <cfdi:Emisor Rfc="${notaData.rfcEmisor}" Nombre="${notaData.nombreEmisor}" RegimenFiscal="601"/>\n  <cfdi:Receptor Rfc="${notaData.rfcReceptor}" Nombre="${notaData.nombreReceptor}" UsoCFDI="${notaData.usoCFDI || notaData.usoCfdi}"/>\n  <cfdi:Conceptos>\n    ${conceptosXML}\n  </cfdi:Conceptos>\n</cfdi:Comprobante>`;
+  const obtenerDescripcionConcepto = () => {
+    if (concepto.descripcion === 'OTRO') {
+      return descripcionLibre.trim();
+    }
+    return CONCEPTO_DESC_OPTIONS.find((o) => o.value === concepto.descripcion)?.label || concepto.descripcion;
+  };
+
+  const extraerCpDesdeTexto = (valor?: string) => {
+    if (!valor) return '';
+    const match = valor.match(CP_REGEX);
+    if (match) return match[0];
+    return valor.trim();
+  };
+
+  const prepararNotaCredito = async (): Promise<{ notaData: NotaCreditoData; rfcReceptor: string } | null> => {
+    if (!validarCampos()) {
+      setMensaje({ tipo: 'error', texto: 'Completa los datos fiscales obligatorios' });
+      return null;
+    }
+    if (concepto.descripcion === 'OTRO' && !descripcionLibre.trim()) {
+      setMensaje({ tipo: 'error', texto: 'Especifica la descripción libre del concepto' });
+      return null;
+    }
+    const rfcReceptor = `${formData.rfcIniciales}${formData.rfcFecha}${formData.rfcHomoclave}`.toUpperCase();
+    const { subtotal, iva, total } = calcularImportes();
+    const uuidInfo = await obtenerUuidNotaCredito(formData.referenciaFactura);
+    const descripcionConcepto = obtenerDescripcionConcepto();
+    const cantidad = typeof concepto.cantidad === 'number' ? concepto.cantidad : 0;
+    const precioUnitario = typeof concepto.precioUnitario === 'number' ? concepto.precioUnitario : 0;
+
+    const notaData: NotaCreditoData = {
+      uuid: uuidInfo?.uuidNc || '',
+      serie: formData.serie || uuidInfo?.serie || 'NC',
+      folio: formData.folio || uuidInfo?.folio || new Date().getTime().toString().slice(-6),
+      fechaEmision: new Date().toISOString(),
+      rfcEmisor: empresaInfo.rfc,
+      nombreEmisor: empresaInfo.nombre,
+      rfcReceptor,
+      nombreReceptor: (formData.razonSocial || `${formData.nombre} ${formData.paterno} ${formData.materno}`.trim() || rfcReceptor),
+      domicilioFiscalReceptor: formData.domicilioFiscal.trim(),
+      usoCfdi: formData.usoCfdi,
+      regimenFiscal: formData.regimenFiscal,
+      formaPago: formData.formaPago,
+      metodoPago: formData.metodoPago,
+      subtotal,
+      iva,
+      ivaTasa: IVA_TASA_DEFAULT,
+      importe: total,
+      conceptos: [{
+        descripcion: descripcionConcepto,
+        cantidad,
+        unidad: concepto.unidad,
+        precioUnitario,
+        importe: subtotal,
+        claveProdServ: CLAVE_PROD_SERV_DEFAULT,
+      }],
+      referenciaFactura: formData.referenciaFactura || undefined,
+      motivo: formData.motivo || undefined,
+      lugarExpedicion: DEFAULT_LUGAR_EXPEDICION,
+    };
+    return { notaData, rfcReceptor };
+  };
+
+  const descargarXmlArchivo = (xmlContent: string, serie: string, folio: string) => {
+    const blob = new Blob([xmlContent], { type: 'application/xml' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `NotaCredito_${serie}-${folio}.xml`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  };
+
+  const obtenerLogoConfigFinal = async () => {
+    let logoConfigFinal: any = { logoUrl, customColors };
+    try {
+      const logosResp = await facturaService.obtenerConfiguracionLogos();
+      if ((logosResp as any)?.exitoso) {
+        logoConfigFinal = {
+          logoUrl: logosResp.logoUrl,
+          logoBase64: logosResp.logoBase64,
+          customColors: logosResp.customColors,
+        };
+      }
+    } catch {
+      // Ignorar y usar fallback actual
+    }
+    return logoConfigFinal;
+  };
+
+  const crearXMLNotaCredito = (notaData: NotaCreditoData) => {
+    const fecha = new Date(notaData.fechaEmision).toISOString().split('.')[0];
+    const concepto = notaData.conceptos[0];
+    const cpReceptor = extraerCpDesdeTexto(notaData.domicilioFiscalReceptor);
+    const tieneImpuestos = notaData.iva > 0;
+    const tasaIva = (notaData.ivaTasa ?? IVA_TASA_DEFAULT).toFixed(6);
+    const objetoImp = tieneImpuestos ? '02' : '01';
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<cfdi:Comprobante xmlns:cfdi="http://www.sat.gob.mx/cfd/4" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.sat.gob.mx/cfd/4 http://www.sat.gob.mx/sitio_internet/cfd/4/cfdv40.xsd" Version="4.0" Serie="${notaData.serie}" Folio="${notaData.folio}" Fecha="${fecha}" SubTotal="${notaData.subtotal.toFixed(2)}" Total="${notaData.importe.toFixed(2)}" Moneda="MXN" TipoDeComprobante="E" Exportacion="01" LugarExpedicion="${notaData.lugarExpedicion || DEFAULT_LUGAR_EXPEDICION}" FormaPago="${notaData.formaPago}" MetodoPago="${notaData.metodoPago}">
+${notaData.referenciaFactura ? `  <cfdi:CfdiRelacionados TipoRelacion="${notaData.motivo || '01'}">
+    <cfdi:CfdiRelacionado UUID="${notaData.referenciaFactura.toUpperCase()}"/>
+  </cfdi:CfdiRelacionados>
+` : ''}  <cfdi:Emisor Rfc="${notaData.rfcEmisor}" Nombre="${notaData.nombreEmisor}" RegimenFiscal="601"/>
+  <cfdi:Receptor Rfc="${notaData.rfcReceptor}" Nombre="${notaData.nombreReceptor}" DomicilioFiscalReceptor="${cpReceptor}" RegimenFiscalReceptor="${notaData.regimenFiscal}" UsoCFDI="${notaData.usoCfdi}"/>
+  <cfdi:Conceptos>
+    <cfdi:Concepto ClaveProdServ="${concepto.claveProdServ}" Cantidad="${concepto.cantidad.toFixed(6).replace(/0+$/, '').replace(/\.$/, '')}" ClaveUnidad="${concepto.unidad || 'E48'}" Descripcion="${concepto.descripcion}" ValorUnitario="${concepto.precioUnitario.toFixed(2)}" Importe="${concepto.importe.toFixed(2)}" ObjetoImp="${objetoImp}">
+${tieneImpuestos ? `      <cfdi:Impuestos>
+        <cfdi:Traslados>
+          <cfdi:Traslado Base="${notaData.subtotal.toFixed(2)}" Impuesto="002" TipoFactor="Tasa" TasaOCuota="${tasaIva}" Importe="${notaData.iva.toFixed(2)}"/>
+        </cfdi:Traslados>
+      </cfdi:Impuestos>
+    </cfdi:Concepto>` : '    </cfdi:Concepto>'}
+  </cfdi:Conceptos>
+${tieneImpuestos ? `  <cfdi:Impuestos TotalImpuestosTrasladados="${notaData.iva.toFixed(2)}">
+    <cfdi:Traslados>
+      <cfdi:Traslado Base="${notaData.subtotal.toFixed(2)}" Impuesto="002" TipoFactor="Tasa" TasaOCuota="${tasaIva}" Importe="${notaData.iva.toFixed(2)}"/>
+    </cfdi:Traslados>
+  </cfdi:Impuestos>
+` : ''}</cfdi:Comprobante>`;
   };
 
   // Guardar la nota de crédito en Oracle (FACTURAS y NOTAS_CREDITO) antes de generar/descargar
-  const guardarNotaCreditoEnBD = async (notaData: any, rfcReceptor: string) => {
+  const guardarNotaCreditoEnBD = async (notaData: NotaCreditoData, rfcReceptor: string): Promise<TimbradoResult> => {
     try {
       const xmlContent = crearXMLNotaCredito(notaData);
-      const payload = {
-        uuidFacturaOrig: formData.referenciaFactura || undefined,
+      const conceptoPrincipal = notaData.conceptos[0];
+      const payload: Record<string, any> = {
+        uuidFacturaOrig: notaData.referenciaFactura || undefined,
         serieFacturaOrig: undefined,
         folioFacturaOrig: undefined,
         uuidNc: notaData.uuid || undefined,
         serieNc: notaData.serie,
         folioNc: notaData.folio,
         fechaEmision: notaData.fechaEmision,
-        usoCfdi: formData.usoCfdi,
-        regimenFiscal: formData.regimenFiscal,
-        motivo: formData.motivo || undefined,
-        concepto: notaData.conceptos?.[0]?.descripcion || 'Nota de crédito',
-        cantidad: notaData.conceptos?.[0]?.cantidad || 1,
-        unidad: notaData.conceptos?.[0]?.unidad || 'E48',
-        precioUnitario: notaData.conceptos?.[0]?.precioUnitario || 0,
+        usoCfdi: notaData.usoCfdi,
+        regimenFiscal: notaData.regimenFiscal,
+        motivo: notaData.motivo || undefined,
+        concepto: conceptoPrincipal?.descripcion || 'Nota de crédito',
+        cantidad: conceptoPrincipal?.cantidad || 1,
+        unidad: conceptoPrincipal?.unidad || 'E48',
+        precioUnitario: conceptoPrincipal?.precioUnitario || 0,
         subtotal: notaData.subtotal,
         ivaImporte: notaData.iva,
-        ivaPorcentaje: 0.16,
-        iepsImporte: notaData.ieps || 0,
+        ivaPorcentaje: notaData.ivaTasa,
+        iepsImporte: 0,
         iepsPorcentaje: undefined,
         total: notaData.importe,
         xmlContent,
-        selloDigital: undefined,
-        estatusSat: undefined,
-        codeSat: undefined,
-        rfcEmisor: empresaInfo.rfc,
+        rfcEmisor: notaData.rfcEmisor,
         rfcReceptor,
-        formaPago: formData.formaPago,
-        metodoPago: formData.metodoPago,
+        formaPago: notaData.formaPago,
+        metodoPago: notaData.metodoPago,
+        nombreReceptor: notaData.nombreReceptor,
+        domicilioFiscalReceptor: notaData.domicilioFiscalReceptor,
       };
-      console.log('[NC] Payload guardar/timbrar:', payload);
+
       const resp = await fetch(`${CREDIT_NOTES_BASE_URL}/credit-notes/guardar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
-      if (!resp.ok) {
-        throw new Error('No se pudo guardar la nota de crédito en BD');
-      }
       const data = await resp.json();
-      console.log('[NC] Respuesta guardar:', data);
-      if (!data?.ok) {
+      if (!resp.ok || !data?.ok) {
         const errs = (data?.errors || []) as string[];
-        const msg = errs.length ? errs.join(' | ') : 'Guardado incompleto';
+        const msg = errs.length ? errs.join(' | ') : (data?.message || 'No se pudo guardar la nota de crédito');
         throw new Error(msg);
       }
-      // Si el backend generó uuidNc, propagarlo al payload y a notaData para timbrar con el mismo UUID
       if (data?.uuidNc) {
         payload.uuidNc = data.uuidNc;
         notaData.uuid = data.uuidNc;
-        console.log('[NC] UUID_NC del guardado propagado al timbrado:', data.uuidNc);
       }
 
-      // Timbrar en PAC inmediatamente después de guardar
       const respTimbrar = await fetch(`${CREDIT_NOTES_BASE_URL}/credit-notes/timbrar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
-      if (!respTimbrar.ok) {
-        throw new Error('Guardado correcto, pero fallo timbrado en PAC');
-      }
       const dataTimbrar = await respTimbrar.json();
-      console.log('[NC] Respuesta timbrar:', dataTimbrar);
-      if (!dataTimbrar?.ok) {
-        const msg = String(dataTimbrar?.message || 'Timbrado rechazado por PAC');
+      if (!respTimbrar.ok || !dataTimbrar?.ok) {
+        const msg = dataTimbrar?.message || 'Guardado correcto, pero el PAC rechazó el timbrado';
         throw new Error(msg);
       }
-      // Actualizar UUID timbrado si el backend lo devuelve
-      if (dataTimbrar?.uuid) {
-        notaData.uuid = dataTimbrar.uuid;
-        console.log('[NC] UUID timbrado actualizado en notaData:', notaData.uuid);
+      const result: TimbradoResult = {
+        ok: true,
+        uuid: dataTimbrar.uuid || payload.uuidNc,
+        serie: dataTimbrar.serie || notaData.serie,
+        folio: dataTimbrar.folio || notaData.folio,
+        xmlTimbrado: dataTimbrar.xmlTimbrado || xmlContent,
+        message: dataTimbrar.message,
+      };
+      notaData.uuid = result.uuid || notaData.uuid;
+      notaData.serie = result.serie || notaData.serie;
+      notaData.folio = result.folio || notaData.folio;
+      return result;
+    } catch (error: any) {
+      console.warn('Fallo guardando NOTA_CREDITO:', error);
+      return { ok: false, error: error?.message || 'Error al guardar la nota de crédito' };
+    }
+  };
+
+  const enviarNotaPorCorreo = async (
+    notaData: NotaCreditoData,
+    rfcReceptor: string,
+    timbrado?: TimbradoResult,
+    manageState = true
+  ) => {
+    try {
+      if (manageState) {
+        setEnviandoCorreo(true);
       }
-      return true;
-    } catch (e) {
-      console.warn('Fallo guardando NOTA_CREDITO:', e);
+      if (timbrado?.uuid) {
+        notaData.uuid = timbrado.uuid;
+      }
+      if (timbrado?.serie) {
+        notaData.serie = timbrado.serie;
+      }
+      if (timbrado?.folio) {
+        notaData.folio = timbrado.folio;
+      }
+      const logoConfigFinal = await obtenerLogoConfigFinal();
+      const facturaData = convertirANotaDataParaPDF(notaData as any);
+      const response = await fetch(apiUrl('/factura/generar-pdf'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ facturaData, logoConfig: logoConfigFinal })
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al generar PDF en el servidor');
+      }
+
+      const pdfBlob = await response.blob();
+      const pdfBase64 = await blobToBase64(pdfBlob);
+
+      const configMensaje = await configuracionCorreoService.obtenerMensajeParaEnvio();
+      const facturaInfo = `${notaData.serie}-${notaData.folio}`;
+      let asunto = (configMensaje?.asunto || 'Nota de Crédito - {facturaInfo}');
+      asunto = configuracionCorreoService.procesarMensaje(asunto, {
+        facturaInfo,
+        serie: notaData.serie,
+        folio: notaData.folio,
+        uuid: notaData.uuid || '',
+        rfcEmisor: notaData.rfcEmisor,
+        rfcReceptor
+      });
+
+      const templateVars = {
+        facturaInfo,
+        serie: notaData.serie,
+        folio: notaData.folio,
+        uuid: notaData.uuid || '',
+        rfcEmisor: notaData.rfcEmisor,
+        rfcReceptor
+      } as Record<string, string>;
+
+      const mensajeBase = configMensaje?.mensajePersonalizado || configMensaje?.mensaje || 'Se ha generado su nota de crédito.\n\nGracias por su preferencia.';
+
+      const xmlFirmado = timbrado?.xmlTimbrado || crearXMLNotaCredito(notaData);
+      const xmlBase64 = stringToBase64(xmlFirmado);
+
+      const correoResp = await correoService.enviarPdfDirecto({
+        pdfBase64,
+        correoReceptor: formData.correoElectronico,
+        asunto,
+        mensaje: mensajeBase,
+        nombreAdjunto: `NotaCredito_${notaData.serie}-${notaData.folio}.pdf`,
+        templateVars,
+        xmlBase64,
+        nombreAdjuntoXml: xmlBase64 ? `NotaCredito_${notaData.serie}-${notaData.folio}.xml` : undefined
+      });
+
+      if (correoResp.success) {
+        setMensaje({ tipo: 'success', texto: correoResp.message || 'Correo enviado exitosamente' });
+        alert(`✅ PDF de nota de crédito enviado exitosamente al correo: ${formData.correoElectronico}`);
+        return true;
+      } else {
+        setMensaje({ tipo: 'error', texto: correoResp.message || 'Error al enviar el correo' });
+        return false;
+      }
+    } catch (e: any) {
+      setMensaje({ tipo: 'error', texto: e?.message || 'Error al enviar el correo' });
       return false;
+    } finally {
+      if (manageState) {
+        setEnviandoCorreo(false);
+      }
     }
   };
 
   // Guardar únicamente en BD, sin generar PDF/XML
   const handleGuardarFactura = async () => {
     setMensaje(null);
-    if (!validarCampos()) {
-      setMensaje({ tipo: 'error', texto: 'Completa los datos fiscales obligatorios' });
-      return;
-    }
-    if (concepto.descripcion === 'OTRO' && !descripcionLibre.trim()) {
-      setMensaje({ tipo: 'error', texto: 'Especifica la descripción libre del concepto' });
-      return;
-    }
-
-    const rfcReceptor = `${formData.rfcIniciales}${formData.rfcFecha}${formData.rfcHomoclave}`;
-    const { subtotal, iva, total } = calcularImportes();
-    const uuidInfo = await obtenerUuidNotaCredito(formData.referenciaFactura);
-
-    const notaData = {
-      uuid: uuidInfo?.uuidNc || '',
-      rfcEmisor: empresaInfo.rfc,
-      nombreEmisor: empresaInfo.nombre,
-      rfcReceptor,
-      nombreReceptor: formData.razonSocial || `${formData.nombre} ${formData.paterno} ${formData.materno}`.trim(),
-      serie: (formData.serie || uuidInfo?.serie || 'NC'),
-      folio: (formData.folio || uuidInfo?.folio || new Date().getTime().toString().slice(-6)),
-      fechaEmision: new Date().toISOString(),
-      importe: total,
-      subtotal,
-      iva,
-      ieps: undefined,
-      conceptos: [
-        {
-          descripcion: (concepto.descripcion === 'OTRO'
-            ? descripcionLibre
-            : (CONCEPTO_DESC_OPTIONS.find(o => o.value === concepto.descripcion)?.label || concepto.descripcion)),
-          cantidad: typeof concepto.cantidad === 'number' ? concepto.cantidad : 0,
-          unidad: concepto.unidad,
-          precioUnitario: typeof concepto.precioUnitario === 'number' ? concepto.precioUnitario : 0,
-          importe: subtotal,
-        },
-      ],
-      metodoPago: formData.metodoPago,
-      formaPago: formData.formaPago,
-      usoCFDI: formData.usoCfdi,
-      referenciaFactura: formData.referenciaFactura || undefined,
-      motivo: formData.motivo || undefined,
-    };
+    const prepared = await prepararNotaCredito();
+    if (!prepared) return;
+    const { notaData, rfcReceptor } = prepared;
 
     try {
       setGenerando(true);
-      const ok = await guardarNotaCreditoEnBD(notaData, rfcReceptor);
-      if (ok) {
-        setMensaje({ tipo: 'success', texto: 'Nota de crédito guardada y timbrada correctamente' });
-        // Mostrar alerta con UUID timbrado (si disponible)
-        alert(`✅ Factura emitida y timbrada exitosamente\nUUID: ${notaData.uuid || 'SIN-UUID'}`);
-        // Preguntar envío por correo como en otras vistas
-        const enviar = window.confirm('¿Desea enviar la factura al correo?');
-        if (enviar) {
-          // Reutilizar flujo existente de envío
-          await handleEnviarCorreo();
+      const timbrado = await guardarNotaCreditoEnBD(notaData, rfcReceptor);
+      if (timbrado.ok) {
+        setMensaje({ tipo: 'success', texto: 'Nota de crédito guardada y timbrada correctamente con Finkok demo' });
+        alert(`✅ Factura emitida y timbrada exitosamente\nUUID: ${timbrado.uuid || 'SIN-UUID'}`);
+        if (window.confirm('¿Desea enviar la factura al correo?')) {
+          await enviarNotaPorCorreo(notaData, rfcReceptor, timbrado);
         }
       } else {
-        setMensaje({ tipo: 'error', texto: 'No se pudo guardar la nota de crédito' });
+        setMensaje({ tipo: 'error', texto: timbrado.error || 'No se pudo guardar la nota de crédito' });
       }
     } catch (e: any) {
       setMensaje({ tipo: 'error', texto: e?.message || 'Error al guardar la nota de crédito' });
@@ -328,7 +615,7 @@ export const NotasCreditoPage: React.FC = () => {
       moneda: 'MXN',
       metodoPago: notaData.metodoPago,
       formaPago: notaData.formaPago,
-      usoCfdi: notaData.usoCFDI || notaData.usoCfdi,
+      usoCfdi: notaData.usoCfdi || notaData.usoCFDI,
       tipoComprobante: 'E',
       lugarExpedicion: '12345',
       xmlTimbrado: crearXMLNotaCredito(notaData),
@@ -338,7 +625,7 @@ export const NotasCreditoPage: React.FC = () => {
       folioFiscal: notaData.uuid || '',
       fechaTimbrado: notaData.fechaEmision,
       conceptos: notaData.conceptos.map((concepto: any) => ({
-        claveProdServ: '01010101',
+        claveProdServ: concepto.claveProdServ || CLAVE_PROD_SERV_DEFAULT,
         noIdentificacion: 'NC001',
         cantidad: concepto.cantidad,
         claveUnidad: concepto.unidad || 'E48',
@@ -361,104 +648,33 @@ export const NotasCreditoPage: React.FC = () => {
 
   const handleDescargarPDFyXML = async () => {
     setMensaje(null);
-    if (!validarCampos()) {
-      setMensaje({ tipo: 'error', texto: 'Completa los datos fiscales obligatorios' });
-      return;
-    }
-    if (concepto.descripcion === 'OTRO' && !descripcionLibre.trim()) {
-      setMensaje({ tipo: 'error', texto: 'Especifica la descripción libre del concepto' });
-      return;
-    }
-    const rfcReceptor = `${formData.rfcIniciales}${formData.rfcFecha}${formData.rfcHomoclave}`;
-    const { subtotal, iva, total } = calcularImportes();
-
-    // Intentar obtener uuid de la nota de crédito vinculada a la factura origen
-    const uuidInfo = await obtenerUuidNotaCredito(formData.referenciaFactura);
-
-    const notaData = {
-      uuid: uuidInfo?.uuidNc || '',
-      rfcEmisor: empresaInfo.rfc,
-      nombreEmisor: empresaInfo.nombre,
-      rfcReceptor,
-      nombreReceptor: formData.razonSocial || `${formData.nombre} ${formData.paterno} ${formData.materno}`.trim(),
-      serie: (formData.serie || uuidInfo?.serie || 'NC'),
-      folio: (formData.folio || uuidInfo?.folio || new Date().getTime().toString().slice(-6)),
-      fechaEmision: new Date().toISOString(),
-      importe: total,
-      subtotal,
-      iva,
-      ieps: undefined,
-      conceptos: [
-        {
-          descripcion: (concepto.descripcion === 'OTRO'
-            ? descripcionLibre
-            : (CONCEPTO_DESC_OPTIONS.find(o => o.value === concepto.descripcion)?.label || concepto.descripcion)),
-          cantidad: typeof concepto.cantidad === 'number' ? concepto.cantidad : 0,
-          unidad: concepto.unidad,
-          precioUnitario: typeof concepto.precioUnitario === 'number' ? concepto.precioUnitario : 0,
-          importe: subtotal,
-        },
-      ],
-      metodoPago: formData.metodoPago,
-      formaPago: formData.formaPago,
-      usoCFDI: formData.usoCfdi,
-      referenciaFactura: formData.referenciaFactura || undefined,
-      motivo: formData.motivo || undefined,
-    };
-
-    // Obtener configuración de logos del backend con fallback al tema
-    let logoConfigFinal: any = { logoUrl, customColors };
-    try {
-      const logosResp = await facturaService.obtenerConfiguracionLogos();
-      if ((logosResp as any)?.exitoso) {
-        logoConfigFinal = {
-          logoUrl: logosResp.logoUrl,
-          logoBase64: logosResp.logoBase64,
-          customColors: logosResp.customColors
-        };
-      }
-    } catch {
-      // Fallback ya inicializado
-    }
+    const prepared = await prepararNotaCredito();
+    if (!prepared) return;
+    const { notaData, rfcReceptor } = prepared;
 
     try {
       setGenerando(true);
-      // Guardar en BD antes de generar/descargar
-      await guardarNotaCreditoEnBD(notaData, rfcReceptor);
-      // Adaptar datos y llamar endpoint backend para PDF
+      const timbrado = await guardarNotaCreditoEnBD(notaData, rfcReceptor);
+      if (!timbrado.ok) {
+        setMensaje({ tipo: 'error', texto: timbrado.error || 'No se pudo timbrar la nota de crédito' });
+        return;
+      }
+
+      const logoConfigFinal = await obtenerLogoConfigFinal();
       const facturaData = convertirANotaDataParaPDF(notaData as any);
       const response = await fetch(apiUrl('/factura/generar-pdf'), {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          facturaData: facturaData,
-          logoConfig: logoConfigFinal
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ facturaData, logoConfig: logoConfigFinal })
       });
 
       if (!response.ok) {
         throw new Error('Error al generar PDF en el servidor');
       }
 
-      setMensaje({ tipo: 'success', texto: 'PDF generado. Iniciando descarga...' });
-
       const pdfBlob = await response.blob();
       pdfService.descargarPDF(pdfBlob, `NotaCredito_${notaData.serie}-${notaData.folio}.pdf`);
-
-      // Generar y descargar XML desde el frontend
-      const xmlContent = crearXMLNotaCredito(notaData);
-      const xmlBlob = new Blob([xmlContent], { type: 'application/xml' });
-      const url = window.URL.createObjectURL(xmlBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `NotaCredito_${notaData.serie}-${notaData.folio}.xml`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
+      descargarXmlArchivo(timbrado.xmlTimbrado || crearXMLNotaCredito(notaData), notaData.serie, notaData.folio);
       setMensaje({ tipo: 'success', texto: 'PDF y XML descargados correctamente' });
     } catch (e: any) {
       setMensaje({ tipo: 'error', texto: e?.message || 'Error al descargar PDF/XML' });
@@ -470,63 +686,18 @@ export const NotasCreditoPage: React.FC = () => {
   // Descargas individuales: XML y PDF para Nota de Crédito
   const handleDescargarXML = async () => {
     setMensaje(null);
-    if (!validarCampos()) {
-      setMensaje({ tipo: 'error', texto: 'Completa los datos fiscales obligatorios' });
-      return;
-    }
-    if (concepto.descripcion === 'OTRO' && !descripcionLibre.trim()) {
-      setMensaje({ tipo: 'error', texto: 'Especifica la descripción libre del concepto' });
-      return;
-    }
-  
-    const rfcReceptor = `${formData.rfcIniciales}${formData.rfcFecha}${formData.rfcHomoclave}`;
-    const { subtotal, iva, total } = calcularImportes();
-  
-    const uuidInfo = await obtenerUuidNotaCredito(formData.referenciaFactura);
-  
-    const notaData = {
-      uuid: uuidInfo?.uuidNc || '',
-      rfcEmisor: empresaInfo.rfc,
-      nombreEmisor: empresaInfo.nombre,
-      rfcReceptor,
-      nombreReceptor: formData.razonSocial || `${formData.nombre} ${formData.paterno} ${formData.materno}`.trim(),
-      serie: (formData.serie || uuidInfo?.serie || 'NC'),
-      folio: (formData.folio || uuidInfo?.folio || new Date().getTime().toString().slice(-6)),
-      fechaEmision: new Date().toISOString(),
-      importe: total,
-      subtotal,
-      iva,
-      ieps: undefined,
-      conceptos: [
-        {
-          descripcion: (concepto.descripcion === 'OTRO'
-            ? descripcionLibre
-            : (CONCEPTO_DESC_OPTIONS.find(o => o.value === concepto.descripcion)?.label || concepto.descripcion)),
-          cantidad: typeof concepto.cantidad === 'number' ? concepto.cantidad : 0,
-          unidad: concepto.unidad,
-          precioUnitario: typeof concepto.precioUnitario === 'number' ? concepto.precioUnitario : 0,
-          importe: subtotal,
-        },
-      ],
-      metodoPago: formData.metodoPago,
-      formaPago: formData.formaPago,
-      usoCFDI: formData.usoCfdi,
-      referenciaFactura: formData.referenciaFactura || undefined,
-      motivo: formData.motivo || undefined,
-    };
+    const prepared = await prepararNotaCredito();
+    if (!prepared) return;
+    const { notaData, rfcReceptor } = prepared;
   
     try {
       setGenerando(true);
-      const xmlContent = crearXMLNotaCredito(notaData);
-      const xmlBlob = new Blob([xmlContent], { type: 'application/xml' });
-      const url = window.URL.createObjectURL(xmlBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `NotaCredito_${notaData.serie}-${notaData.folio}.xml`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      const timbrado = await guardarNotaCreditoEnBD(notaData, rfcReceptor);
+      if (!timbrado.ok) {
+        setMensaje({ tipo: 'error', texto: timbrado.error || 'No se pudo timbrar la nota de crédito' });
+        return;
+      }
+      descargarXmlArchivo(timbrado.xmlTimbrado || crearXMLNotaCredito(notaData), notaData.serie, notaData.folio);
       setMensaje({ tipo: 'success', texto: 'XML descargado correctamente' });
     } catch (e: any) {
       setMensaje({ tipo: 'error', texto: e?.message || 'Error al descargar XML' });
@@ -537,68 +708,18 @@ export const NotasCreditoPage: React.FC = () => {
 
   const handleDescargarPDF = async () => {
     setMensaje(null);
-    if (!validarCampos()) {
-      setMensaje({ tipo: 'error', texto: 'Completa los datos fiscales obligatorios' });
-      return;
-    }
-    if (concepto.descripcion === 'OTRO' && !descripcionLibre.trim()) {
-      setMensaje({ tipo: 'error', texto: 'Especifica la descripción libre del concepto' });
-      return;
-    }
-  
-    const rfcReceptor = `${formData.rfcIniciales}${formData.rfcFecha}${formData.rfcHomoclave}`;
-    const { subtotal, iva, total } = calcularImportes();
-  
-    const uuidInfo = await obtenerUuidNotaCredito(formData.referenciaFactura);
-  
-    const notaData = {
-      uuid: uuidInfo?.uuidNc || '',
-      rfcEmisor: empresaInfo.rfc,
-      nombreEmisor: empresaInfo.nombre,
-      rfcReceptor,
-      nombreReceptor: formData.razonSocial || `${formData.nombre} ${formData.paterno} ${formData.materno}`.trim(),
-      serie: (formData.serie || uuidInfo?.serie || 'NC'),
-      folio: (formData.folio || uuidInfo?.folio || new Date().getTime().toString().slice(-6)),
-      fechaEmision: new Date().toISOString(),
-      importe: total,
-      subtotal,
-      iva,
-      ieps: undefined,
-      conceptos: [
-        {
-          descripcion: (concepto.descripcion === 'OTRO'
-            ? descripcionLibre
-            : (CONCEPTO_DESC_OPTIONS.find(o => o.value === concepto.descripcion)?.label || concepto.descripcion)),
-          cantidad: typeof concepto.cantidad === 'number' ? concepto.cantidad : 0,
-          unidad: concepto.unidad,
-          precioUnitario: typeof concepto.precioUnitario === 'number' ? concepto.precioUnitario : 0,
-          importe: subtotal,
-        },
-      ],
-      metodoPago: formData.metodoPago,
-      formaPago: formData.formaPago,
-      usoCFDI: formData.usoCfdi,
-      referenciaFactura: formData.referenciaFactura || undefined,
-      motivo: formData.motivo || undefined,
-    };
-  
-    // Obtener configuración de logos del backend con fallback al tema
-    let logoConfigFinal: any = { logoUrl, customColors };
-    try {
-      const logosResp = await facturaService.obtenerConfiguracionLogos();
-      if ((logosResp as any)?.exitoso) {
-        logoConfigFinal = {
-          logoUrl: logosResp.logoUrl,
-          logoBase64: logosResp.logoBase64,
-          customColors: logosResp.customColors
-        };
-      }
-    } catch {}
+    const prepared = await prepararNotaCredito();
+    if (!prepared) return;
+    const { notaData, rfcReceptor } = prepared;
   
     try {
       setGenerando(true);
-      // Guardar en BD antes de generar PDF
-      await guardarNotaCreditoEnBD(notaData, rfcReceptor);
+      const timbrado = await guardarNotaCreditoEnBD(notaData, rfcReceptor);
+      if (!timbrado.ok) {
+        setMensaje({ tipo: 'error', texto: timbrado.error || 'No se pudo timbrar la nota de crédito' });
+        return;
+      }
+      const logoConfigFinal = await obtenerLogoConfigFinal();
       const facturaData = convertirANotaDataParaPDF(notaData as any);
       const response = await fetch(apiUrl('/factura/generar-pdf'), {
         method: 'POST',
@@ -618,124 +739,18 @@ export const NotasCreditoPage: React.FC = () => {
 
   const handleEnviarCorreo = async () => {
     setMensaje(null);
-    if (!validarCampos()) {
-      setMensaje({ tipo: 'error', texto: 'Completa los datos fiscales obligatorios' });
-      return;
-    }
-    if (concepto.descripcion === 'OTRO' && !descripcionLibre.trim()) {
-      setMensaje({ tipo: 'error', texto: 'Especifica la descripción libre del concepto' });
-      return;
-    }
-
-    const rfcReceptor = `${formData.rfcIniciales}${formData.rfcFecha}${formData.rfcHomoclave}`;
-    const { subtotal, iva, total } = calcularImportes();
-
-    // Intentar obtener uuid de la nota de crédito vinculada a la factura origen
-    const uuidInfo = await obtenerUuidNotaCredito(formData.referenciaFactura);
-
-    const notaData = {
-      uuid: uuidInfo?.uuidNc || '',
-      rfcEmisor: empresaInfo.rfc,
-      nombreEmisor: empresaInfo.nombre,
-      rfcReceptor,
-      nombreReceptor: formData.razonSocial || `${formData.nombre} ${formData.paterno} ${formData.materno}`.trim(),
-      serie: (formData.serie || uuidInfo?.serie || 'NC'),
-      folio: (formData.folio || uuidInfo?.folio || new Date().getTime().toString().slice(-6)),
-      fechaEmision: new Date().toISOString(),
-      importe: total,
-      subtotal,
-      iva,
-      ieps: undefined,
-      conceptos: [
-        {
-          descripcion: (concepto.descripcion === 'OTRO'
-            ? descripcionLibre
-            : (CONCEPTO_DESC_OPTIONS.find(o => o.value === concepto.descripcion)?.label || concepto.descripcion)),
-          cantidad: typeof concepto.cantidad === 'number' ? concepto.cantidad : 0,
-          unidad: concepto.unidad,
-          precioUnitario: typeof concepto.precioUnitario === 'number' ? concepto.precioUnitario : 0,
-          importe: subtotal,
-        },
-      ],
-      metodoPago: formData.metodoPago,
-      formaPago: formData.formaPago,
-      usoCFDI: formData.usoCfdi,
-      referenciaFactura: formData.referenciaFactura || undefined,
-      motivo: formData.motivo || undefined,
-    } as any;
-
-    // Obtener configuración de logos del backend con fallback al tema
-    let logoConfigFinal: any = { logoUrl, customColors };
-    try {
-      const logosResp = await facturaService.obtenerConfiguracionLogos();
-      if ((logosResp as any)?.exitoso) {
-        logoConfigFinal = {
-          logoUrl: logosResp.logoUrl,
-          logoBase64: logosResp.logoBase64,
-          customColors: logosResp.customColors
-        };
-      }
-    } catch {}
+    const prepared = await prepararNotaCredito();
+    if (!prepared) return;
+    const { notaData, rfcReceptor } = prepared;
 
     try {
       setEnviandoCorreo(true);
-      // Guardar en BD antes de enviar correo
-      await guardarNotaCreditoEnBD(notaData, rfcReceptor);
-      const facturaData = convertirANotaDataParaPDF(notaData);
-      const response = await fetch(apiUrl('/factura/generar-pdf'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ facturaData, logoConfig: logoConfigFinal })
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al generar PDF en el servidor');
+      const timbrado = await guardarNotaCreditoEnBD(notaData, rfcReceptor);
+      if (!timbrado.ok) {
+        setMensaje({ tipo: 'error', texto: timbrado.error || 'No se pudo timbrar la nota de crédito' });
+        return;
       }
-
-      const pdfBlob = await response.blob();
-      const pdfBase64 = await blobToBase64(pdfBlob);
-
-      // Construir asunto y mensaje usando configuración
-      const configMensaje = await configuracionCorreoService.obtenerMensajeParaEnvio();
-      const facturaInfo = `${notaData.serie}-${notaData.folio}`;
-      let asunto = (configMensaje?.asunto || 'Nota de Crédito - {facturaInfo}');
-      asunto = configuracionCorreoService.procesarMensaje(asunto, {
-        facturaInfo,
-        serie: notaData.serie,
-        folio: notaData.folio,
-        uuid: notaData.uuid || '',
-        rfcEmisor: empresaInfo.rfc,
-        rfcReceptor
-      });
-
-      // Preparar variables para plantilla en backend
-      const templateVars = {
-        facturaInfo,
-        serie: notaData.serie,
-        folio: notaData.folio,
-        uuid: notaData.uuid || '',
-        rfcEmisor: empresaInfo.rfc,
-        rfcReceptor
-      } as Record<string, string>;
-
-      // Mensaje base (se aplicará formato en backend)
-      const mensajeBase = configMensaje?.mensajePersonalizado || configMensaje?.mensaje || 'Se ha generado su nota de crédito.\n\nGracias por su preferencia.';
-
-      const correoResp = await correoService.enviarPdfDirecto({
-        pdfBase64,
-        correoReceptor: formData.correoElectronico,
-        asunto,
-        mensaje: mensajeBase,
-        nombreAdjunto: `NotaCredito_${notaData.serie}-${notaData.folio}.pdf`,
-        templateVars
-      });
-
-      if (correoResp.success) {
-        setMensaje({ tipo: 'success', texto: correoResp.message || 'Correo enviado exitosamente' });
-        alert(`✅ PDF de nota de crédito enviado exitosamente al correo: ${formData.correoElectronico}`);
-      } else {
-        setMensaje({ tipo: 'error', texto: correoResp.message || 'Error al enviar el correo' });
-      }
+      await enviarNotaPorCorreo(notaData, rfcReceptor, timbrado, false);
     } catch (e: any) {
       setMensaje({ tipo: 'error', texto: e?.message || 'Error al enviar el correo' });
     } finally {
@@ -755,6 +770,8 @@ export const NotasCreditoPage: React.FC = () => {
         isUsoCfdiRequired={true}
         isCorreoElectronicoRequired={true}
         fieldErrors={fieldErrors}
+        mostrarRazonSocial={tipoPersona === 'moral' || tipoPersona === null}
+        mostrarNombreCompleto={tipoPersona === 'fisica' || tipoPersona === null}
       />
 
       <Card>

@@ -24,9 +24,26 @@ export interface CustomColors {
   accentDark: string;
 }
 
-
 export interface EmpresaInfo {
   nombre: string;
   rfc: string;
+}
+
+export interface UsuarioLogin {
+  noUsuario: string;
+  nombreEmpleado: string;
+  nombrePerfil: string;
+  idPerfil: number | null;
+  estatusUsuario: string;
+  idDfi: number | null;
+  idEstacionamiento: number | null;
+  modificaUbicacion: string | null;
+}
+
+export interface LoginResponse {
+  success: boolean;
+  message: string;
+  token?: string | null;
+  usuario?: UsuarioLogin | null;
 }
     

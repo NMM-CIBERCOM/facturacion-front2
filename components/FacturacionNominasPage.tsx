@@ -23,6 +23,14 @@ interface NominaFormData {
   tipoNomina: string;
   usoCfdi: string;
   correo: string;
+  domicilioFiscalReceptor: string;
+  // CRÍTICO NOM44: Campos requeridos cuando existe RegistroPatronal
+  numSeguridadSocial: string;
+  fechaInicioRelLaboral: string;
+  antiguedad: string;
+  riesgoPuesto: string;
+  salarioDiarioIntegrado: string;
+  numDiasPagados?: string; // Para calcular salario diario integrado
 }
 
 interface HistoryRecord {
@@ -47,6 +55,15 @@ const initialNominaFormData: NominaFormData = {
   tipoNomina: '',
   usoCfdi: '',
   correo: '',
+          domicilioFiscalReceptor: '',
+          // CRÍTICO NOM44: Campos requeridos cuando existe RegistroPatronal
+          // Valores por defecto para facilitar el timbrado
+          numSeguridadSocial: '12345678901', // Ejemplo: Número de IMSS (11 dígitos)
+          fechaInicioRelLaboral: new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString().split('T')[0], // Hace 1 año por defecto
+          antiguedad: 'P1Y', // Se calculará automáticamente
+          riesgoPuesto: '1', // Riesgo mínimo por defecto (1-5 según IMSS)
+          salarioDiarioIntegrado: '500.00', // Se calculará automáticamente
+          numDiasPagados: '15', // Para quincenal
 };
 
 // --- DATOS DUMMY PARA LA DEMOSTRACIÓN ---
@@ -105,6 +122,63 @@ export const FacturacionNominasPage: React.FC = () => {
     setFormData((prev) => ({ ...prev, periodoPago: label }));
   }, [formData.periodicidad, formData.fechaPago]);
 
+  // Función para calcular antigüedad en formato PnYnMnDn basada en fecha de inicio
+  const calcularAntiguedad = (fechaInicio: string): string => {
+    if (!fechaInicio) return '';
+    try {
+      const inicio = new Date(fechaInicio);
+      const hoy = new Date();
+      let años = hoy.getFullYear() - inicio.getFullYear();
+      let meses = hoy.getMonth() - inicio.getMonth();
+      let días = hoy.getDate() - inicio.getDate();
+      
+      if (días < 0) {
+        meses--;
+        const ultimoDiaMesAnterior = new Date(hoy.getFullYear(), hoy.getMonth(), 0).getDate();
+        días += ultimoDiaMesAnterior;
+      }
+      if (meses < 0) {
+        años--;
+        meses += 12;
+      }
+      
+      // Formato PnYnMnDn (ej: P1Y2M15D)
+      const partes: string[] = [];
+      if (años > 0) partes.push(`${años}Y`);
+      if (meses > 0) partes.push(`${meses}M`);
+      if (días > 0) partes.push(`${días}D`);
+      
+      return partes.length > 0 ? `P${partes.join('')}` : 'P0D';
+    } catch {
+      return '';
+    }
+  };
+
+  // Calcular antigüedad automáticamente cuando cambia la fecha de inicio
+  useEffect(() => {
+    if (formData.fechaInicioRelLaboral) {
+      const antiguedadCalculada = calcularAntiguedad(formData.fechaInicioRelLaboral);
+      if (antiguedadCalculada) {
+        setFormData((prev) => ({ ...prev, antiguedad: antiguedadCalculada }));
+      }
+    }
+  }, [formData.fechaInicioRelLaboral]);
+
+  // Calcular salario diario integrado basado en percepciones
+  useEffect(() => {
+    if (formData.percepciones && formData.numDiasPagados) {
+      const percepcionesNum = parseFloat(formData.percepciones.replace(/,/g, '')) || 0;
+      const diasNum = parseInt(formData.numDiasPagados) || 15; // Default 15 días para quincenal
+      const salarioDiario = percepcionesNum / diasNum;
+      // Salario diario integrado suele ser ~1.5 veces el salario diario (incluye prestaciones)
+      const salarioDiarioIntegrado = salarioDiario * 1.5;
+      setFormData((prev) => ({ 
+        ...prev, 
+        salarioDiarioIntegrado: formatMoney2(salarioDiarioIntegrado) 
+      }));
+    }
+  }, [formData.percepciones, formData.numDiasPagados]);
+
   const handleSearchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const id = (employeeId || '').trim();
@@ -126,6 +200,7 @@ export const FacturacionNominasPage: React.FC = () => {
           correo: (emp as any).correo || prev.correo,
           rfcReceptor: (emp as any).rfc || prev.rfcReceptor,
           curp: (emp as any).curp || prev.curp,
+          domicilioFiscalReceptor: (emp as any).codigoPostal || (emp as any).cp || (emp as any).domicilioFiscal || prev.domicilioFiscalReceptor || '',
           percepciones: percep !== undefined ? formatMoney2(Number(percep)) : prev.percepciones,
           deducciones: ded !== undefined ? formatMoney2(Number(ded)) : prev.deducciones,
           total: totalCalc !== undefined ? formatMoney2(Number(totalCalc)) : prev.total,
@@ -172,6 +247,13 @@ export const FacturacionNominasPage: React.FC = () => {
         tipoNomina: formData.tipoNomina,
         usoCfdi: formData.usoCfdi,
         correoElectronico: formData.correo,
+        domicilioFiscalReceptor: formData.domicilioFiscalReceptor,
+        // CRÍTICO NOM44: Campos requeridos cuando existe RegistroPatronal
+        numSeguridadSocial: formData.numSeguridadSocial,
+        fechaInicioRelLaboral: formData.fechaInicioRelLaboral,
+        antiguedad: formData.antiguedad,
+        riesgoPuesto: formData.riesgoPuesto,
+        salarioDiarioIntegrado: formData.salarioDiarioIntegrado,
       };
       const resp = await guardarNomina(payload, employeeId, fechaNomina);
       if (resp.ok) {
@@ -311,6 +393,7 @@ export const FacturacionNominasPage: React.FC = () => {
               { label: 'RFC Receptor', name: 'rfcReceptor', type: 'text', required: true },
               { label: 'Nombre', name: 'nombre', type: 'text', required: true },
               { label: 'CURP', name: 'curp', type: 'text' },
+              { label: 'Domicilio Fiscal Receptor (CP)', name: 'domicilioFiscalReceptor', type: 'text', required: true, placeholder: 'Ej: 58000' },
               { label: 'Periodo de Pago', name: 'periodoPago', type: 'text', placeholder: 'Ej: 01/10/2025 al 30/10/2025' },
               { label: 'Fecha de Pago', name: 'fechaPago', type: 'date', required: true },
               { label: 'Percepciones', name: 'percepciones', type: 'number' },
@@ -372,6 +455,28 @@ export const FacturacionNominasPage: React.FC = () => {
                 required
               />
             </div>
+            {/* CRÍTICO NOM44: Campos requeridos cuando existe RegistroPatronal */}
+            {[
+              { label: 'Número de Seguridad Social', name: 'numSeguridadSocial', type: 'text', required: true, placeholder: 'Ej: 12345678901' },
+              { label: 'Fecha Inicio Relación Laboral', name: 'fechaInicioRelLaboral', type: 'date', required: true },
+              { label: 'Antigüedad (PnYnMnDn)', name: 'antiguedad', type: 'text', required: true, placeholder: 'Ej: P1Y2M15D' },
+              { label: 'Riesgo Puesto', name: 'riesgoPuesto', type: 'text', required: true, placeholder: 'Ej: 1, 2, 3' },
+              { label: 'Salario Diario Integrado', name: 'salarioDiarioIntegrado', type: 'number', required: true, placeholder: 'Ej: 500.00' },
+            ].map(({ label, name, type, required, placeholder }) => (
+              <div className="flex flex-col" key={name}>
+                <label className="mb-1 font-semibold text-black dark:text-white">{label}:</label>
+                <input
+                  type={type}
+                  name={name}
+                  value={(formData as any)[name]}
+                  onChange={handleFormChange}
+                  required={required}
+                  placeholder={placeholder}
+                  className="rounded-lg p-2 border border-gray-300 dark:bg-gray-700 dark:text-gray-100"
+                  step={type === 'number' ? '0.01' : undefined}
+                />
+              </div>
+            ))}
           </div>
           <div className="flex justify-end mt-6">
             <Button type="submit" variant="primary">Guardar Nómina</Button>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card } from './Card';
 import { FormField } from './FormField';
 import { SelectField } from './SelectField';
@@ -141,6 +141,8 @@ export const FacturacionCapturaLibrePage: React.FC = () => {
   const [timbradoStatus, setTimbradoStatus] = useState<string | null>(null);
   const [timbradoIntervalId, setTimbradoIntervalId] = useState<number | null>(null);
   const [guardandoBD, setGuardandoBD] = useState<boolean>(false);
+  const [tipoPersona, setTipoPersona] = useState<'fisica' | 'moral' | null>(null);
+  const tipoPersonaAnteriorRef = useRef<'fisica' | 'moral' | null>(null);
 
   useEffect(() => {
     if (!formData.tiendaBoleta && tiendasOpts.length > 0) {
@@ -156,6 +158,50 @@ export const FacturacionCapturaLibrePage: React.FC = () => {
       }
     }
   }, [justificacionesOpts]);
+
+  // Funciones para determinar el tipo de persona según el RFC
+  const esPersonaMoral = (rfc: string): boolean => {
+    return rfc.length === 12;
+  };
+
+  const esPersonaFisica = (rfc: string): boolean => {
+    return rfc.length === 13;
+  };
+
+  // Detectar tipo de persona cuando cambia el RFC
+  useEffect(() => {
+    const rfc = clienteCatalogoService.buildRfc(formData.rfcIniciales, formData.rfcFecha, formData.rfcHomoclave);
+    let nuevoTipo: 'fisica' | 'moral' | null = null;
+    
+    if (rfc && rfc.length >= 12) {
+      if (esPersonaMoral(rfc)) {
+        nuevoTipo = 'moral';
+      } else if (esPersonaFisica(rfc)) {
+        nuevoTipo = 'fisica';
+      }
+    }
+    
+    // Solo actualizar si el tipo cambió
+    if (nuevoTipo !== tipoPersonaAnteriorRef.current) {
+      tipoPersonaAnteriorRef.current = nuevoTipo;
+      setTipoPersona(nuevoTipo);
+      
+      // Limpiar campos según el nuevo tipo
+      if (nuevoTipo === 'moral') {
+        setFormData(prev => ({
+          ...prev,
+          nombre: '',
+          paterno: '',
+          materno: '',
+        }));
+      } else if (nuevoTipo === 'fisica') {
+        setFormData(prev => ({
+          ...prev,
+          razonSocial: '',
+        }));
+      }
+    }
+  }, [formData.rfcIniciales, formData.rfcFecha, formData.rfcHomoclave]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -759,6 +805,8 @@ export const FacturacionCapturaLibrePage: React.FC = () => {
         formData={formData}
         handleChange={handleChange}
         onRfcSearchClick={handleRfcSearch}
+        mostrarRazonSocial={tipoPersona === 'moral' || tipoPersona === null}
+        mostrarNombreCompleto={tipoPersona === 'fisica' || tipoPersona === null}
       />
 
       <Card>

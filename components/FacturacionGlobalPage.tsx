@@ -194,6 +194,9 @@ export const FacturacionGlobalPage: React.FC = () => {
   const [correoModal, setCorreoModal] = useState<{ open: boolean; factura?: FacturaResult } | null>(null);
   const [correoDestino, setCorreoDestino] = useState<string>('');
   const [correoEnviando, setCorreoEnviando] = useState<boolean>(false);
+  const [facturasExpandidas, setFacturasExpandidas] = useState<Set<string>>(new Set());
+  const [guardandoFacturaGlobal, setGuardandoFacturaGlobal] = useState<boolean>(false);
+  const [facturasGlobalesGuardadas, setFacturasGlobalesGuardadas] = useState<Set<string>>(new Set());
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -570,6 +573,132 @@ export const FacturacionGlobalPage: React.FC = () => {
   const handleCancelar = (factura: FacturaResult) => {
     setModal({ open: true, factura });
   };
+
+  const toggleExpandirFactura = (uuid: string) => {
+    setFacturasExpandidas((prev) => {
+      const nuevo = new Set(prev);
+      if (nuevo.has(uuid)) {
+        nuevo.delete(uuid);
+      } else {
+        nuevo.add(uuid);
+      }
+      return nuevo;
+    });
+  };
+
+  const handleDescargarPDFFactura = async (uuid: string, serieFolio: string) => {
+    try {
+      await facturaService.generarYDescargarPDF(uuid);
+      setToast({ message: `PDF descargado: ${serieFolio}`, type: 'success' });
+    } catch (error: any) {
+      console.error('Error descargando PDF de factura:', error);
+      setToast({ 
+        message: error?.message || 'Error al descargar el PDF de la factura.', 
+        type: 'error' 
+      });
+    }
+  };
+
+  const handleDescargarXMLFactura = async (uuid: string) => {
+    try {
+      await facturaService.generarYDescargarXML(uuid);
+      setToast({ message: 'XML descargado exitosamente', type: 'success' });
+    } catch (error: any) {
+      console.error('Error descargando XML de factura:', error);
+      setToast({ 
+        message: error?.message || 'Error al descargar el XML de la factura.', 
+        type: 'error' 
+      });
+    }
+  };
+
+  const handleGuardarFacturaGlobal = async () => {
+    if (aggregatedFacturas.length === 0) {
+      setToast({ message: 'No hay facturas para guardar como factura global.', type: 'error' });
+      return;
+    }
+
+    try {
+      setGuardandoFacturaGlobal(true);
+
+      // Calcular total global
+      const totalGlobal = aggregatedFacturas.reduce((acc, f) => acc + Number(f?.importe ?? 0), 0);
+      
+      // Construir etiqueta de periodo
+      const periodLabel = (() => {
+        const fecha = formData.fecha;
+        if (formData.periodo === 'DIA') return `día ${fecha}`;
+        if (formData.periodo === 'SEMANA') {
+          const d = new Date(fecha + 'T00:00:00');
+          d.setHours(0, 0, 0, 0);
+          d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+          const week1 = new Date(d.getFullYear(), 0, 4);
+          const week = 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
+          return `semana ${week}`;
+        }
+        const d = new Date(fecha + 'T00:00:00');
+        const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+        return `mes ${meses[d.getMonth()]} ${d.getFullYear()}`;
+      })();
+
+      // Recopilar UUIDs de facturas hijas
+      const facturasHijasUuid = aggregatedFacturas.map(f => f.uuid).filter(Boolean);
+
+      // Preparar datos para enviar al backend
+      const facturaGlobalData = {
+        periodo: formData.periodo,
+        fecha: formData.fecha,
+        codigoTienda: formData.tienda === 'Todas' || !formData.tienda ? null : formData.tienda,
+        serie: 'RG', // Serie para Resumen Global
+        folio: `${formData.periodo}_${formData.fecha}`,
+        importe: totalGlobal,
+        subtotal: totalGlobal,
+        facturasHijasUuid: facturasHijasUuid,
+        totalFacturas: stats.totalFacturas || 0,
+        totalTickets: stats.totalTickets || 0,
+        totalCartaPorte: stats.totalCartaPorte || 0,
+        descripcion: `Facturación Global - ${periodLabel}`,
+      };
+
+      const response = await fetch(apiUrl('/factura/global/guardar'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(facturaGlobalData),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Error desconocido');
+        throw new Error(`Error al guardar factura global: ${errorText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        // Marcar todas las facturas como guardadas usando el UUID de la factura global o un identificador único
+        const facturaGlobalId = result.idFacturaGlobal || result.uuid || 'global-' + Date.now();
+        setFacturasGlobalesGuardadas((prev) => {
+          const nuevo = new Set(prev);
+          nuevo.add(facturaGlobalId);
+          return nuevo;
+        });
+        
+        setToast({ 
+          message: `Factura global guardada exitosamente. ID: ${result.idFacturaGlobal || facturaGlobalId}`, 
+          type: 'success' 
+        });
+      } else {
+        throw new Error(result.message || 'Error al guardar factura global');
+      }
+    } catch (error: any) {
+      console.error('Error guardando factura global:', error);
+      setToast({ 
+        message: error?.message || 'Error al guardar la factura global. Por favor intenta nuevamente.', 
+        type: 'error' 
+      });
+    } finally {
+      setGuardandoFacturaGlobal(false);
+    }
+  };
   const handleConfirmCancelar = async () => {
     if (!modal?.factura) return;
     setModal({ ...modal, loading: true });
@@ -616,6 +745,275 @@ export const FacturacionGlobalPage: React.FC = () => {
         <div className="mt-6 p-4 border border-dashed border-gray-300 dark:border-gray-600 rounded-md min-h-[200px] flex items-center justify-center text-gray-400 dark:text-gray-500">
             Los resultados de la búsqueda aparecerán aquí.
         </div>
+      )}
+
+      {/* Tabla de facturas individuales del periodo */}
+      {aggregatedFacturas.length > 0 && (
+        <Card>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-primary dark:text-secondary">
+              Facturas del Periodo Seleccionado
+            </h3>
+            <div className="flex items-center gap-4">
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Total: {aggregatedFacturas.length} factura(s)
+              </div>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={handleGuardarFacturaGlobal}
+                disabled={guardandoFacturaGlobal || facturasGlobalesGuardadas.size > 0}
+              >
+                {guardandoFacturaGlobal 
+                  ? 'Guardando...' 
+                  : facturasGlobalesGuardadas.size > 0 
+                    ? '✓ Factura Global Guardada' 
+                    : 'Guardar Factura Global'}
+              </Button>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-800">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Acción
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Serie-Folio
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    UUID
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Fecha Emisión
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Tienda
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Estatus
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Importe
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Tickets
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Acciones
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                {aggregatedFacturas.map((factura, idx) => {
+                  const estaExpandida = facturasExpandidas.has(factura.uuid);
+                  const totalTickets = Array.isArray(factura.tickets) ? factura.tickets.length : 0;
+                  const serieFolio = factura.serie ? `${factura.serie}-${factura.folio ?? ''}` : `${factura.folio ?? ''}`;
+                  const estatusDisplay = factura.estatusFacturacion || '';
+                  const estatusSatDisplay = factura.estatusSat ? ` (${factura.estatusSat})` : '';
+                  
+                  return (
+                    <React.Fragment key={`factura-${factura.uuid}-${idx}`}>
+                      <tr className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <button
+                            onClick={() => toggleExpandirFactura(factura.uuid)}
+                            className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-200 font-medium text-sm"
+                          >
+                            {estaExpandida ? '▼ Ocultar' : '▶ Ver Detalles'}
+                          </button>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                          {serieFolio}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-300">
+                          <span className="truncate block max-w-xs" title={factura.uuid}>
+                            {factura.uuid}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                          {factura.fechaEmision ? new Date(factura.fechaEmision).toLocaleDateString('es-MX') : '-'}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                          {factura.tienda || '-'}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            estatusDisplay === 'Timbrada' || estatusDisplay === 'TIMBRADA' 
+                              ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100'
+                              : estatusDisplay === 'Cancelada' || estatusDisplay === 'CANCELADA'
+                              ? 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100'
+                              : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100'
+                          }`}>
+                            {estatusDisplay}{estatusSatDisplay}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-white">
+                          {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(Number(factura.importe ?? 0))}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                          {totalTickets}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium space-x-2">
+                          <button
+                            onClick={() => handleDescargarPDFFactura(factura.uuid, serieFolio)}
+                            className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-200"
+                            title="Descargar PDF"
+                          >
+                            PDF
+                          </button>
+                          <button
+                            onClick={() => handleDescargarXMLFactura(factura.uuid)}
+                            className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-200"
+                            title="Descargar XML"
+                          >
+                            XML
+                          </button>
+                        </td>
+                      </tr>
+                      {/* Fila expandible con detalles de tickets */}
+                      {estaExpandida && (
+                        <tr>
+                          <td colSpan={9} className="px-4 py-4 bg-gray-50 dark:bg-gray-800">
+                            <div className="space-y-4">
+                              {Array.isArray(factura.tickets) && factura.tickets.length > 0 ? (
+                                <>
+                                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                    Tickets asociados ({factura.tickets.length}):
+                                  </h4>
+                                  <div className="overflow-x-auto">
+                                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900 rounded-md">
+                                      <thead className="bg-gray-100 dark:bg-gray-700">
+                                        <tr>
+                                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                                            ID Ticket
+                                          </th>
+                                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                                            Folio
+                                          </th>
+                                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                                            Fecha
+                                          </th>
+                                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                                            Forma Pago
+                                          </th>
+                                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                                            Total
+                                          </th>
+                                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                                            Detalles
+                                          </th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                        {factura.tickets.map((ticket, tIdx) => (
+                                          <React.Fragment key={`ticket-${ticket.idTicket}-${tIdx}`}>
+                                            <tr className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                                              <td className="px-3 py-2 text-sm text-gray-900 dark:text-white">
+                                                {ticket.idTicket}
+                                              </td>
+                                              <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-300">
+                                                {ticket.folio ?? '-'}
+                                              </td>
+                                              <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-300">
+                                                {ticket.fecha ? new Date(ticket.fecha).toLocaleDateString('es-MX') : '-'}
+                                              </td>
+                                              <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-300">
+                                                {ticket.formaPago ?? '-'}
+                                              </td>
+                                              <td className="px-3 py-2 text-sm font-semibold text-gray-900 dark:text-white">
+                                                {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(Number(ticket.total ?? 0))}
+                                              </td>
+                                              <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-300">
+                                                {Array.isArray(ticket.detalles) ? `${ticket.detalles.length} producto(s)` : '0 productos'}
+                                              </td>
+                                            </tr>
+                                            {/* Detalles del ticket */}
+                                            {Array.isArray(ticket.detalles) && ticket.detalles.length > 0 && (
+                                              <tr>
+                                                <td colSpan={6} className="px-3 py-2 bg-gray-50 dark:bg-gray-700">
+                                                  <div className="overflow-x-auto">
+                                                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+                                                      <thead className="bg-gray-200 dark:bg-gray-600">
+                                                        <tr>
+                                                          <th className="px-2 py-1 text-left text-xs font-medium text-gray-600 dark:text-gray-300">
+                                                            Descripción
+                                                          </th>
+                                                          <th className="px-2 py-1 text-left text-xs font-medium text-gray-600 dark:text-gray-300">
+                                                            Cant.
+                                                          </th>
+                                                          <th className="px-2 py-1 text-left text-xs font-medium text-gray-600 dark:text-gray-300">
+                                                            Unidad
+                                                          </th>
+                                                          <th className="px-2 py-1 text-left text-xs font-medium text-gray-600 dark:text-gray-300">
+                                                            Precio Unit.
+                                                          </th>
+                                                          <th className="px-2 py-1 text-left text-xs font-medium text-gray-600 dark:text-gray-300">
+                                                            Subtotal
+                                                          </th>
+                                                          <th className="px-2 py-1 text-left text-xs font-medium text-gray-600 dark:text-gray-300">
+                                                            IVA
+                                                          </th>
+                                                          <th className="px-2 py-1 text-left text-xs font-medium text-gray-600 dark:text-gray-300">
+                                                            Total
+                                                          </th>
+                                                        </tr>
+                                                      </thead>
+                                                      <tbody className="divide-y divide-gray-200 dark:divide-gray-600 bg-white dark:bg-gray-800">
+                                                        {ticket.detalles.map((detalle, dIdx) => (
+                                                          <tr key={`detalle-${detalle.idDetalle}-${dIdx}`} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                                            <td className="px-2 py-1 text-xs text-gray-700 dark:text-gray-300">
+                                                              {detalle.descripcion ?? '-'}
+                                                            </td>
+                                                            <td className="px-2 py-1 text-xs text-gray-500 dark:text-gray-400">
+                                                              {detalle.cantidad ?? '-'}
+                                                            </td>
+                                                            <td className="px-2 py-1 text-xs text-gray-500 dark:text-gray-400">
+                                                              {detalle.unidad ?? '-'}
+                                                            </td>
+                                                            <td className="px-2 py-1 text-xs text-gray-500 dark:text-gray-400">
+                                                              {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(Number(detalle.precioUnitario ?? 0))}
+                                                            </td>
+                                                            <td className="px-2 py-1 text-xs text-gray-500 dark:text-gray-400">
+                                                              {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(Number(detalle.subtotal ?? 0))}
+                                                            </td>
+                                                            <td className="px-2 py-1 text-xs text-gray-500 dark:text-gray-400">
+                                                              {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(Number(detalle.ivaImporte ?? 0))}
+                                                            </td>
+                                                            <td className="px-2 py-1 text-xs font-semibold text-gray-900 dark:text-white">
+                                                              {new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(Number(detalle.total ?? 0))}
+                                                            </td>
+                                                          </tr>
+                                                        ))}
+                                                      </tbody>
+                                                    </table>
+                                                  </div>
+                                                </td>
+                                              </tr>
+                                            )}
+                                          </React.Fragment>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="text-sm text-gray-500 dark:text-gray-400 py-2">
+                                  No hay tickets asociados a esta factura.
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
 
       {/* Modal de confirmación de cancelación */}

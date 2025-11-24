@@ -5,7 +5,7 @@ import { Button } from './Button';
 import { FormField } from './FormField';
 
 interface LoginPageProps {
-  onLogin: (username: string, password: string) => Promise<boolean>;
+  onLogin: (username: string, password: string) => Promise<void>;
   logoUrl?: string;
   appName?: string;
 }
@@ -23,12 +23,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, logoUrl, appName 
     setIsLoading(true);
     
     try {
-      const success = await onLogin(username, password);
-      if (!success) {
-        setError('Usuario o contraseña incorrectos.');
-      }
+      await onLogin(username, password);
     } catch (error) {
-      setError('Error de conexión con el servidor.');
+      if (error instanceof Error && error.message) {
+        setError(error.message);
+      } else {
+        setError('Error de conexión con el servidor.');
+      }
     } finally {
       setIsLoading(false);
     }

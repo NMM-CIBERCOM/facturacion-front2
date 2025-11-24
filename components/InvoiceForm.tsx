@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useCallback } from 'react';
+import React, { useState, useEffect, useContext, useCallback, useRef } from 'react';
 import { Card } from './Card';
 import { FormField } from './FormField';
 import { SelectField } from './SelectField';
@@ -113,6 +113,52 @@ export const InvoiceForm: React.FC = () => {
     rfcReceptor: ''
   });
   const { empresaInfo } = useEmpresa();
+  const [tipoPersona, setTipoPersona] = useState<'fisica' | 'moral' | null>(null);
+  const tipoPersonaAnteriorRef = useRef<'fisica' | 'moral' | null>(null);
+
+  // Funciones para determinar el tipo de persona según el RFC
+  const esPersonaMoral = (rfc: string): boolean => {
+    return rfc.length === 12;
+  };
+
+  const esPersonaFisica = (rfc: string): boolean => {
+    return rfc.length === 13;
+  };
+
+  // Detectar tipo de persona cuando cambia el RFC
+  useEffect(() => {
+    const rfc = (formData.rfc || '').trim().toUpperCase();
+    let nuevoTipo: 'fisica' | 'moral' | null = null;
+    
+    if (rfc && rfc.length >= 12) {
+      if (esPersonaMoral(rfc)) {
+        nuevoTipo = 'moral';
+      } else if (esPersonaFisica(rfc)) {
+        nuevoTipo = 'fisica';
+      }
+    }
+    
+    // Solo actualizar si el tipo cambió
+    if (nuevoTipo !== tipoPersonaAnteriorRef.current) {
+      tipoPersonaAnteriorRef.current = nuevoTipo;
+      setTipoPersona(nuevoTipo);
+      
+      // Limpiar campos según el nuevo tipo
+      if (nuevoTipo === 'moral') {
+        setFormData(prev => ({
+          ...prev,
+          nombre: '',
+          paterno: '',
+          materno: '',
+        }));
+      } else if (nuevoTipo === 'fisica') {
+        setFormData(prev => ({
+          ...prev,
+          razonSocial: '',
+        }));
+      }
+    }
+  }, [formData.rfc]);
 
   // Función para formatear fechas con milisegundos
   const formatearFechaConMilisegundos = (fecha: string | null): string => {
@@ -617,10 +663,16 @@ export const InvoiceForm: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <FormField name="rfc" label="RFC *" value={formData.rfc} onChange={handleChange} required />
             <FormField name="correoElectronico" label="Correo Electrónico *" type="email" value={formData.correoElectronico} onChange={handleChange} required />
-            <FormField name="razonSocial" label="Razón Social *" value={formData.razonSocial} onChange={handleChange} required />
-            <FormField name="nombre" label="Nombre" value={formData.nombre} onChange={handleChange} />
-            <FormField name="paterno" label="Paterno" value={formData.paterno} onChange={handleChange} />
-            <FormField name="materno" label="Materno" value={formData.materno} onChange={handleChange} />
+            {(tipoPersona === 'moral' || tipoPersona === null) && (
+              <FormField name="razonSocial" label="Razón Social *" value={formData.razonSocial} onChange={handleChange} required={tipoPersona === 'moral'} />
+            )}
+            {(tipoPersona === 'fisica' || tipoPersona === null) && (
+              <>
+                <FormField name="nombre" label="Nombre" value={formData.nombre} onChange={handleChange} required={tipoPersona === 'fisica'} />
+                <FormField name="paterno" label="Paterno" value={formData.paterno} onChange={handleChange} required={tipoPersona === 'fisica'} />
+                <FormField name="materno" label="Materno" value={formData.materno} onChange={handleChange} />
+              </>
+            )}
             <SelectField name="pais" label="País" value={formData.pais} onChange={handleChange} options={PAIS_OPTIONS} />
             <FormField name="noRegistroIdentidadTributaria" label="No. Registro Identidad Tributaria" value={formData.noRegistroIdentidadTributaria} onChange={handleChange} />
             <FormField name="domicilioFiscal" label="Domicilio Fiscal *" value={formData.domicilioFiscal} onChange={handleChange} required />
