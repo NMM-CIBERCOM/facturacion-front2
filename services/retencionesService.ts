@@ -20,6 +20,7 @@ export interface RetencionPayload {
   concepto: string;
   correoReceptor: string;
   usuarioRegistro?: string | null;
+  codigoPostalReceptor?: string; // CRÍTICO: Código postal del receptor (DomicilioFiscalR) - 5 dígitos
 }
 
 export interface RetencionResponse {

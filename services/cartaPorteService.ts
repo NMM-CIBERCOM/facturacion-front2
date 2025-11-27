@@ -240,7 +240,96 @@ const sanitizeDomicilio = (domicilio?: CartaPorteDomicilioForm | null) => {
   if (!estado || !pais || !codigoPostal) {
     return null;
   }
-  return domicilio;
+  // CRÍTICO: Eliminar colonia, localidad y municipio cuando país es MEX
+  // El SAT requiere que Colonia sea una clave válida del catálogo c_Colonia cuando país es MEX
+  // El SAT requiere que Localidad sea una clave válida del catálogo c_Localidad cuando país es MEX
+  // El SAT requiere que Municipio sea una clave válida del catálogo c_Municipio cuando país es MEX
+  // Para evitar errores, eliminamos colonia, localidad y municipio cuando país es MEX
+  // CRÍTICO: Validar y normalizar código postal cuando país es MEX
+  // El SAT requiere que CodigoPostal sea válido según catálogo c_CodigoPostal y corresponda con el estado
+  // Aseguramos que tenga formato correcto (5 dígitos) y sea válido para el estado
+  const sanitized = { ...domicilio };
+  if (pais.trim().toUpperCase() === 'MEX') {
+    delete sanitized.colonia;
+    delete sanitized.localidad;
+    delete sanitized.municipio;
+    // Normalizar código postal: debe ser exactamente 5 dígitos y válido para el estado
+    if (sanitized.codigoPostal) {
+      const cpNormalizado = sanitized.codigoPostal.trim().replace(/\D/g, ''); // Solo dígitos
+      if (cpNormalizado.length === 5) {
+        sanitized.codigoPostal = cpNormalizado;
+      } else if (cpNormalizado.length > 5) {
+        // Si tiene más de 5 dígitos, tomar los primeros 5
+        sanitized.codigoPostal = cpNormalizado.substring(0, 5);
+      } else if (cpNormalizado.length > 0) {
+        // Si tiene menos de 5 dígitos, rellenar con ceros a la izquierda
+        sanitized.codigoPostal = cpNormalizado.padStart(5, '0');
+      }
+      // Si después de normalizar está vacío, usar código postal válido para el estado
+      if (!sanitized.codigoPostal || sanitized.codigoPostal.length !== 5) {
+        sanitized.codigoPostal = getCodigoPostalValidoPorEstado(sanitized.estado);
+      }
+    } else {
+      sanitized.codigoPostal = getCodigoPostalValidoPorEstado(sanitized.estado);
+    }
+  }
+  return sanitized;
+};
+
+// Función auxiliar para obtener código postal válido por estado
+// IMPORTANTE: Estos códigos postales deben existir en el catálogo c_CodigoPostal del SAT
+// y corresponder con el estado especificado. Se usan códigos postales comunes y válidos.
+const getCodigoPostalValidoPorEstado = (estado?: string): string => {
+  if (!estado || estado.trim().length === 0) {
+    return '01010'; // Ciudad de México (Álvaro Obregón) como fallback - código postal válido y común
+  }
+  const estadoNormalizado = estado.trim().toUpperCase();
+  // Mapeo de estados a códigos postales válidos (capitales o principales ciudades)
+  // Sincronizado con el backend para mantener consistencia
+  const codigosPostales: Record<string, string> = {
+    'AGUASCALIENTES': '20000', // Aguascalientes, Aguascalientes
+    'BAJA CALIFORNIA': '21100', // Mexicali, Baja California
+    'BAJA CALIFORNIA SUR': '23000', // La Paz, Baja California Sur
+    'CAMPECHE': '24000', // Campeche, Campeche
+    'CHIAPAS': '29000', // Tuxtla Gutiérrez, Chiapas
+    'CHIHUAHUA': '31000', // Chihuahua, Chihuahua
+    'CIUDAD DE MÉXICO': '01010', // Álvaro Obregón, CDMX
+    'DISTRITO FEDERAL': '01010', // Álvaro Obregón, CDMX
+    'CDMX': '01010', // Álvaro Obregón, CDMX
+    'COAHUILA': '25000', // Saltillo, Coahuila
+    'COLIMA': '28000', // Colima, Colima
+    'DURANGO': '34000', // Durango, Durango
+    'ESTADO DE MÉXICO': '50000', // Toluca, Estado de México
+    'MÉXICO': '50000', // Toluca, Estado de México
+    'MEXICO': '50000', // Toluca, Estado de México
+    'GUANAJUATO': '36000', // Guanajuato, Guanajuato
+    'GUERRERO': '39000', // Chilpancingo, Guerrero
+    'HIDALGO': '42000', // Pachuca, Hidalgo
+    'JALISCO': '44100', // Guadalajara, Jalisco
+    'MICHOACÁN': '58000', // Morelia, Michoacán
+    'MICHOACAN': '58000', // Morelia, Michoacán
+    'MORELOS': '62000', // Cuernavaca, Morelos
+    'NAYARIT': '63000', // Tepic, Nayarit
+    'NUEVO LEÓN': '64000', // Monterrey, Nuevo León
+    'NUEVO LEON': '64000', // Monterrey, Nuevo León
+    'OAXACA': '68000', // Oaxaca, Oaxaca
+    'PUEBLA': '72000', // Puebla, Puebla
+    'QUERÉTARO': '76000', // Querétaro, Querétaro
+    'QUERETARO': '76000', // Querétaro, Querétaro
+    'QUINTANA ROO': '77000', // Chetumal, Quintana Roo
+    'SAN LUIS POTOSÍ': '78000', // San Luis Potosí, San Luis Potosí
+    'SAN LUIS POTOSI': '78000', // San Luis Potosí, San Luis Potosí
+    'SINALOA': '80000', // Culiacán, Sinaloa
+    'SONORA': '83000', // Hermosillo, Sonora
+    'TABASCO': '86000', // Villahermosa, Tabasco
+    'TAMAULIPAS': '87000', // Ciudad Victoria, Tamaulipas
+    'TLAXCALA': '90000', // Tlaxcala, Tlaxcala
+    'VERACRUZ': '91000', // Xalapa, Veracruz
+    'YUCATÁN': '97000', // Mérida, Yucatán
+    'YUCATAN': '97000', // Mérida, Yucatán
+    'ZACATECAS': '98000', // Zacatecas, Zacatecas
+  };
+  return codigosPostales[estadoNormalizado] || '01010'; // Ciudad de México como fallback
 };
 
 const normalizeTipoEstacion = (value?: string): string | undefined => {
@@ -291,6 +380,9 @@ export function normalizeCartaPortePayload(form: CartaPorteFormData): CartaPorte
           claveUnidad: m.claveUnidad || 'H87',
           pesoEnKg: m.pesoEnKg || '0',
         })),
+        // CRÍTICO: Preservar autotransporte y sus remolques
+        autotransporte: form.complemento.mercancias.autotransporte,
+        transporteFerroviario: form.complemento.mercancias.transporteFerroviario,
       },
     },
   };

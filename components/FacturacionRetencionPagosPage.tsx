@@ -6,81 +6,163 @@ import { Button } from './Button';
 import { useEmpresa } from '../context/EmpresaContext';
 import { retencionesService } from '../services/retencionesService';
 
-type RetencionPagoFormData = {
+// Mapeo de claves de retención según catRetenciones.xsd.xml (01-28)
+const CLAVES_RETENCION = [
+  { value: '01', label: '01 - Pagos a residentes en el extranjero' },
+  { value: '02', label: '02 - Dividendos o utilidades distribuidas' },
+  { value: '03', label: '03 - Intereses' },
+  { value: '04', label: '04 - Regalías' },
+  { value: '05', label: '05 - Arrendamiento' },
+  { value: '06', label: '06 - Enajenación de acciones' },
+  { value: '07', label: '07 - Enajenación de bienes' },
+  { value: '08', label: '08 - Servicios profesionales' },
+  { value: '09', label: '09 - Sueldos y salarios' },
+  { value: '10', label: '10 - Otros ingresos' },
+  { value: '11', label: '11 - Premios' },
+  { value: '12', label: '12 - Fideicomisos' },
+  { value: '13', label: '13 - Planes de retiro' },
+  { value: '14', label: '14 - IVA - Retención de IVA (requiere complemento SectorFinanciero)' },
+  { value: '15', label: '15 - Intereses (requiere complemento Intereses)' },
+  { value: '16', label: '16 - Fideicomisos (requiere complemento FideicomisoNoEmpresarial)' },
+  { value: '17', label: '17 - Remanente distribuible' },
+  { value: '18', label: '18 - Planes de retiro (requiere complemento PlanesDeRetiro11)' },
+  { value: '19', label: '19 - Enajenación de acciones (requiere complemento EnajenacionDeAcciones)' },
+  { value: '20', label: '20 - Otros ingresos' },
+  { value: '21', label: '21 - Otros ingresos' },
+  { value: '22', label: '22 - Otros ingresos' },
+  { value: '23', label: '23 - Arrendamiento (requiere complemento ArrendamientoEnFideicomiso)' },
+  { value: '24', label: '24 - Enajenación de bienes' },
+  { value: '25', label: '25 - ISR Servicios profesionales (puede requerir PlataformasTecnologicas10)' },
+  { value: '26', label: '26 - ISR Regalías' },
+  { value: '27', label: '27 - Servicios mediante plataformas tecnológicas (requiere complemento PlataformasTecnologicas10)' },
+  { value: '28', label: '28 - Dividendos o utilidades distribuidas (requiere complemento Dividendos)' },
+];
+
+// Catálogo c_TipoPagoRet según catRetenciones.xsd.xml
+const TIPO_PAGO_RET_OPTIONS = [
+  { value: '01', label: '01 - Definitivo' },
+  { value: '02', label: '02 - Provisional' },
+  { value: '03', label: '03 - A cuenta de definitivo' },
+  { value: '04', label: '04 - A cuenta de provisional' },
+];
+
+// Catálogo c_Periodo (meses 01-12)
+const MESES_OPTIONS = [
+  { value: '01', label: '01 - Enero' },
+  { value: '02', label: '02 - Febrero' },
+  { value: '03', label: '03 - Marzo' },
+  { value: '04', label: '04 - Abril' },
+  { value: '05', label: '05 - Mayo' },
+  { value: '06', label: '06 - Junio' },
+  { value: '07', label: '07 - Julio' },
+  { value: '08', label: '08 - Agosto' },
+  { value: '09', label: '09 - Septiembre' },
+  { value: '10', label: '10 - Octubre' },
+  { value: '11', label: '11 - Noviembre' },
+  { value: '12', label: '12 - Diciembre' },
+];
+
+// Catálogo c_Ejercicio (años válidos)
+const ANIOS_OPTIONS = Array.from({ length: 9 }, (_, i) => {
+  const anio = 2019 + i;
+  return { value: String(anio), label: String(anio) };
+});
+
+// Catálogo c_Impuesto
+const IMPUESTO_OPTIONS = [
+  { value: '001', label: '001 - ISR' },
+  { value: '002', label: '002 - IVA' },
+  { value: '003', label: '003 - IEPS' },
+];
+
+type RetencionFormData = {
+  // Datos del Emisor (según XSD)
   rfcEmisor: string;
   nombreEmisor: string;
+  regimenFiscalEmisor: string;
+  
+  // Datos del Receptor (según XSD)
+  nacionalidadReceptor: 'Nacional' | 'Extranjero';
   rfcReceptor: string;
   razonSocial: string; // Para persona moral
   nombre: string; // Para persona física
-  paterno: string; // Para persona física
-  materno: string; // Para persona física
-  tipoRetencion: string;
-  montoBase: string;
-  isrRetenido: string;
-  ivaRetenido: string;
-  periodoMes: string;
-  periodoAnio: string;
+  paterno: string;
+  materno: string;
+  curpReceptor: string; // Opcional
+  domicilioFiscalReceptor: string; // CRÍTICO: Código postal (5 dígitos) - requerido para Nacional
+  numRegIdTribReceptor: string; // Para Extranjero
+  
+  // Datos del Período (según XSD)
+  mesIni: string;
+  mesFin: string;
+  ejercicio: string;
+  
+  // Datos de la Retención (según XSD)
+  cveRetenc: string; // Clave de retención (01-28)
+  descRetenc: string; // Descripción de la retención
+  folioInt: string; // Folio interno (opcional)
+  
+  // Totales (según XSD)
+  montoTotOperacion: string;
+  montoTotGrav: string;
+  montoTotExent: string;
+  montoTotRet: string;
+  
+  // ImpRetenidos (puede haber múltiples)
+  impRetenidos: Array<{
+    baseRet: string;
+    impuestoRet: string; // 001=ISR, 002=IVA, 003=IEPS
+    montoRet: string;
+    tipoPagoRet: string; // 01-04
+  }>;
+  
+  // Información adicional
   fechaPago: string;
   concepto: string;
   correoReceptor: string;
   usuarioRegistro: string;
 };
 
-const TIPO_RETENCION_OPTIONS = [
-  { value: 'ISR_SERVICIOS', label: 'ISR - Servicios profesionales (honorarios)' },
-  { value: 'ISR_ARRENDAMIENTO', label: 'ISR - Arrendamiento' },
-  { value: 'ISR_ENAJENACION', label: 'ISR - Enajenación de bienes' },
-  { value: 'ISR_REGALIAS', label: 'ISR - Regalías' },
-  { value: 'IVA', label: 'IVA - Retención de IVA' },
-  { value: 'ISR_SUELDOS', label: 'ISR - Sueldos y salarios' },
-  { value: 'DIVIDENDOS', label: 'Dividendos o utilidades distribuidas' },
-  { value: 'INTERESES', label: 'Intereses' },
-  { value: 'FIDEICOMISOS', label: 'Fideicomisos' },
-  { value: 'REMANENTE', label: 'Remanente distribuible' },
-  { value: 'PLANES_RETIRO', label: 'Planes de retiro' },
-  { value: 'ENAJENACION_ACCIONES', label: 'Enajenación de acciones' },
-  { value: 'OTROS', label: 'Otros ingresos regulados' },
-];
-
-const MESES_OPTIONS = [
-  { value: '01', label: 'Enero' },
-  { value: '02', label: 'Febrero' },
-  { value: '03', label: 'Marzo' },
-  { value: '04', label: 'Abril' },
-  { value: '05', label: 'Mayo' },
-  { value: '06', label: 'Junio' },
-  { value: '07', label: 'Julio' },
-  { value: '08', label: 'Agosto' },
-  { value: '09', label: 'Septiembre' },
-  { value: '10', label: 'Octubre' },
-  { value: '11', label: 'Noviembre' },
-  { value: '12', label: 'Diciembre' },
-];
-
-const ANIOS_OPTIONS = Array.from({ length: 10 }, (_, i) => {
-  const anio = new Date().getFullYear() - 5 + i;
-  return { value: String(anio), label: String(anio) };
-});
-
 export const FacturacionRetencionPagosPage: React.FC = () => {
   const { empresaInfo } = useEmpresa();
   const [tipoPersona, setTipoPersona] = useState<'fisica' | 'moral' | null>(null);
   const tipoPersonaAnteriorRef = useRef<'fisica' | 'moral' | null>(null);
 
-  const [formData, setFormData] = useState<RetencionPagoFormData>({
+  const [formData, setFormData] = useState<RetencionFormData>({
     rfcEmisor: empresaInfo.rfc || '',
     nombreEmisor: empresaInfo.nombre || '',
+    regimenFiscalEmisor: '601', // Por defecto: General de Ley Personas Morales
+    
+    nacionalidadReceptor: 'Nacional',
     rfcReceptor: '',
     razonSocial: '',
     nombre: '',
     paterno: '',
     materno: '',
-    tipoRetencion: '',
-    montoBase: '',
-    isrRetenido: '',
-    ivaRetenido: '',
-    periodoMes: '',
-    periodoAnio: String(new Date().getFullYear()),
+    curpReceptor: '',
+    domicilioFiscalReceptor: '', // CRÍTICO: Debe ser un código postal válido del catálogo c_CodigoPostal
+    numRegIdTribReceptor: '',
+    
+    mesIni: '',
+    mesFin: '',
+    ejercicio: String(new Date().getFullYear()),
+    
+    cveRetenc: '',
+    descRetenc: '',
+    folioInt: '',
+    
+    montoTotOperacion: '',
+    montoTotGrav: '',
+    montoTotExent: '0.00',
+    montoTotRet: '',
+    
+    impRetenidos: [{
+      baseRet: '',
+      impuestoRet: '001', // ISR por defecto
+      montoRet: '',
+      tipoPagoRet: '01', // Definitivo por defecto
+    }],
+    
     fechaPago: new Date().toISOString().split('T')[0],
     concepto: '',
     correoReceptor: '',
@@ -92,34 +174,23 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [uuidRetencionGuardado, setUuidRetencionGuardado] = useState<string | null>(null);
 
-  // Funciones para determinar el tipo de persona según el RFC
-  const esPersonaMoral = (rfc: string): boolean => {
-    return rfc.length === 12;
-  };
-
-  const esPersonaFisica = (rfc: string): boolean => {
-    return rfc.length === 13;
-  };
-
-  // Detectar tipo de persona cuando cambia el RFC del receptor
+  // Detectar tipo de persona según RFC
   useEffect(() => {
     const rfc = formData.rfcReceptor.trim().toUpperCase();
     let nuevoTipo: 'fisica' | 'moral' | null = null;
     
     if (rfc && rfc.length >= 12) {
-      if (esPersonaMoral(rfc)) {
+      if (rfc.length === 12) {
         nuevoTipo = 'moral';
-      } else if (esPersonaFisica(rfc)) {
+      } else if (rfc.length === 13) {
         nuevoTipo = 'fisica';
       }
     }
     
-    // Solo actualizar si el tipo cambió
     if (nuevoTipo !== tipoPersonaAnteriorRef.current) {
       tipoPersonaAnteriorRef.current = nuevoTipo;
       setTipoPersona(nuevoTipo);
       
-      // Limpiar campos según el nuevo tipo
       if (nuevoTipo === 'moral') {
         setFormData(prev => ({
           ...prev,
@@ -136,7 +207,7 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
     }
   }, [formData.rfcReceptor]);
 
-  // Actualizar RFC emisor cuando cambia la empresa
+  // Actualizar datos del emisor desde empresaInfo
   useEffect(() => {
     if (empresaInfo.rfc) {
       setFormData((prev) => ({
@@ -147,6 +218,7 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
     }
   }, [empresaInfo]);
 
+  // Obtener usuario del localStorage
   useEffect(() => {
     const storedUser =
       localStorage.getItem('session.idUsuario') ||
@@ -160,41 +232,40 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
     }
   }, []);
 
-  // Calcular ISR retenido según el tipo de retención
-  const calcularIsrRetenido = useCallback((montoBase: number, tipoRetencion: string): number => {
-    if (!montoBase || montoBase <= 0) return 0;
+  // Calcular montos automáticamente
+  useEffect(() => {
+    const montoOperacion = parseFloat(formData.montoTotOperacion || '0');
+    const montoGrav = parseFloat(formData.montoTotGrav || '0');
+    const montoExent = parseFloat(formData.montoTotExent || '0');
     
-    // Porcentajes de retención según el tipo
-    const porcentajesIsr: Record<string, number> = {
-      'ISR_SERVICIOS': 0.10,        // 10% para servicios profesionales
-      'ISR_ARRENDAMIENTO': 0.10,    // 10% para arrendamiento
-      'ISR_ENAJENACION': 0.10,      // 10% para enajenación
-      'ISR_REGALIAS': 0.10,         // 10% para regalías
-      'ISR_SUELDOS': 0.10,          // 10% para sueldos
-      'DIVIDENDOS': 0.10,           // 10% para dividendos
-      'INTERESES': 0.10,            // 10% para intereses
-      'FIDEICOMISOS': 0.10,         // 10% para fideicomisos
-      'REMANENTE': 0.10,            // 10% para remanente
-      'PLANES_RETIRO': 0.10,        // 10% para planes de retiro
-      'ENAJENACION_ACCIONES': 0.10, // 10% para enajenación de acciones
-      'OTROS': 0.10,                // 10% para otros
-    };
+    // Calcular total retenido desde impRetenidos
+    const totalRetenido = formData.impRetenidos.reduce((sum, imp) => {
+      return sum + parseFloat(imp.montoRet || '0');
+    }, 0);
     
-    const porcentaje = porcentajesIsr[tipoRetencion] || 0;
-    return montoBase * porcentaje;
-  }, []);
-
-  // Calcular IVA retenido (2/3 del IVA total)
-  const calcularIvaRetenido = useCallback((montoBase: number): number => {
-    if (!montoBase || montoBase <= 0) return 0;
-    
-    // IVA = 16% del monto base
-    const ivaTotal = montoBase * 0.16;
-    // IVA retenido = 2/3 del IVA total
-    const ivaRetenido = ivaTotal * (2 / 3);
-    
-    return ivaRetenido;
-  }, []);
+    // Actualizar montos
+    setFormData(prev => {
+      const cambios: Partial<RetencionFormData> = {};
+      
+      if (prev.montoTotGrav !== montoGrav.toFixed(2)) {
+        cambios.montoTotGrav = montoGrav.toFixed(2);
+      }
+      
+      if (prev.montoTotExent !== montoExent.toFixed(2)) {
+        cambios.montoTotExent = montoExent.toFixed(2);
+      }
+      
+      if (prev.montoTotRet !== totalRetenido.toFixed(2)) {
+        cambios.montoTotRet = totalRetenido.toFixed(2);
+      }
+      
+      if (prev.montoTotOperacion !== montoOperacion.toFixed(2)) {
+        cambios.montoTotOperacion = montoOperacion.toFixed(2);
+      }
+      
+      return Object.keys(cambios).length > 0 ? { ...prev, ...cambios } : prev;
+    });
+  }, [formData.montoTotOperacion, formData.montoTotGrav, formData.montoTotExent, formData.impRetenidos]);
 
   const handleFormChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -207,77 +278,177 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
     [],
   );
 
+  const handleImpRetenidoChange = useCallback((index: number, field: string, value: string) => {
+    setFormData(prev => {
+      const nuevosImpRetenidos = [...prev.impRetenidos];
+      nuevosImpRetenidos[index] = {
+        ...nuevosImpRetenidos[index],
+        [field]: value,
+      };
+      return {
+        ...prev,
+        impRetenidos: nuevosImpRetenidos,
+      };
+    });
+  }, []);
+
+  const agregarImpRetenido = useCallback(() => {
+    setFormData(prev => ({
+      ...prev,
+      impRetenidos: [
+        ...prev.impRetenidos,
+        {
+          baseRet: prev.montoTotOperacion || '',
+          impuestoRet: '001',
+          montoRet: '',
+          tipoPagoRet: '01',
+        },
+      ],
+    }));
+  }, []);
+
+  const eliminarImpRetenido = useCallback((index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      impRetenidos: prev.impRetenidos.filter((_, i) => i !== index),
+    }));
+  }, []);
+
   const validarFormulario = useCallback((): string[] => {
     const errores: string[] = [];
 
-    if (!formData.rfcEmisor || !formData.rfcEmisor.trim()) {
+    // Validar Emisor
+    if (!formData.rfcEmisor?.trim()) {
       errores.push('RFC del emisor es obligatorio');
-    }
-    if (!formData.nombreEmisor || !formData.nombreEmisor.trim()) {
-      errores.push('Nombre del emisor es obligatorio');
-    }
-    if (!formData.rfcReceptor || !formData.rfcReceptor.trim()) {
-      errores.push('RFC del receptor es obligatorio');
+    } else if (formData.rfcEmisor.trim().length < 12 || formData.rfcEmisor.trim().length > 13) {
+      errores.push('RFC del emisor debe tener 12 o 13 caracteres');
     }
     
-    // Validar según el tipo de persona
-    if (tipoPersona === 'moral') {
-      if (!formData.razonSocial || !formData.razonSocial.trim()) {
-        errores.push('Razón social es obligatoria para persona moral');
+    if (!formData.nombreEmisor?.trim()) {
+      errores.push('Nombre del emisor es obligatorio');
+    }
+    
+    if (!formData.regimenFiscalEmisor?.trim()) {
+      errores.push('Régimen fiscal del emisor es obligatorio');
+    }
+
+    // Validar Receptor
+    if (!formData.rfcReceptor?.trim()) {
+      errores.push('RFC del receptor es obligatorio');
+    } else if (formData.rfcReceptor.trim().length < 12 || formData.rfcReceptor.trim().length > 13) {
+      errores.push('RFC del receptor debe tener 12 o 13 caracteres');
+    }
+    
+    if (formData.nacionalidadReceptor === 'Nacional') {
+      // CRÍTICO: DomicilioFiscalR es requerido y debe ser un código postal válido (5 dígitos)
+      if (!formData.domicilioFiscalReceptor?.trim()) {
+        errores.push('Código postal del receptor es obligatorio (DomicilioFiscalR)');
+      } else {
+        const cp = formData.domicilioFiscalReceptor.trim().replace(/\D/g, '');
+        if (cp.length !== 5) {
+          errores.push('El código postal del receptor debe tener exactamente 5 dígitos');
+        } else if (!/^[0-9]{5}$/.test(cp)) {
+          errores.push('El código postal del receptor debe contener solo números');
+        }
       }
-    } else if (tipoPersona === 'fisica') {
-      if (!formData.nombre || !formData.nombre.trim()) {
-        errores.push('Nombre es obligatorio para persona física');
+      
+      if (tipoPersona === 'moral') {
+        if (!formData.razonSocial?.trim()) {
+          errores.push('Razón social es obligatoria para persona moral');
+        }
+      } else if (tipoPersona === 'fisica') {
+        if (!formData.nombre?.trim()) {
+          errores.push('Nombre es obligatorio para persona física');
+        }
+        if (!formData.paterno?.trim()) {
+          errores.push('Apellido paterno es obligatorio para persona física');
+        }
+      } else {
+        errores.push('El RFC del receptor debe tener 12 caracteres (moral) o 13 caracteres (física)');
       }
-      if (!formData.paterno || !formData.paterno.trim()) {
-        errores.push('Apellido paterno es obligatorio para persona física');
+    } else if (formData.nacionalidadReceptor === 'Extranjero') {
+      if (!formData.razonSocial?.trim()) {
+        errores.push('Nombre o razón social es obligatorio para receptor extranjero');
       }
+    }
+
+    // Validar Período
+    if (!formData.mesIni?.trim()) {
+      errores.push('Mes inicial del período es obligatorio');
+    }
+    if (!formData.mesFin?.trim()) {
+      errores.push('Mes final del período es obligatorio');
+    }
+    if (!formData.ejercicio?.trim()) {
+      errores.push('Ejercicio (año) es obligatorio');
+    }
+
+    // Validar Retención
+    if (!formData.cveRetenc?.trim()) {
+      errores.push('Clave de retención (CveRetenc) es obligatoria');
     } else {
-      errores.push('El RFC del receptor debe tener 12 caracteres (moral) o 13 caracteres (física)');
-    }
-    if (!formData.tipoRetencion || !formData.tipoRetencion.trim()) {
-      errores.push('Tipo de retención es obligatorio');
-    }
-    if (!formData.montoBase || !formData.montoBase.trim()) {
-      errores.push('Monto base es obligatorio');
-    } else {
-      const monto = parseFloat(formData.montoBase);
-      if (isNaN(monto) || monto <= 0) {
-        errores.push('Monto base debe ser un número mayor a cero');
+      const clave = parseInt(formData.cveRetenc);
+      if (isNaN(clave) || clave < 1 || clave > 28) {
+        errores.push('La clave de retención debe estar entre 01 y 28');
       }
     }
-    if (!formData.periodoMes || !formData.periodoMes.trim()) {
-      errores.push('Mes del período es obligatorio');
+
+    // Validar Totales
+    const montoOperacion = parseFloat(formData.montoTotOperacion || '0');
+    if (montoOperacion <= 0) {
+      errores.push('El monto total de la operación debe ser mayor a cero');
     }
-    if (!formData.periodoAnio || !formData.periodoAnio.trim()) {
-      errores.push('Año del período es obligatorio');
+    
+    const montoGrav = parseFloat(formData.montoTotGrav || '0');
+    const montoExent = parseFloat(formData.montoTotExent || '0');
+    if (montoGrav + montoExent !== montoOperacion) {
+      errores.push('La suma de monto gravado y monto exento debe igualar el monto total de la operación');
     }
-    if (!formData.fechaPago || !formData.fechaPago.trim()) {
+    
+    const montoRet = parseFloat(formData.montoTotRet || '0');
+    if (montoRet <= 0) {
+      errores.push('El monto total retenido debe ser mayor a cero');
+    }
+
+    // Validar ImpRetenidos
+    if (formData.impRetenidos.length === 0) {
+      errores.push('Debe haber al menos un impuesto retenido');
+    }
+    
+    formData.impRetenidos.forEach((imp, index) => {
+      const montoRet = parseFloat(imp.montoRet || '0');
+      if (montoRet <= 0) {
+        errores.push(`El monto retenido del impuesto ${index + 1} debe ser mayor a cero`);
+      }
+      if (!imp.impuestoRet?.trim()) {
+        errores.push(`El tipo de impuesto del impuesto ${index + 1} es obligatorio`);
+      }
+      if (!imp.tipoPagoRet?.trim()) {
+        errores.push(`El tipo de pago ret del impuesto ${index + 1} es obligatorio`);
+      }
+      
+      // CRÍTICO: Validación Reten20135 - TipoPagoRet debe ser válido según ImpuestoRet
+      // IVA (002): SOLO puede usar TipoPagoRet="01" (Definitivo)
+      // ISR (001): Puede usar 01, 02, 03 o 04
+      if (imp.impuestoRet === '002' && imp.tipoPagoRet !== '01') {
+        errores.push(`El impuesto ${index + 1}: Para IVA (002), el Tipo de Pago Ret debe ser "01" (Definitivo). El IVA siempre es definitivo.`);
+      }
+      if (imp.impuestoRet === '001' && !['01', '02', '03', '04'].includes(imp.tipoPagoRet)) {
+        errores.push(`El impuesto ${index + 1}: Para ISR (001), el Tipo de Pago Ret debe ser 01, 02, 03 o 04`);
+      }
+    });
+
+    // Validar información adicional
+    if (!formData.fechaPago?.trim()) {
       errores.push('Fecha de pago es obligatoria');
     }
-    if (!formData.concepto || !formData.concepto.trim()) {
-      errores.push('Concepto es obligatorio');
-    }
-    if (!formData.correoReceptor || !formData.correoReceptor.trim()) {
+    
+    if (!formData.correoReceptor?.trim()) {
       errores.push('Correo del receptor es obligatorio');
     } else {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(formData.correoReceptor.trim())) {
         errores.push('El correo del receptor no tiene un formato válido');
-      }
-    }
-
-    // Validar montos de retención si están presentes
-    if (formData.isrRetenido && formData.isrRetenido.trim()) {
-      const isr = parseFloat(formData.isrRetenido);
-      if (isNaN(isr) || isr < 0) {
-        errores.push('ISR retenido debe ser un número mayor o igual a cero');
-      }
-    }
-    if (formData.ivaRetenido && formData.ivaRetenido.trim()) {
-      const iva = parseFloat(formData.ivaRetenido);
-      if (isNaN(iva) || iva < 0) {
-        errores.push('IVA retenido debe ser un número mayor o igual a cero');
       }
     }
 
@@ -294,17 +465,38 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
     setFormData({
       rfcEmisor: empresaInfo.rfc || '',
       nombreEmisor: empresaInfo.nombre || '',
+      regimenFiscalEmisor: '601',
+      
+      nacionalidadReceptor: 'Nacional',
       rfcReceptor: '',
       razonSocial: '',
       nombre: '',
       paterno: '',
       materno: '',
-      tipoRetencion: '',
-      montoBase: '',
-      isrRetenido: '',
-      ivaRetenido: '',
-      periodoMes: '',
-      periodoAnio: String(new Date().getFullYear()),
+      curpReceptor: '',
+      domicilioFiscalReceptor: '',
+      numRegIdTribReceptor: '',
+      
+      mesIni: '',
+      mesFin: '',
+      ejercicio: String(new Date().getFullYear()),
+      
+      cveRetenc: '',
+      descRetenc: '',
+      folioInt: '',
+      
+      montoTotOperacion: '',
+      montoTotGrav: '',
+      montoTotExent: '0.00',
+      montoTotRet: '',
+      
+      impRetenidos: [{
+        baseRet: '',
+        impuestoRet: '001',
+        montoRet: '',
+        tipoPagoRet: '01',
+      }],
+      
       fechaPago: new Date().toISOString().split('T')[0],
       concepto: '',
       correoReceptor: '',
@@ -326,11 +518,58 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
     try {
       setIsSubmitting(true);
       
-      // Calcular monto retenido total
-      const isrRetenido = parseFloat(formData.isrRetenido || '0');
-      const ivaRetenido = parseFloat(formData.ivaRetenido || '0');
-      const montoRetenido = isrRetenido + ivaRetenido;
-
+      // Normalizar código postal (solo 5 dígitos)
+      const cpNormalizado = formData.domicilioFiscalReceptor.trim().replace(/\D/g, '').padStart(5, '0').substring(0, 5);
+      
+      // Construir tipo de retención basado en la clave
+      const tipoRetencionMap: Record<string, string> = {
+        '01': 'OTROS',
+        '02': 'DIVIDENDOS',
+        '03': 'INTERESES',
+        '04': 'ISR_REGALIAS',
+        '05': 'ISR_ARRENDAMIENTO',
+        '06': 'ENAJENACION_ACCIONES',
+        '07': 'ISR_ENAJENACION',
+        '08': 'ISR_SERVICIOS',
+        '09': 'ISR_SUELDOS',
+        '10': 'OTROS',
+        '11': 'OTROS',
+        '12': 'FIDEICOMISOS',
+        '13': 'PLANES_RETIRO',
+        '14': 'IVA',
+        '15': 'INTERESES',
+        '16': 'FIDEICOMISOS',
+        '17': 'REMANENTE',
+        '18': 'PLANES_RETIRO',
+        '19': 'ENAJENACION_ACCIONES',
+        '20': 'OTROS',
+        '21': 'OTROS',
+        '22': 'OTROS',
+        '23': 'ISR_ARRENDAMIENTO',
+        '24': 'ISR_ENAJENACION',
+        '25': 'ISR_SERVICIOS',
+        '26': 'ISR_REGALIAS',
+        '27': 'ISR_SUELDOS', // Nota: Esta clave requiere complemento PlataformasTecnologicas10
+        '28': 'DIVIDENDOS',
+      };
+      
+      const tipoRetencion = tipoRetencionMap[formData.cveRetenc] || 'OTROS';
+      
+      // Calcular ISR e IVA retenidos desde impRetenidos
+      let isrRetenido = 0;
+      let ivaRetenido = 0;
+      
+      formData.impRetenidos.forEach(imp => {
+        const monto = parseFloat(imp.montoRet || '0');
+        if (imp.impuestoRet === '001') {
+          isrRetenido += monto;
+        } else if (imp.impuestoRet === '002') {
+          ivaRetenido += monto;
+        }
+      });
+      
+      const montoRetenido = parseFloat(formData.montoTotRet || '0');
+      
       const payload = {
         rfcEmisor: formData.rfcEmisor.trim(),
         nombreEmisor: formData.nombreEmisor.trim(),
@@ -340,20 +579,23 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
         paterno: tipoPersona === 'fisica' ? formData.paterno.trim() : undefined,
         materno: tipoPersona === 'fisica' ? formData.materno.trim() : undefined,
         tipoPersona: tipoPersona || 'moral',
-        tipoRetencion: formData.tipoRetencion.trim(),
-        montoBase: parseFloat(formData.montoBase),
+        tipoRetencion: tipoRetencion,
+        cveRetenc: formData.cveRetenc.trim(), // CRÍTICO: Enviar la clave de retención directamente del formulario
+        montoBase: parseFloat(formData.montoTotOperacion),
         isrRetenido: isrRetenido,
         ivaRetenido: ivaRetenido,
         montoRetenido: montoRetenido,
-        periodoMes: formData.periodoMes.trim(),
-        periodoAnio: formData.periodoAnio.trim(),
+        periodoMes: formData.mesIni.trim(),
+        periodoAnio: formData.ejercicio.trim(),
         fechaPago: formData.fechaPago.trim(),
-        concepto: formData.concepto.trim(),
+        concepto: formData.concepto.trim() || formData.descRetenc.trim(),
         correoReceptor: formData.correoReceptor.trim(),
         usuarioRegistro: formData.usuarioRegistro?.trim() || undefined,
+        // CRÍTICO: Incluir código postal del receptor
+        codigoPostalReceptor: cpNormalizado,
       };
 
-      const resultado = await retencionesService.registrarRetencion(payload);
+      const resultado = await retencionesService.registrarRetencion(payload as any);
       
       if (resultado.success) {
         const mensajeBase = resultado.message || 'Retención registrada correctamente.';
@@ -363,11 +605,11 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
             : mensajeBase;
         setSuccessMessage(mensajeUuid);
         
-        let uuidRetencion = resultado.uuidRetencion?.trim() || '';
+        const uuidRetencion = resultado.uuidRetencion?.trim() || '';
         setUuidRetencionGuardado(uuidRetencion || null);
         
-        if (resultado.uuidRetencion && resultado.uuidRetencion.trim().length > 0) {
-          window.alert(`✅ Retención de pagos timbrada exitosamente\nUUID: ${resultado.uuidRetencion}`);
+        if (uuidRetencion) {
+          window.alert(`✅ Retención de pagos timbrada exitosamente\nUUID: ${uuidRetencion}`);
         } else {
           window.alert('✅ Retención de pagos timbrada exitosamente');
         }
@@ -387,9 +629,9 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
               serieRetencion: resultado.serieRetencion || undefined,
               folioRetencion: resultado.folioRetencion || undefined,
               fechaTimbrado: resultado.fechaTimbrado || undefined,
-              tipoRetencion: formData.tipoRetencion.trim(),
+              tipoRetencion: tipoRetencion,
               montoRetenido: resultado.montoRetenido || montoRetenido,
-              baseRetencion: resultado.baseRetencion || parseFloat(formData.montoBase),
+              baseRetencion: resultado.baseRetencion || parseFloat(formData.montoTotOperacion),
             });
             window.alert(`📧 Retención enviada exitosamente al correo: ${formData.correoReceptor.trim()}`);
             setSuccessMessage(`Retención enviada por correo a ${formData.correoReceptor.trim()}`);
@@ -415,58 +657,7 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
     } finally {
       setIsSubmitting(false);
     }
-  }, [formData, tipoPersona, resetAlerts, validarFormulario, handleLimpiarFormulario]);
-
-  // Calcular automáticamente las retenciones cuando cambia el monto base o tipo de retención
-  useEffect(() => {
-    const montoBase = parseFloat(formData.montoBase || '0');
-    const tipoRetencion = formData.tipoRetencion?.trim() || '';
-    
-    // Solo calcular si hay monto base válido y tipo de retención seleccionado
-    if (montoBase > 0 && tipoRetencion) {
-      // Calcular ISR retenido
-      const isrCalculado = calcularIsrRetenido(montoBase, tipoRetencion);
-      
-      // Calcular IVA retenido (solo si el tipo de retención aplica IVA)
-      const tiposConIva = ['ISR_SERVICIOS', 'ISR_ARRENDAMIENTO', 'IVA'];
-      const ivaCalculado = tiposConIva.includes(tipoRetencion) 
-        ? calcularIvaRetenido(montoBase) 
-        : 0;
-      
-      const isrFormateado = isrCalculado.toFixed(2);
-      const ivaFormateado = ivaCalculado.toFixed(2);
-      
-      // Solo actualizar si los valores han cambiado para evitar loops infinitos
-      setFormData((prev) => {
-        if (prev.isrRetenido === isrFormateado && prev.ivaRetenido === ivaFormateado) {
-          return prev; // No hay cambios, retornar el mismo estado
-        }
-        return {
-          ...prev,
-          isrRetenido: isrFormateado,
-          ivaRetenido: ivaFormateado,
-        };
-      });
-    } else if (montoBase === 0 || !tipoRetencion) {
-      // Limpiar retenciones si no hay monto base o tipo de retención
-      setFormData((prev) => {
-        if (prev.isrRetenido === '' && prev.ivaRetenido === '') {
-          return prev; // Ya están vacíos, no actualizar
-        }
-        return {
-          ...prev,
-          isrRetenido: '',
-          ivaRetenido: '',
-        };
-      });
-    }
-  }, [formData.montoBase, formData.tipoRetencion, calcularIsrRetenido, calcularIvaRetenido]);
-
-  const calcularTotalRetenido = useCallback(() => {
-    const isr = parseFloat(formData.isrRetenido || '0');
-    const iva = parseFloat(formData.ivaRetenido || '0');
-    return isr + iva;
-  }, [formData.isrRetenido, formData.ivaRetenido]);
+  }, [formData, tipoPersona, resetAlerts, validarFormulario]);
 
   return (
     <div className="space-y-4">
@@ -475,7 +666,7 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
           Retención de Pagos
         </h1>
         <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-          CFDI de Retenciones e Información de Pagos según el SAT (Anexo 20, CFDI 2.0)
+          CFDI de Retenciones e Información de Pagos 2.0 según Anexo 20 del SAT
         </p>
       </div>
 
@@ -495,8 +686,48 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
         </div>
       )}
 
+      <Card title="Datos del Emisor">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <FormField
+            label="RFC del Emisor"
+            name="rfcEmisor"
+            value={formData.rfcEmisor}
+            onChange={handleFormChange}
+            placeholder="Ej. ABC123456789"
+            required
+          />
+          <FormField
+            label="Nombre del Emisor"
+            name="nombreEmisor"
+            value={formData.nombreEmisor}
+            onChange={handleFormChange}
+            placeholder="Razón social o nombre"
+            required
+          />
+          <FormField
+            label="Régimen Fiscal del Emisor"
+            name="regimenFiscalEmisor"
+            value={formData.regimenFiscalEmisor}
+            onChange={handleFormChange}
+            placeholder="Ej. 601"
+            required
+          />
+        </div>
+      </Card>
+
       <Card title="Datos del Receptor">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <SelectField
+            label="Nacionalidad del Receptor"
+            name="nacionalidadReceptor"
+            value={formData.nacionalidadReceptor}
+            onChange={handleFormChange}
+            options={[
+              { value: 'Nacional', label: 'Nacional' },
+              { value: 'Extranjero', label: 'Extranjero' },
+            ]}
+            required
+          />
           <FormField
             label="RFC del Receptor"
             name="rfcReceptor"
@@ -505,96 +736,165 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
             placeholder="Ej. XAXX010101000 (13 chars) o ABC123456789 (12 chars)"
             required
           />
-          {tipoPersona === 'moral' && (
+        </div>
+
+        {formData.nacionalidadReceptor === 'Nacional' && (
+          <>
+            {tipoPersona === 'moral' && (
+              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <FormField
+                  label="Razón Social"
+                  name="razonSocial"
+                  value={formData.razonSocial}
+                  onChange={handleFormChange}
+                  placeholder="Ej. Empresa Ejemplo S.A. de C.V."
+                  required
+                />
+                <FormField
+                  label="CURP (Opcional)"
+                  name="curpReceptor"
+                  value={formData.curpReceptor}
+                  onChange={handleFormChange}
+                  placeholder="Ej. ABC123456HDFGHI01"
+                />
+              </div>
+            )}
+            
+            {tipoPersona === 'fisica' && (
+              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <FormField
+                  label="Nombre"
+                  name="nombre"
+                  value={formData.nombre}
+                  onChange={handleFormChange}
+                  placeholder="Ej. Juan"
+                  required
+                />
+                <FormField
+                  label="Apellido Paterno"
+                  name="paterno"
+                  value={formData.paterno}
+                  onChange={handleFormChange}
+                  placeholder="Ej. Pérez"
+                  required
+                />
+                <FormField
+                  label="Apellido Materno"
+                  name="materno"
+                  value={formData.materno}
+                  onChange={handleFormChange}
+                  placeholder="Ej. García"
+                />
+                <FormField
+                  label="CURP (Opcional)"
+                  name="curpReceptor"
+                  value={formData.curpReceptor}
+                  onChange={handleFormChange}
+                  placeholder="Ej. ABC123456HDFGHI01"
+                />
+              </div>
+            )}
+            
+            <div className="mt-4">
+              <FormField
+                label="Código Postal del Receptor (DomicilioFiscalR) *"
+                name="domicilioFiscalReceptor"
+                value={formData.domicilioFiscalReceptor}
+                onChange={handleFormChange}
+                placeholder="Ej. 58000 (5 dígitos)"
+                required
+                maxLength={5}
+              />
+              <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                ⚠️ CRÍTICO: Debe ser un código postal válido del catálogo c_CodigoPostal del SAT (5 dígitos numéricos)
+              </p>
+            </div>
+          </>
+        )}
+
+        {formData.nacionalidadReceptor === 'Extranjero' && (
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
             <FormField
-              label="Razón Social"
+              label="Nombre o Razón Social"
               name="razonSocial"
               value={formData.razonSocial}
               onChange={handleFormChange}
-              placeholder="Ej. Empresa Ejemplo S.A. de C.V."
+              placeholder="Nombre completo o razón social"
               required
             />
-          )}
-          {tipoPersona === 'fisica' && (
-            <>
-              <FormField
-                label="Nombre"
-                name="nombre"
-                value={formData.nombre}
-                onChange={handleFormChange}
-                placeholder="Ej. Juan"
-                required
-              />
-              <FormField
-                label="Apellido Paterno"
-                name="paterno"
-                value={formData.paterno}
-                onChange={handleFormChange}
-                placeholder="Ej. Pérez"
-                required
-              />
-              <FormField
-                label="Apellido Materno"
-                name="materno"
-                value={formData.materno}
-                onChange={handleFormChange}
-                placeholder="Ej. García"
-              />
-            </>
-          )}
-        </div>
+            <FormField
+              label="Número de Registro de Identificación Fiscal"
+              name="numRegIdTribReceptor"
+              value={formData.numRegIdTribReceptor}
+              onChange={handleFormChange}
+              placeholder="Opcional"
+            />
+          </div>
+        )}
+
         {!tipoPersona && formData.rfcReceptor.trim().length > 0 && (
           <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
             Ingresa un RFC válido (12 caracteres para persona moral, 13 para persona física)
           </p>
         )}
-        {tipoPersona === 'moral' && (
-          <p className="mt-2 text-xs text-blue-600 dark:text-blue-400">
-            ✓ Persona Moral detectada (RFC de 12 caracteres)
-          </p>
-        )}
-        {tipoPersona === 'fisica' && (
-          <p className="mt-2 text-xs text-blue-600 dark:text-blue-400">
-            ✓ Persona Física detectada (RFC de 13 caracteres)
-          </p>
-        )}
       </Card>
 
-      <Card title="Información de la Retención">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <Card title="Período">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <SelectField
-            label="Tipo de Retención o Pago"
-            name="tipoRetencion"
-            value={formData.tipoRetencion}
-            onChange={handleFormChange}
-            options={TIPO_RETENCION_OPTIONS}
-            required
-          />
-          <FormField
-            label="Fecha de Pago"
-            name="fechaPago"
-            type="date"
-            value={formData.fechaPago}
-            onChange={handleFormChange}
-            required
-          />
-        </div>
-        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-          <SelectField
-            label="Mes del Período"
-            name="periodoMes"
-            value={formData.periodoMes}
+            label="Mes Inicial"
+            name="mesIni"
+            value={formData.mesIni}
             onChange={handleFormChange}
             options={MESES_OPTIONS}
             required
           />
           <SelectField
-            label="Año del Período"
-            name="periodoAnio"
-            value={formData.periodoAnio}
+            label="Mes Final"
+            name="mesFin"
+            value={formData.mesFin}
+            onChange={handleFormChange}
+            options={MESES_OPTIONS}
+            required
+          />
+          <SelectField
+            label="Ejercicio (Año)"
+            name="ejercicio"
+            value={formData.ejercicio}
             onChange={handleFormChange}
             options={ANIOS_OPTIONS}
             required
+          />
+        </div>
+      </Card>
+
+      <Card title="Información de la Retención">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <SelectField
+            label="Clave de Retención (CveRetenc)"
+            name="cveRetenc"
+            value={formData.cveRetenc}
+            onChange={handleFormChange}
+            options={CLAVES_RETENCION}
+            required
+          />
+          <FormField
+            label="Descripción de la Retención (DescRetenc)"
+            name="descRetenc"
+            value={formData.descRetenc}
+            onChange={handleFormChange}
+            placeholder="Descripción opcional de la retención"
+            maxLength={100}
+          />
+        </div>
+        <div className="mt-4">
+          <FormField
+            label="Folio Interno (Opcional)"
+            name="folioInt"
+            value={formData.folioInt}
+            onChange={handleFormChange}
+            placeholder="Folio interno del contribuyente"
+            maxLength={20}
           />
         </div>
         <div className="mt-4">
@@ -607,65 +907,130 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
             required
           />
         </div>
+        <div className="mt-4">
+          <FormField
+            label="Fecha de Pago"
+            name="fechaPago"
+            type="date"
+            value={formData.fechaPago}
+            onChange={handleFormChange}
+            required
+          />
+        </div>
       </Card>
 
-      <Card title="Montos">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <Card title="Totales">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           <FormField
-            label="Monto Base"
-            name="montoBase"
+            label="Monto Total de la Operación"
+            name="montoTotOperacion"
             type="number"
             step="0.01"
             min="0"
-            value={formData.montoBase}
+            value={formData.montoTotOperacion}
+            onChange={handleFormChange}
+            placeholder="0.00"
+            required
+          />
+          <FormField
+            label="Monto Total Gravado"
+            name="montoTotGrav"
+            type="number"
+            step="0.01"
+            min="0"
+            value={formData.montoTotGrav}
+            onChange={handleFormChange}
+            placeholder="0.00"
+            required
+          />
+          <FormField
+            label="Monto Total Exento"
+            name="montoTotExent"
+            type="number"
+            step="0.01"
+            min="0"
+            value={formData.montoTotExent}
             onChange={handleFormChange}
             placeholder="0.00"
             required
           />
           <div className="flex items-end">
             <div className="w-full rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
-              <p className="text-xs text-blue-700 dark:text-blue-300">
-                💡 Las retenciones se calculan automáticamente al ingresar el monto base y tipo de retención
+              <label className="block text-xs font-medium text-blue-700 dark:text-blue-300">
+                Monto Total Retenido
+              </label>
+              <p className="mt-1 text-lg font-semibold text-blue-900 dark:text-blue-100">
+                ${parseFloat(formData.montoTotRet || '0').toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
           </div>
         </div>
-        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-          <FormField
-            label="ISR Retenido"
-            name="isrRetenido"
-            type="number"
-            step="0.01"
-            min="0"
-            value={formData.isrRetenido}
-            onChange={handleFormChange}
-            placeholder="0.00"
-          />
-          <FormField
-            label="IVA Retenido"
-            name="ivaRetenido"
-            type="number"
-            step="0.01"
-            min="0"
-            value={formData.ivaRetenido}
-            onChange={handleFormChange}
-            placeholder="0.00"
-          />
-        </div>
-        <div className="mt-4">
-          <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Total Retenido
-            </label>
-            <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">
-              ${calcularTotalRetenido().toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </p>
-          </div>
-        </div>
         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-          Puedes modificar manualmente los valores de ISR e IVA retenido si es necesario. 
-          Los valores se recalcularán automáticamente al cambiar el monto base o tipo de retención.
+          El monto total retenido se calcula automáticamente desde los impuestos retenidos
         </p>
+      </Card>
+
+      <Card title="Impuestos Retenidos">
+        {formData.impRetenidos.map((imp, index) => (
+          <div key={index} className="mb-4 rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+            <div className="mb-2 flex items-center justify-between">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Impuesto Retenido {index + 1}
+              </h4>
+              {formData.impRetenidos.length > 1 && (
+                <Button
+                  variant="neutral"
+                  onClick={() => eliminarImpRetenido(index)}
+                  className="text-xs"
+                >
+                  Eliminar
+                </Button>
+              )}
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <FormField
+                label="Base de Retención"
+                name={`baseRet_${index}`}
+                type="number"
+                step="0.01"
+                min="0"
+                value={imp.baseRet}
+                onChange={(e) => handleImpRetenidoChange(index, 'baseRet', e.target.value)}
+                placeholder="0.00"
+              />
+              <SelectField
+                label="Impuesto Retenido"
+                name={`impuestoRet_${index}`}
+                value={imp.impuestoRet}
+                onChange={(e) => handleImpRetenidoChange(index, 'impuestoRet', e.target.value)}
+                options={IMPUESTO_OPTIONS}
+                required
+              />
+              <FormField
+                label="Monto Retenido"
+                name={`montoRet_${index}`}
+                type="number"
+                step="0.01"
+                min="0"
+                value={imp.montoRet}
+                onChange={(e) => handleImpRetenidoChange(index, 'montoRet', e.target.value)}
+                placeholder="0.00"
+                required
+              />
+              <SelectField
+                label="Tipo de Pago Ret"
+                name={`tipoPagoRet_${index}`}
+                value={imp.tipoPagoRet}
+                onChange={(e) => handleImpRetenidoChange(index, 'tipoPagoRet', e.target.value)}
+                options={TIPO_PAGO_RET_OPTIONS}
+                required
+              />
+            </div>
+          </div>
+        ))}
+        <Button variant="secondary" onClick={agregarImpRetenido} className="mt-2">
+          + Agregar Impuesto Retenido
+        </Button>
       </Card>
 
       <Card title="Información Adicional">
@@ -704,9 +1069,9 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
               const asunto = encodeURIComponent(`Retención de Pagos - UUID: ${uuidRetencionGuardado}`);
               const cuerpo = encodeURIComponent(
                 `Se adjunta el CFDI de Retención de Pagos.\n\nUUID: ${uuidRetencionGuardado}\n` +
-                `Tipo de Retención: ${formData.tipoRetencion}\n` +
-                `Monto Base: $${formData.montoBase}\n` +
-                `Monto Retenido: $${(parseFloat(formData.isrRetenido || '0') + parseFloat(formData.ivaRetenido || '0')).toFixed(2)}`
+                `Clave de Retención: ${formData.cveRetenc}\n` +
+                `Monto Total Operación: $${formData.montoTotOperacion}\n` +
+                `Monto Total Retenido: $${formData.montoTotRet}`
               );
               window.open(
                 `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(formData.correoReceptor)}&su=${asunto}&body=${cuerpo}`,
@@ -723,4 +1088,3 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
 };
 
 export default FacturacionRetencionPagosPage;
-

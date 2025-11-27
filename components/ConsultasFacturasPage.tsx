@@ -45,6 +45,7 @@ interface Factura {
   usuario: string;
   permiteCancelacion: boolean;
   motivoNoCancelacion?: string;
+  tipoFactura?: number | string;
 }
 
 interface ConsultaFacturaResponse {
@@ -374,23 +375,33 @@ export const ConsultasFacturasPage: React.FC = () => {
         tickets = 0; detalles = 0;
       }
 
-      // 3) Carta Porte: detectar complementos en XML del CFDI
+      // 3) Carta Porte: detectar por TIPO_FACTURA o complementos en XML del CFDI
       let cartaPorte = false;
-      try {
-        const datosFactura = await facturaService.obtenerFacturaPorUUID(uuid);
-        const xml = datosFactura?.xmlContent || '';
-        if (xml && typeof xml === 'string') {
-          const hasCp = /CartaPorte/i.test(xml) || /cartaporte/i.test(xml) || /cce20:ComplementoCartaPorte/i.test(xml);
-          cartaPorte = !!hasCp;
-        } else {
-          // Si no hay xml en backend principal, intentar PAC
-          const cfdi = await facturaService.consultarCfdiPorUUID({ uuid, tipo: 'I' });
-          // No expone XML, pero si basicos/relacionados. Como heurística: si tipoRelacion indica CP o existen uuids relacionados de tipo transporte
-          const tipoRel = (cfdi?.relacionados?.tipoRelacion || '').toUpperCase();
-          cartaPorte = tipoRel.includes('CARTA') || tipoRel.includes('CP');
+      // Primero verificar si TIPO_FACTURA es 3 o "T" (Carta Porte)
+      const tipoFactura = factura.tipoFactura;
+      if (tipoFactura !== undefined && tipoFactura !== null) {
+        const tipoStr = String(tipoFactura).trim().toUpperCase();
+        cartaPorte = tipoStr === '3' || tipoStr === 'T';
+      }
+      
+      // Si no se detectó por tipo, buscar en XML
+      if (!cartaPorte) {
+        try {
+          const datosFactura = await facturaService.obtenerFacturaPorUUID(uuid);
+          const xml = datosFactura?.xmlContent || '';
+          if (xml && typeof xml === 'string') {
+            const hasCp = /CartaPorte/i.test(xml) || /cartaporte/i.test(xml) || /cce20:ComplementoCartaPorte/i.test(xml);
+            cartaPorte = !!hasCp;
+          } else {
+            // Si no hay xml en backend principal, intentar PAC
+            const cfdi = await facturaService.consultarCfdiPorUUID({ uuid, tipo: 'I' });
+            // No expone XML, pero si basicos/relacionados. Como heurística: si tipoRelacion indica CP o existen uuids relacionados de tipo transporte
+            const tipoRel = (cfdi?.relacionados?.tipoRelacion || '').toUpperCase();
+            cartaPorte = tipoRel.includes('CARTA') || tipoRel.includes('CP');
+          }
+        } catch (_) {
+          cartaPorte = false;
         }
-      } catch (_) {
-        cartaPorte = false;
       }
 
       setRelacionesPorUuid(prev => ({
