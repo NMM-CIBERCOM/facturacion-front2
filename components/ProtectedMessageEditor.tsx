@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import formatoCorreoService, { FormatoCorreoConfig } from '../services/formatoCorreoService';
+import formatoCorreoService from '../services/formatoCorreoService';
+// import type { FormatoCorreoConfig } from '../services/formatoCorreoService';
 
 interface FormatConfig {
   fontFamily: string;
@@ -31,8 +32,8 @@ export const ProtectedMessageEditor: React.FC<ProtectedMessageEditorProps> = ({
 }) => {
   const [protectedContent, setProtectedContent] = useState<string>('');
   const [editableContent, setEditableContent] = useState<string>('');
-  const [displayProtectedContent, setDisplayProtectedContent] = useState<string>('');
-  const [cleanProtectedContent, setCleanProtectedContent] = useState<string>('');
+  const [_displayProtectedContent, _setDisplayProtectedContent] = useState<string>('');
+  const [_cleanProtectedContent, setCleanProtectedContent] = useState<string>('');
   const [formatConfig, setFormatConfig] = useState<FormatConfig>({
     fontFamily: 'Arial',
     fontSize: 14,
@@ -86,37 +87,38 @@ export const ProtectedMessageEditor: React.FC<ProtectedMessageEditorProps> = ({
   // Variables dinámicas que deben protegerse
   const protectedVariables = ['{facturaInfo}', '{serie}', '{folio}', '{uuid}', '{rfcEmisor}'];
 
-  // Texto completo que debe protegerse
-  const protectedTexts = [
-    'Estimado(a) cliente,',
-    '',
-    'Se ha generado su factura electrónica.',
-    '',
-    'Gracias por su preferencia.',
-    '',
-    'Con los siguientes datos:',
-    'Serie de la factura:',
-    'Folio de la factura:',
-    'UUID de la factura:',
-    'RFC del emisor:',
-    '',
-    'Atentamente,',
-    'Equipo de Facturación Cibercom'
-  ];
+  // Texto completo que debe protegerse - no utilizado directamente
+  // const protectedTexts = [
+  //   'Estimado(a) cliente,',
+  //   '',
+  //   'Se ha generado su factura electrónica.',
+  //   '',
+  //   'Gracias por su preferencia.',
+  //   '',
+  //   'Con los siguientes datos:',
+  //   'Serie de la factura:',
+  //   'Folio de la factura:',
+  //   'UUID de la factura:',
+  //   'RFC del emisor:',
+  //   '',
+  //   'Atentamente,',
+  //   'Equipo de Facturación Cibercom'
+  // ];
 
   useEffect(() => {
     separateContent();
   }, [value]);
 
-  const isProtectedText = (text: string): boolean => {
-    return protectedTexts.some(protectedText => 
-      text.toLowerCase().includes(protectedText.toLowerCase())
-    );
-  };
+  // Funciones no utilizadas - comentadas para evitar error de TypeScript
+  // const isProtectedText = (text: string): boolean => {
+  //   return protectedTexts.some(protectedText => 
+  //     text.toLowerCase().includes(protectedText.toLowerCase())
+  //   );
+  // };
 
-  const isProtectedVariable = (text: string): boolean => {
-    return protectedVariables.some(variable => text.includes(variable));
-  };
+  // const isProtectedVariable = (text: string): boolean => {
+  //   return protectedVariables.some(variable => text.includes(variable));
+  // };
 
   const separateContent = () => {
     // Contenido protegido limpio sin etiquetas para el correo final
@@ -160,17 +162,18 @@ export const ProtectedMessageEditor: React.FC<ProtectedMessageEditorProps> = ({
     onChange(newEditableContent);
   };
 
-  const handleFontChange = (fontFamily: string) => {
-    const newConfig = { ...formatConfig, fontFamily };
-    setFormatConfig(newConfig);
-    guardarConfiguracionFormato(newConfig);
-  };
+  // Funciones no utilizadas - comentadas para evitar error de TypeScript
+  // const handleFontChange = (fontFamily: string) => {
+  //   const newConfig = { ...formatConfig, fontFamily };
+  //   setFormatConfig(newConfig);
+  //   guardarConfiguracionFormato(newConfig);
+  // };
 
-  const handleFontSizeChange = (fontSize: number) => {
-    const newConfig = { ...formatConfig, fontSize };
-    setFormatConfig(newConfig);
-    guardarConfiguracionFormato(newConfig);
-  };
+  // const handleFontSizeChange = (fontSize: number) => {
+  //   const newConfig = { ...formatConfig, fontSize };
+  //   setFormatConfig(newConfig);
+  //   guardarConfiguracionFormato(newConfig);
+  // };
 
   // Toolbar de formato
   const handleItalicClick = () => {

@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
 import type { NavItem } from '../types';
 import { ChevronDownIcon } from './icons/ChevronDownIcon';
-import { MenuIcon } from './icons/MenuIcon';
+// import { MenuIcon } from './icons/MenuIcon'; // No utilizado
 import { XMarkIcon } from './icons/XMarkIcon';
 import { ThemeContext } from '../App';
 import { NAV_ITEMS } from '../constants';
@@ -124,7 +124,7 @@ const SidebarNavItemChild: React.FC<{
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ navItems, isOpen, toggleSidebar, onNavItemClick, logoUrl, appName }) => {
-  const { theme } = useContext(ThemeContext);
+  // const { theme } = useContext(ThemeContext); // No se usa directamente, solo en subcomponentes
   const [activePath, setActivePath] = useState('dashboard');
 
   // Debug: Log what the sidebar is receiving

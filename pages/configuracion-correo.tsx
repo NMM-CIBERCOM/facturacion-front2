@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Layout } from '../components/Layout';
+import { useState, useEffect } from 'react';
+// import { Layout } from '../components/Layout'; // Componente no existe, usando div directamente
 import { LogoUploader } from '../components/LogoUploader';
 import { logoService } from '../services/logoService';
 import { Button } from '../components/Button';
@@ -40,7 +40,7 @@ export default function ConfiguracionCorreo() {
   };
 
   return (
-    <Layout title="Configuración de Correo">
+    <div>
       <div className="max-w-4xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         <h1 className="text-2xl font-semibold text-gray-900 mb-6">Configuración de Correo Electrónico</h1>
         
@@ -99,6 +99,6 @@ export default function ConfiguracionCorreo() {
           </div>
         </div>
       </div>
-    </Layout>
+    </div>
   );
 }

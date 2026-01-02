@@ -28,6 +28,8 @@ import { ConsultasSkuPage } from './components/ConsultasSkuPage';
 import { ConsultasBoletasPage } from './components/ConsultasBoletasPage';
 import { ConsultasReportesPage } from './components/ConsultasReportesPage';
 import { ConsultasRepsSustituidosPage } from './components/ConsultasRepsSustituidosPage';
+import { FacturasSustituidasPage } from './components/FacturasSustituidasPage';
+import { FacturasPorUsuarioPage } from './components/FacturasPorUsuarioPage';
 import { AdminEmpleadosPage } from './components/AdminEmpleadosPage';
 import { AdminTiendasPage } from './components/AdminTiendasPage';
 import { AdminPeriodosPerfilPage } from './components/AdminPeriodosPerfilPage';
@@ -55,6 +57,8 @@ import { MonitorPermisosPage } from './components/MonitorPermisosPage';
 import TestPdfPage from './components/TestPdfPage';
 import ITextPdfTest from './components/ITextPdfTest';
 import RegistroCFDIPage from './components/RegistroCFDIPage';
+import { CatalogosProductosServiciosPage } from './components/CatalogosProductosServiciosPage';
+import { CatalogosClientesPage } from './components/CatalogosClientesPage';
 import { ConfiguracionTemasPage } from './components/ConfiguracionTemasPage';
 import { ConfiguracionEmpresaPage } from './components/ConfiguracionEmpresaPage';
 import { ConfiguracionCorreoPage } from './components/ConfiguracionCorreoPage';
@@ -249,20 +253,47 @@ export const App: React.FC = () => {
         localStorage.setItem('nombreEmpleado', nombreEmpleado);
       } catch {}
       try {
+        // Determinar el ID del usuario: preferir idDfi, luego idPerfil
+        // IMPORTANTE: ID_PERFIL es NOT NULL en la tabla USUARIOS, siempre existe
+        // ID_DFI puede ser NULL, por lo que usamos ID_PERFIL como fallback
+        const idUsuario = authUser.idDfi != null && authUser.idDfi !== undefined 
+                         ? authUser.idDfi 
+                         : (authUser.idPerfil != null && authUser.idPerfil !== undefined 
+                            ? authUser.idPerfil 
+                            : null);
+        
+        if (!idUsuario) {
+          console.warn('Usuario no tiene ID_DFI ni ID_PERFIL. NO_USUARIO:', authUser.noUsuario);
+        }
+        
         localStorage.setItem(
           'perfil',
           JSON.stringify({
             nombrePerfil: authUser.nombrePerfil || 'Sin perfil',
-            idPerfil: authUser.idPerfil,
-            idDfi: authUser.idDfi,
+            idPerfil: authUser.idPerfil, // ID del perfil asignado al usuario (NOT NULL en BD)
+            idDfi: authUser.idDfi, // ID numérico del usuario en tabla DFI/empleados (puede ser NULL)
             idEstacionamiento: authUser.idEstacionamiento,
+            noUsuario: authUser.noUsuario, // Guardar también noUsuario para referencia (NO usar como ID)
+            idUsuario: idUsuario, // ID del usuario que se usará para guardar en FACTURAS
           }),
         );
-      } catch {}
+        
+        // Guardar el ID del usuario en session.idUsuario para acceso rápido
+        if (idUsuario != null) {
+          localStorage.setItem('session.idUsuario', String(idUsuario));
+        } else {
+          console.error('No se pudo determinar el ID del usuario');
+        }
+      } catch (error) {
+        console.error('Error al guardar perfil del usuario:', error);
+      }
       try {
         const username = authUser.noUsuario || nombreEmpleado;
         localStorage.setItem('username', username);
-        localStorage.setItem('session.idUsuario', username);
+        // NO sobrescribir session.idUsuario aquí si ya se estableció arriba con el ID real
+        if (!localStorage.getItem('session.idUsuario')) {
+          localStorage.setItem('session.idUsuario', username);
+        }
       } catch {}
     } else {
       localStorage.removeItem(USER_STORAGE_KEY);
@@ -438,9 +469,13 @@ export const App: React.FC = () => {
       case 'consultas-tickets':
         return <ConsultasBoletasPage />;
       case 'consultas-reportes':
-        return <ConsultasReportesPage />;
+        return <ConsultasReportesPage setActivePage={setActivePage} />;
       case 'consultas-reps-sustituidos':
         return <ConsultasRepsSustituidosPage />;
+      case 'facturas-sustituidas':
+        return <FacturasSustituidasPage />;
+      case 'facturas-por-usuario':
+        return <FacturasPorUsuarioPage />;
       case 'admin-empleados':
         return <AdminEmpleadosPage />;
       case 'admin-tiendas':
@@ -495,6 +530,10 @@ export const App: React.FC = () => {
         return <ITextPdfTest />;
       case 'registro-cfdi':
         return <RegistroCFDIPage />;
+      case 'catalogos-productos-servicios':
+        return <CatalogosProductosServiciosPage />;
+      case 'catalogos-clientes':
+        return <CatalogosClientesPage />;
       case 'configuracion-temas':
         return <ConfiguracionTemasPage />;
       case 'configuracion-empresa':
@@ -524,10 +563,10 @@ export const App: React.FC = () => {
     <button
       type="button"
       onClick={toggleTheme}
-      className="px-3 py-1 rounded-md border border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+      className="px-2 sm:px-3 py-1 rounded-md border border-gray-300 dark:border-gray-600 text-xs sm:text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
       aria-label="Cambiar tema"
     >
-      {theme === 'dark' ? '🌙' : '☀️'}
+      {theme === 'dark' ? 'Oscuro' : 'Claro'}
     </button>
   );
 

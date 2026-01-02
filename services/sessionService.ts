@@ -1,19 +1,51 @@
 import { TIENDA_OPTIONS } from '../constants';
 
 // Obtiene idUsuario desde localStorage y asegura persistencia en clave de sesión
+// IMPORTANTE: Este método ahora devuelve el ID numérico del usuario (idDfi o idPerfil)
+// establecido al hacer login, NO el noUsuario
 export function getSessionIdUsuario(): string {
   try {
-    const fromUsername = window.localStorage.getItem('username');
+    // PRIMERO: Intentar obtener del perfil (idUsuario establecido al hacer login)
+    const perfilRaw = window.localStorage.getItem('perfil');
+    if (perfilRaw) {
+      try {
+        const perfil = JSON.parse(perfilRaw);
+        if (perfil?.idUsuario != null && /^\d+$/.test(String(perfil.idUsuario))) {
+          const id = String(perfil.idUsuario);
+          window.localStorage.setItem('session.idUsuario', id);
+          return id;
+        }
+        // Fallback: idDfi
+        if (perfil?.idDfi != null && /^\d+$/.test(String(perfil.idDfi))) {
+          const id = String(perfil.idDfi);
+          window.localStorage.setItem('session.idUsuario', id);
+          return id;
+        }
+        // Fallback: idPerfil
+        if (perfil?.idPerfil != null && /^\d+$/.test(String(perfil.idPerfil))) {
+          const id = String(perfil.idPerfil);
+          window.localStorage.setItem('session.idUsuario', id);
+          return id;
+        }
+      } catch {}
+    }
+    
+    // SEGUNDO: Intentar obtener de session.idUsuario (debe contener el ID real)
     const existing = window.localStorage.getItem('session.idUsuario');
-    const id = fromUsername || existing;
-    if (id) {
-      window.localStorage.setItem('session.idUsuario', id);
-      return id;
+    if (existing && /^\d+$/.test(existing)) {
+      return existing;
+    }
+    
+    // TERCERO: Fallback al username solo si es numérico (no recomendado)
+    const fromUsername = window.localStorage.getItem('username');
+    if (fromUsername && /^\d+$/.test(fromUsername)) {
+      window.localStorage.setItem('session.idUsuario', fromUsername);
+      return fromUsername;
     }
   } catch {}
-  const fallback = 'USUARIO_DEMO';
-  try { window.localStorage.setItem('session.idUsuario', fallback); } catch {}
-  return fallback;
+  
+  // Si no se encuentra un ID numérico válido, retornar "0"
+  return "0";
 }
 
 // Intenta derivar la tienda desde el perfil guardado en sesión

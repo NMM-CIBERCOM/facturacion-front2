@@ -1,4 +1,4 @@
-import { apiUrl } from './api';
+import { apiUrl, getHeadersWithUsuario } from './api';
 import { facturaService } from './facturaService';
 
 export interface EmpresaInfo {
@@ -398,7 +398,7 @@ export async function generarYDescargarPDFCartaPorte(form: CartaPorteFormData, e
   const facturaData = buildFacturaDataFromCartaPorte(normalizado, empresa);
   const resp = await fetch(apiUrl('/factura/generar-pdf'), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getHeadersWithUsuario(),
     body: JSON.stringify({
       facturaData,
       logoConfig: {
@@ -430,7 +430,7 @@ export async function descargarXmlCartaPorte(form: CartaPorteFormData): Promise<
   const normalizado = normalizeCartaPortePayload(form);
   const resp = await fetch(apiUrl('/carta-porte/preview-xml'), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getHeadersWithUsuario(),
     body: JSON.stringify(normalizado),
   });
   if (!resp.ok) {

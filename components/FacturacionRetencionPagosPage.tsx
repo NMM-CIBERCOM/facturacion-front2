@@ -5,6 +5,7 @@ import { SelectField } from './SelectField';
 import { Button } from './Button';
 import { useEmpresa } from '../context/EmpresaContext';
 import { retencionesService } from '../services/retencionesService';
+import { apiUrl, getHeadersWithUsuario } from '../services/api';
 
 // Mapeo de claves de retención según catRetenciones.xsd.xml (01-28)
 const CLAVES_RETENCION = [
@@ -460,6 +461,129 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
     setSuccessMessage(null);
   }, []);
 
+  const handleVistaPrevia = useCallback(async () => {
+    resetAlerts();
+    const errores = validarFormulario();
+    if (errores.length > 0) {
+      setErrorMessages(errores);
+      alert('Por favor corrija los errores antes de ver la vista previa:\n' + errores.join('\n'));
+      return;
+    }
+
+    try {
+      // Construir payload similar al que se envía al guardar
+      const tipoPersona = formData.rfcReceptor.trim().length === 12 ? 'moral' : 'fisica';
+      const nombreReceptor = tipoPersona === 'moral' 
+        ? formData.razonSocial.trim()
+        : `${formData.nombre.trim()} ${formData.paterno.trim()} ${formData.materno.trim()}`.trim();
+      
+      // Calcular ISR e IVA retenidos desde impRetenidos
+      let isrRetenido = 0;
+      let ivaRetenido = 0;
+      
+      formData.impRetenidos.forEach(imp => {
+        const monto = parseFloat(imp.montoRet || '0');
+        if (imp.impuestoRet === '001') {
+          isrRetenido += monto;
+        } else if (imp.impuestoRet === '002') {
+          ivaRetenido += monto;
+        }
+      });
+      
+      // Mapear clave de retención a tipo de retención
+      const tipoRetencionMap: Record<string, string> = {
+        '01': 'OTROS',
+        '02': 'DIVIDENDOS',
+        '03': 'INTERESES',
+        '04': 'ISR_REGALIAS',
+        '05': 'ISR_ARRENDAMIENTO',
+        '06': 'ENAJENACION_ACCIONES',
+        '07': 'ISR_ENAJENACION',
+        '08': 'ISR_SERVICIOS',
+        '09': 'ISR_SUELDOS',
+        '10': 'OTROS',
+        '11': 'OTROS',
+        '12': 'FIDEICOMISOS',
+        '13': 'PLANES_RETIRO',
+        '14': 'IVA',
+        '15': 'INTERESES',
+        '16': 'FIDEICOMISOS',
+        '17': 'REMANENTE',
+        '18': 'PLANES_RETIRO',
+        '19': 'ENAJENACION_ACCIONES',
+        '20': 'OTROS',
+        '21': 'OTROS',
+        '22': 'OTROS',
+        '23': 'ISR_ARRENDAMIENTO',
+        '24': 'ISR_ENAJENACION',
+        '25': 'ISR_SERVICIOS',
+        '26': 'ISR_REGALIAS',
+        '27': 'ISR_SERVICIOS',
+        '28': 'DIVIDENDOS',
+      };
+      
+      const tipoRetencion = tipoRetencionMap[formData.cveRetenc] || 'OTROS';
+      
+      const payload: any = {
+        rfcEmisor: formData.rfcEmisor.trim(),
+        nombreEmisor: formData.nombreEmisor.trim(),
+        rfcReceptor: formData.rfcReceptor.trim(),
+        razonSocial: tipoPersona === 'moral' ? formData.razonSocial.trim() : undefined,
+        nombre: tipoPersona === 'fisica' ? formData.nombre.trim() : undefined,
+        paterno: tipoPersona === 'fisica' ? formData.paterno.trim() : undefined,
+        materno: tipoPersona === 'fisica' ? formData.materno.trim() : undefined,
+        tipoPersona: tipoPersona,
+        tipoRetencion: tipoRetencion,
+        cveRetenc: formData.cveRetenc.trim(),
+        montoBase: parseFloat(formData.montoTotOperacion || '0'),
+        montoTotGravado: parseFloat(formData.montoTotGrav || '0'),
+        montoTotExento: parseFloat(formData.montoTotExent || '0'),
+        isrRetenido: isrRetenido,
+        ivaRetenido: ivaRetenido,
+        montoRetenido: parseFloat(formData.montoTotRet || '0'),
+        periodoMes: formData.mesIni.trim(),
+        periodoAnio: formData.ejercicio.trim(),
+        fechaPago: formData.fechaPago.trim(),
+        concepto: formData.concepto.trim() || formData.descRetenc.trim(),
+        correoReceptor: formData.correoReceptor.trim(),
+        codigoPostalReceptor: formData.domicilioFiscalReceptor.trim(),
+        impRetenidos: formData.impRetenidos.map(imp => ({
+          baseRet: imp.baseRet || '0',
+          impuestoRet: imp.impuestoRet || '001',
+          montoRet: imp.montoRet || '0',
+          tipoPagoRet: imp.tipoPagoRet || '01',
+        })),
+      };
+
+      const response = await fetch(apiUrl('/retenciones/preview-pdf'), {
+        method: 'POST',
+        headers: getHeadersWithUsuario(),
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Error HTTP ${response.status}: ${errorText}`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error en vista previa:', error);
+      const mensaje = error instanceof Error ? error.message : 'Error desconocido';
+      setErrorMessages([`Error al generar vista previa: ${mensaje}`]);
+      alert(`Error al generar vista previa: ${mensaje}`);
+    }
+  }, [formData, validarFormulario, resetAlerts]);
+
   const handleLimpiarFormulario = useCallback(() => {
     resetAlerts();
     setFormData({
@@ -609,9 +733,9 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
         setUuidRetencionGuardado(uuidRetencion || null);
         
         if (uuidRetencion) {
-          window.alert(`✅ Retención de pagos timbrada exitosamente\nUUID: ${uuidRetencion}`);
+          window.alert(`Retención de pagos timbrada exitosamente\nUUID: ${uuidRetencion}`);
         } else {
-          window.alert('✅ Retención de pagos timbrada exitosamente');
+          window.alert('Retención de pagos timbrada exitosamente');
         }
 
         // Preguntar si desea enviar por correo
@@ -633,19 +757,19 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
               montoRetenido: resultado.montoRetenido || montoRetenido,
               baseRetencion: resultado.baseRetencion || parseFloat(formData.montoTotOperacion),
             });
-            window.alert(`📧 Retención enviada exitosamente al correo: ${formData.correoReceptor.trim()}`);
+            window.alert(`Retención enviada exitosamente al correo: ${formData.correoReceptor.trim()}`);
             setSuccessMessage(`Retención enviada por correo a ${formData.correoReceptor.trim()}`);
           } catch (error) {
             const mensajeError = error instanceof Error ? error.message : 'Error al enviar por correo.';
             setErrorMessages([mensajeError]);
-            window.alert(`⚠️ ${mensajeError}`);
+            window.alert(mensajeError);
           }
         }
       } else {
         const erroresBackend = resultado.errors || [];
         const mensajeError = resultado.message || 'Error al registrar la retención.';
         setErrorMessages([mensajeError, ...erroresBackend]);
-        window.alert(`⚠️ ${mensajeError}\n${erroresBackend.join('\n')}`);
+        window.alert(`${mensajeError}\n${erroresBackend.join('\n')}`);
       }
     } catch (error) {
       const message =
@@ -653,7 +777,7 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
           ? error.message
           : 'No se pudo registrar la retención de pagos.';
       setErrorMessages([message]);
-      window.alert(`⚠️ ${message}`);
+      window.alert(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -806,7 +930,7 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
                 maxLength={5}
               />
               <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-                ⚠️ CRÍTICO: Debe ser un código postal válido del catálogo c_CodigoPostal del SAT (5 dígitos numéricos)
+                CRÍTICO: Debe ser un código postal válido del catálogo c_CodigoPostal del SAT (5 dígitos numéricos)
               </p>
             </div>
           </>
@@ -1002,7 +1126,7 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
                 label="Impuesto Retenido"
                 name={`impuestoRet_${index}`}
                 value={imp.impuestoRet}
-                onChange={(e) => handleImpRetenidoChange(index, 'impuestoRet', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleImpRetenidoChange(index, 'impuestoRet', e.target.value)}
                 options={IMPUESTO_OPTIONS}
                 required
               />
@@ -1013,7 +1137,7 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
                 step="0.01"
                 min="0"
                 value={imp.montoRet}
-                onChange={(e) => handleImpRetenidoChange(index, 'montoRet', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleImpRetenidoChange(index, 'montoRet', e.target.value)}
                 placeholder="0.00"
                 required
               />
@@ -1021,7 +1145,7 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
                 label="Tipo de Pago Ret"
                 name={`tipoPagoRet_${index}`}
                 value={imp.tipoPagoRet}
-                onChange={(e) => handleImpRetenidoChange(index, 'tipoPagoRet', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleImpRetenidoChange(index, 'tipoPagoRet', e.target.value)}
                 options={TIPO_PAGO_RET_OPTIONS}
                 required
               />
@@ -1059,6 +1183,9 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
         <Button variant="neutral" onClick={handleLimpiarFormulario}>
           Limpiar formulario
         </Button>
+        <Button variant="secondary" onClick={handleVistaPrevia} disabled={isSubmitting}>
+          Vista Previa
+        </Button>
         <Button onClick={handleGuardar} disabled={isSubmitting}>
           {isSubmitting ? 'Guardando…' : 'Guardar Retención'}
         </Button>
@@ -1079,7 +1206,7 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
               );
             }}
           >
-            📧 Enviar Gmail
+            Enviar Gmail
           </Button>
         )}
       </div>

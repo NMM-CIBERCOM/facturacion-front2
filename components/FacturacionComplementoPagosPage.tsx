@@ -5,7 +5,7 @@ import { SelectField } from './SelectField';
 import { Button } from './Button';
 import { MEDIO_PAGO_OPTIONS } from '../constants';
 import { pagosService } from '../services/pagosService';
-import { apiUrl } from '../services/api';
+import { apiUrl, getHeadersWithUsuario } from '../services/api';
 
 type PagoDetalle = {
   id: string;
@@ -27,6 +27,20 @@ const MONEDA_OPTIONS = [
   { value: 'USD', label: 'USD - Dólar estadounidense' },
   { value: 'EUR', label: 'EUR - Euro' },
 ];
+
+// Función para generar UUID compatible con todos los navegadores
+const generateUUID = (): string => {
+  // Intentar usar crypto.randomUUID si está disponible
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback: generar UUID v4 manualmente
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
 
 const initialPago: PagoDetalle = {
   id: '',
@@ -196,7 +210,7 @@ export const FacturacionComplementoPagosPage: React.FC = () => {
 
     const nuevoPago: PagoDetalle = {
       ...pagoDraft,
-      id: selectedPagoId ?? crypto.randomUUID(),
+      id: selectedPagoId ?? generateUUID(),
     };
 
     setPagos((prev) => {
@@ -251,6 +265,62 @@ export const FacturacionComplementoPagosPage: React.FC = () => {
     setXmlComplementoTimbrado(null);
   }, [resetAlerts]);
 
+  const handleVistaPrevia = useCallback(async () => {
+    try {
+      // Validar campos básicos
+      if (!formData.facturaUuid || !formData.facturaUuid.trim()) {
+        alert('Por favor ingrese el UUID de la factura.');
+        return;
+      }
+
+      if (pagos.length === 0) {
+        alert('Por favor agregue al menos un pago antes de ver la vista previa.');
+        return;
+      }
+
+      // Construir request similar al que se envía al preparar
+      const previewRequest = {
+        facturaUuid: formData.facturaUuid.trim(),
+        facturaId: formData.facturaId && !Number.isNaN(Number(formData.facturaId))
+          ? Number(formData.facturaId)
+          : undefined,
+        usuarioRegistro: formData.usuarioRegistro?.trim() || undefined,
+        correoReceptor: formData.correoReceptor.trim(),
+        pagos: pagos.map((pago) => ({
+          fechaPago: pago.fechaPago,
+          formaPago: pago.formaPago,
+          moneda: pago.moneda,
+          monto: Number(pago.monto),
+        })),
+      };
+
+      const response = await fetch(apiUrl('/pagos/complemento/preview-pdf'), {
+        method: 'POST',
+        headers: getHeadersWithUsuario(),
+        body: JSON.stringify(previewRequest),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Error HTTP ${response.status}: ${errorText}`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error al generar vista previa:', error);
+      alert(`Error al generar vista previa: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    }
+  }, [formData, pagos]);
+
   const handleEnviarComplemento = useCallback(async () => {
     resetAlerts();
     const errores = validarFormulario();
@@ -288,15 +358,15 @@ export const FacturacionComplementoPagosPage: React.FC = () => {
         setSuccessMessage(mensajeUuid);
         let uuidComplemento = resultado.uuidComplemento?.trim() || '';
         if (resultado.uuidComplemento && resultado.uuidComplemento.trim().length > 0) {
-          window.alert(`✅ Complemento de pago timbrado exitosamente\nUUID: ${resultado.uuidComplemento}`);
+          window.alert(`Complemento de pago timbrado exitosamente\nUUID: ${resultado.uuidComplemento}`);
         } else {
-          window.alert('✅ Complemento de pago timbrado exitosamente');
+          window.alert('Complemento de pago timbrado exitosamente');
         }
 
         const deseaEnviar = window.confirm('¿Deseas enviar el PDF del complemento al correo registrado?');
         if (deseaEnviar) {
           if (!uuidComplemento) {
-            window.alert('⚠️ No se cuenta con UUID del complemento para enviar el PDF.');
+            window.alert('No se cuenta con UUID del complemento para enviar el PDF.');
           } else {
             try {
               const totalPagadoCalculado = payload.pagos.reduce(
@@ -321,11 +391,11 @@ export const FacturacionComplementoPagosPage: React.FC = () => {
                 moneda: monedaPrimerPago,
                 pagos: payload.pagos,
               });
-              window.alert(`📧 Complemento de pago enviado al correo: ${formData.correoReceptor.trim()}`);
+              window.alert(`Complemento de pago enviado al correo: ${formData.correoReceptor.trim()}`);
             } catch (envioError) {
               const mensajeEnvio =
                 envioError instanceof Error ? envioError.message : 'No se pudo enviar el correo.';
-              window.alert(`⚠️ Error al enviar el complemento por correo: ${mensajeEnvio}`);
+              window.alert(`Error al enviar el complemento por correo: ${mensajeEnvio}`);
             }
           }
         }
@@ -365,7 +435,7 @@ export const FacturacionComplementoPagosPage: React.FC = () => {
 
   const handleGenerarPdf = useCallback(async () => {
     if (!uuidComplementoPreparado) {
-      window.alert('⚠️ Primero debes preparar el complemento para generar el PDF.');
+      window.alert('Primero debes preparar el complemento para generar el PDF.');
       return;
     }
 
@@ -393,7 +463,7 @@ export const FacturacionComplementoPagosPage: React.FC = () => {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error al generar el PDF.';
       setErrorMessages([message]);
-      window.alert(`⚠️ ${message}`);
+      window.alert(message);
     } finally {
       setIsGenerandoPdf(false);
     }
@@ -401,7 +471,7 @@ export const FacturacionComplementoPagosPage: React.FC = () => {
 
   const handleGenerarXml = useCallback(async () => {
     if (!uuidComplementoPreparado) {
-      window.alert('⚠️ Primero debes preparar el complemento para generar el XML.');
+      window.alert('Primero debes preparar el complemento para generar el XML.');
       return;
     }
 
@@ -443,7 +513,7 @@ export const FacturacionComplementoPagosPage: React.FC = () => {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error al generar el XML.';
       setErrorMessages([message]);
-      window.alert(`⚠️ ${message}`);
+      window.alert(message);
     } finally {
       setIsGenerandoXml(false);
     }
@@ -451,17 +521,17 @@ export const FacturacionComplementoPagosPage: React.FC = () => {
 
   const handleEnviarPorCorreo = useCallback(async () => {
     if (!uuidComplementoPreparado) {
-      window.alert('⚠️ Primero debes preparar el complemento para enviarlo por correo.');
+      window.alert('Primero debes preparar el complemento para enviarlo por correo.');
       return;
     }
 
     if (!formData.correoReceptor || !formData.correoReceptor.trim()) {
-      window.alert('⚠️ El campo "Correo del receptor" es obligatorio para enviar por correo.');
+      window.alert('El campo "Correo del receptor" es obligatorio para enviar por correo.');
       return;
     }
 
     if (pagosPreparados.length === 0) {
-      window.alert('⚠️ No hay información de pagos disponible. Debes preparar el complemento primero.');
+      window.alert('No hay información de pagos disponible. Debes preparar el complemento primero.');
       return;
     }
 
@@ -500,11 +570,11 @@ export const FacturacionComplementoPagosPage: React.FC = () => {
       });
       
       setSuccessMessage(`Correo enviado exitosamente a ${formData.correoReceptor.trim()}`);
-      window.alert(`📧 Complemento de pago enviado al correo: ${formData.correoReceptor.trim()}`);
+      window.alert(`Complemento de pago enviado al correo: ${formData.correoReceptor.trim()}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error al enviar por correo.';
       setErrorMessages([message]);
-      window.alert(`⚠️ ${message}`);
+      window.alert(message);
     } finally {
       setIsEnviandoCorreo(false);
     }
@@ -723,6 +793,14 @@ export const FacturacionComplementoPagosPage: React.FC = () => {
           <div className="flex flex-wrap gap-2">
             <Button variant="neutral" onClick={handleLimpiarFormulario}>
               Reiniciar formulario
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={handleVistaPrevia}
+              disabled={pagos.length === 0 || !formData.facturaUuid.trim()}
+              title={pagos.length === 0 ? 'Agregue al menos un pago' : !formData.facturaUuid.trim() ? 'El UUID de la factura es obligatorio' : 'Vista previa del PDF del complemento'}
+            >
+              Vista Previa
             </Button>
             <Button onClick={handleEnviarComplemento} disabled={isSubmitting}>
               {isSubmitting ? 'Preparando…' : 'Preparar complemento'}

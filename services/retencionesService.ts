@@ -1,4 +1,4 @@
-import { apiUrl } from './api';
+import { apiUrl, getHeadersWithUsuario } from './api';
 
 export interface RetencionPayload {
   rfcEmisor: string;
@@ -72,7 +72,7 @@ const handleJsonResponse = async <T>(response: Response): Promise<T> => {
 const registrarRetencion = async (payload: RetencionPayload): Promise<RetencionResponse> => {
   const response = await fetch(apiUrl('/retenciones/registrar'), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getHeadersWithUsuario(),
     body: JSON.stringify(payload),
   });
 
@@ -82,7 +82,8 @@ const registrarRetencion = async (payload: RetencionPayload): Promise<RetencionR
   }));
 
   if (!response.ok || !data.success) {
-    throw new Error(data.message || data.errors?.join(', ') || 'No se pudo registrar la retención.');
+    const errorData = data as RetencionResponse;
+    throw new Error(errorData.message || errorData.errors?.join(', ') || 'No se pudo registrar la retención.');
   }
 
   return data;
@@ -103,7 +104,8 @@ const enviarRetencionPorCorreo = async (
   }));
 
   if (!response.ok || !data.success) {
-    throw new Error(data.message || data.errors?.join(', ') || 'No se pudo enviar la retención por correo.');
+    const errorData = data as RetencionResponse;
+    throw new Error(errorData.message || errorData.errors?.join(', ') || 'No se pudo enviar la retención por correo.');
   }
 
   return data;

@@ -18,14 +18,14 @@ export const MonitorDisponibilidadPage: React.FC = () => {
   const [titulo, setTitulo] = useState('');
   const [metodo, setMetodo] = useState('GET');
   const [url, setUrl] = useState('');
-  const [headers, setHeaders] = useState<Header[]>([]);
+  const [headers, _setHeaders] = useState<Header[]>([]);
   const [nuevoHeader, setNuevoHeader] = useState<Header>({ key: '', value: '' });
 
   // --- Tu lógica de funciones permanece intacta ---
   const handleAddHeader = () => { /* ... */ };
-  const handleHeaderChange = (index: number, field: 'key' | 'value', value: string) => { /* ... */ };
-  const handleRemoveHeader = (index: number) => { /* ... */ };
-  const handleGenerar = (e: React.FormEvent) => { /* ... */ };
+  const handleHeaderChange = (_index: number, _field: 'key' | 'value', _value: string) => { /* ... */ };
+  const handleRemoveHeader = (_index: number) => { /* ... */ };
+  const handleGenerar = (_e: React.FormEvent) => { /* ... */ };
 
   return (
     <div className="flex justify-center items-start min-h-[60vh] p-4">
@@ -99,7 +99,7 @@ export const MonitorDisponibilidadPage: React.FC = () => {
               <div className="md:col-span-2 space-y-2">
                 <h4 className="font-semibold">Headers añadidos:</h4>
                 <ul className="space-y-2">
-                  {headers.map((header, idx) => (
+                  {headers.map((header: Header, idx: number) => (
                     <li key={idx} className="flex flex-col md:flex-row gap-2 items-center p-2 border rounded-md">
                       <input
                         type="text"

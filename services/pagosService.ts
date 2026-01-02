@@ -1,4 +1,4 @@
-import { apiUrl } from './api';
+import { apiUrl, getHeadersWithUsuario } from './api';
 
 export interface PagoFacturaLookupResponse {
   success: boolean;
@@ -87,7 +87,7 @@ const registrarComplemento = async (
 ): Promise<PagoComplementoResponse> => {
   const response = await fetch(apiUrl('/pagos/complemento'), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getHeadersWithUsuario(),
     body: JSON.stringify(payload),
   });
 
@@ -97,12 +97,13 @@ const registrarComplemento = async (
   }));
 
   if (!response.ok) {
+    const errorData = data as PagoComplementoResponse;
     return {
       success: false,
-      message: data.message || 'No se pudo registrar el complemento de pagos.',
-      facturaId: data.facturaId,
-      pagosInsertados: data.pagosInsertados,
-      errors: data.errors,
+      message: errorData.message || 'No se pudo registrar el complemento de pagos.',
+      facturaId: errorData.facturaId,
+      pagosInsertados: errorData.pagosInsertados,
+      errors: errorData.errors,
     };
   }
 

@@ -24,7 +24,8 @@ export interface AgregarConceptoResponse {
 }
 
 class ConceptoService {
-  private baseUrl = apiUrl || 'http://localhost:8080/api';
+  // baseUrl ya no se usa, se usa apiUrl() directamente
+  // private baseUrl = 'http://174.136.25.157:8080/facturacion-backend-0.0.1-SNAPSHOT/api';
 
   async agregarConcepto(req: AgregarConceptoRequest): Promise<AgregarConceptoResponse> {
     const url = apiUrl('/conceptos');

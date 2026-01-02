@@ -1,6 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { justificacionService } from '../services/justificacionService';
-import type { SelectOption } from '../types';
+// Usar la interfaz local en lugar de importar
+interface SelectOption {
+  value: string | number;
+  label: string;
+}
 
 export function useJustificacionesOptions() {
   const [options, setOptions] = useState<SelectOption[]>([]);

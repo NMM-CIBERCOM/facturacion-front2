@@ -295,7 +295,7 @@ export const AdminTiendasPage: React.FC = () => {
             <SelectField
               label="Estado"
               value={filtros.estadoTienda || ''}
-              onChange={(value) => handleFilterChange('estadoTienda', value)}
+              onChange={(value: string | number) => handleFilterChange('estadoTienda', String(value))}
               options={[
                 { value: '', label: 'Todos' },
                 { value: 'ACTIVO', label: 'Activo' },
@@ -306,7 +306,7 @@ export const AdminTiendasPage: React.FC = () => {
             <SelectField
               label="Región"
               value={filtros.region || ''}
-              onChange={(value) => handleFilterChange('region', value)}
+              onChange={(value: string | number) => handleFilterChange('region', String(value))}
               options={[
                 { value: '', label: 'Todas' },
                 ...(estadisticas?.regiones?.map(r => ({ value: r, label: r })) || [])
@@ -315,7 +315,7 @@ export const AdminTiendasPage: React.FC = () => {
             <SelectField
               label="Zona"
               value={filtros.zona || ''}
-              onChange={(value) => handleFilterChange('zona', value)}
+              onChange={(value: string | number) => handleFilterChange('zona', String(value))}
               options={[
                 { value: '', label: 'Todas' },
                 ...(estadisticas?.zonas?.map(z => ({ value: z, label: z })) || [])
@@ -324,7 +324,7 @@ export const AdminTiendasPage: React.FC = () => {
             <SelectField
               label="Tipo"
               value={filtros.tipoTienda || ''}
-              onChange={(value) => handleFilterChange('tipoTienda', value)}
+              onChange={(value: string | number) => handleFilterChange('tipoTienda', String(value))}
               options={[
                 { value: '', label: 'Todos' },
                 ...(estadisticas?.tiposTienda?.map(t => ({ value: t, label: t })) || [])
@@ -564,7 +564,7 @@ export const AdminTiendasPage: React.FC = () => {
                   <SelectField
                     label="Tipo de Tienda"
                     value={formData.tipoTienda || 'Sucursal'}
-                    onChange={(value) => setFormData(prev => ({ ...prev, tipoTienda: value }))}
+                    onChange={(value: string | number) => setFormData(prev => ({ ...prev, tipoTienda: String(value) }))}
                     disabled={modalMode === 'view'}
                     options={[
                       { value: 'Sucursal', label: 'Sucursal' },
@@ -576,7 +576,7 @@ export const AdminTiendasPage: React.FC = () => {
                   <SelectField
                     label="Estado de Tienda"
                     value={formData.estadoTienda || 'ACTIVO'}
-                    onChange={(value) => setFormData(prev => ({ ...prev, estadoTienda: value }))}
+                    onChange={(value: string | number) => setFormData(prev => ({ ...prev, estadoTienda: String(value) }))}
                     disabled={modalMode === 'view'}
                     options={[
                       { value: 'ACTIVO', label: 'Activo' },

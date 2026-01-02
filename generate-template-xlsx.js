@@ -34,6 +34,6 @@ utils.book_append_sheet(wb, ws, 'Datos');
 const filename = 'template_facturas.xlsx';
 writeFile(wb, filename);
 
-console.log(`✅ Archivo ${filename} generado exitosamente.`);
-console.log('📋 Columnas: UUID, Folio, Tienda, Fecha');
+console.log(`Archivo ${filename} generado exitosamente.`);
+console.log('Columnas: UUID, Folio, Tienda, Fecha');
 

@@ -166,12 +166,12 @@ const TestPdfPage: React.FC = () => {
       const backendLogo = await facturaService.obtenerConfiguracionLogos();
       
       if (backendLogo.exitoso) {
-        setMessage(`✅ Logo obtenido: ${backendLogo.logoBase64?.length || 0} caracteres, URL: ${backendLogo.logoUrl}`);
+        setMessage(`Logo obtenido: ${backendLogo.logoBase64?.length || 0} caracteres, URL: ${backendLogo.logoUrl}`);
       } else {
-        setMessage(`❌ Error obteniendo logo: ${backendLogo.error}`);
+        setMessage(`Error obteniendo logo: ${backendLogo.error}`);
       }
     } catch (error) {
-      setMessage(`❌ Error: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      setMessage(`Error: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     } finally {
       setLoading(false);
     }

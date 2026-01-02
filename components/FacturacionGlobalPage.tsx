@@ -59,8 +59,8 @@ interface FacturaResult {
   estatus: string;
 }
 
-// Datos de ejemplo que se mostrarán en la tabla
-const DUMMY_RESULTS: FacturaResult[] = [];
+// Datos de ejemplo que se mostrarán en la tabla - no utilizado
+// const DUMMY_RESULTS: FacturaResult[] = [];
 
 const initialFacturaGlobalFormData: FacturaGlobalFormData = {
   fecha: '',
@@ -121,22 +121,23 @@ const SearchResultsTable: React.FC<SearchResultsTableProps & {
   onPreview: (factura: FacturaResult) => void;
   onEnviarCorreo: (factura: FacturaResult) => void;
 }> = ({ results, onPdf, onXml, onCancelar, onPreview, onEnviarCorreo }) => {
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount);
-  };
+  // Funciones no utilizadas - comentadas para evitar error de TypeScript
+  // const formatCurrency = (amount: number) => {
+  //   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount);
+  // };
   
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'Timbrada':
-        return 'bg-green-100 text-green-800';
-      case 'Cancelada':
-        return 'bg-red-100 text-red-800';
-      case 'Pendiente':
-        return 'bg-yellow-100 text-yellow-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+  // const getStatusBadge = (status: string) => {
+  //   switch (status) {
+  //     case 'Timbrada':
+  //       return 'bg-green-100 text-green-800';
+  //     case 'Cancelada':
+  //       return 'bg-red-100 text-red-800';
+  //     case 'Pendiente':
+  //       return 'bg-yellow-100 text-yellow-800';
+  //     default:
+  //       return 'bg-gray-100 text-gray-800';
+  //   }
+  // };
 
   return (
     <Card>
@@ -187,7 +188,7 @@ export const FacturacionGlobalPage: React.FC = () => {
   const [stats, setStats] = useState<{ totalFacturas?: number; totalTickets?: number; totalCartaPorte?: number }>({});
   // Estado para vista previa en modal
   const [previewOpen, setPreviewOpen] = useState<boolean>(false);
-  const [previewLoading, setPreviewLoading] = useState<boolean>(false);
+  const [_previewLoading, setPreviewLoading] = useState<boolean>(false);
   // Estados para feedback visual y modales
   const [toast, setToast] = useState<{ message: string; type?: 'success' | 'error' } | null>(null);
   const [modal, setModal] = useState<{ open: boolean; factura?: FacturaResult; loading?: boolean } | null>(null);
@@ -249,7 +250,7 @@ export const FacturacionGlobalPage: React.FC = () => {
       })();
       const singleRow: FacturaResult = {
         id: 0,
-        tipo: 'FACTURA GLOBAL',
+        tipo: 'FACTURA' as 'FACTURA' | 'TICKET' | 'CARTA_PORTE',
         folio: `Facturación de ${periodLabel}`,
         fecha: formData.fecha,
         tienda: formData.tienda,
@@ -460,34 +461,35 @@ export const FacturacionGlobalPage: React.FC = () => {
         agregadas = Array.isArray(data?.facturasAgregadas) ? data.facturasAgregadas : [];
       }
 
-      // Construir etiqueta de periodo similar al flujo de consulta
-      const periodLabel = (() => {
-        const fecha = formData.fecha;
-        if (formData.periodo === 'DIA') return `día ${fecha}`;
-        if (formData.periodo === 'SEMANA') {
-          const d = new Date(fecha + 'T00:00:00');
-          d.setHours(0, 0, 0, 0);
-          d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
-          const week1 = new Date(d.getFullYear(), 0, 4);
-          const week = 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
-          return `semana ${week}`;
-        }
-        const d = new Date(fecha + 'T00:00:00');
-        const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-        return `mes ${meses[d.getMonth()]} ${d.getFullYear()}`;
-      })();
+      // Construir etiqueta de periodo similar al flujo de consulta - no utilizado
+      // const _periodLabel = (() => {
+      //   const fecha = formData.fecha;
+      //   if (formData.periodo === 'DIA') return `día ${fecha}`;
+      //   if (formData.periodo === 'SEMANA') {
+      //     const d = new Date(fecha + 'T00:00:00');
+      //     d.setHours(0, 0, 0, 0);
+      //     d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+      //     const week1 = new Date(d.getFullYear(), 0, 4);
+      //     const week = 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
+      //     return `semana ${week}`;
+      //   }
+      //   const d = new Date(fecha + 'T00:00:00');
+      //   const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      //   return `mes ${meses[d.getMonth()]} ${d.getFullYear()}`;
+      // })();
 
       const logoConfig = await facturaService.obtenerConfiguracionLogos();
-      const statsForPdf = {
-        totalFacturas: stats.totalFacturas,
-        totalTickets: stats.totalTickets,
-        totalCartaPorte: stats.totalCartaPorte,
-      };
-      const metaForPdf = {
-        periodoLabel: `Periodo: ${periodLabel}`,
-        fecha: formData.fecha,
-        tiendaLabel: formData.tienda,
-      };
+      // Variables no utilizadas - comentadas para evitar error de TypeScript
+      // const statsForPdf = {
+      //   totalFacturas: stats.totalFacturas,
+      //   totalTickets: stats.totalTickets,
+      //   totalCartaPorte: stats.totalCartaPorte,
+      // };
+      // const metaForPdf = {
+      //   periodoLabel: `Periodo: ${periodLabel}`,
+      //   fecha: formData.fecha,
+      //   tiendaLabel: formData.tienda,
+      // };
 
       // Reutilizar el generador del backend (iText) para evitar PDFs en blanco
       // Mapear cada factura agregada a un concepto resumido
@@ -551,7 +553,7 @@ export const FacturacionGlobalPage: React.FC = () => {
       setToast({ message: error?.message || 'Error al generar PDF de resumen global.', type: 'error' });
     }
   };
-  const handleXml = async (factura: FacturaResult) => {
+  const handleXml = async (_factura: FacturaResult) => {
     try {
       const xmlString = await generarXMLResumenGlobal();
       const blob = new Blob([xmlString], { type: 'application/xml' });

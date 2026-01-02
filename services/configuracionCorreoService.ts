@@ -1,5 +1,6 @@
 // Servicio para el manejo de configuración de correos electrónicos
 import formatoCorreoService from './formatoCorreoService';
+import { apiUrl } from './api';
 
 export interface ConfiguracionMensaje {
   asunto: string;
@@ -22,7 +23,7 @@ export interface ConfiguracionMensajeResponse {
 }
 
 class ConfiguracionCorreoService {
-  private baseUrl = 'http://localhost:8080/api/correo';
+  private baseUrl = apiUrl('/correo');
 
   /**
    * Obtiene la configuración de mensaje actual desde la base de datos

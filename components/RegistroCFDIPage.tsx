@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { FaEdit, FaSave, FaEye, FaTimes, FaUpload, FaFilePdf, FaSpinner } from 'react-icons/fa';
 import { ThemeContext } from '../App';
 import { Card } from './Card';
+import { apiUrl, pacUrl } from '../services/api';
 
 interface RegimenFiscal {
   clave: string;
@@ -45,7 +46,7 @@ const RegistroCFDIPage: React.FC = () => {
 
   const fetchRegimenesFiscales = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/regimenes-fiscales');
+      const response = await fetch(apiUrl('/regimenes-fiscales'));
       if (!response.ok) throw new Error('Error al obtener los regímenes fiscales');
       const data: string[] = await response.json();
       // Convertir strings a objetos RegimenFiscal
@@ -88,67 +89,138 @@ const RegistroCFDIPage: React.FC = () => {
       return;
     }
 
-    console.log("Procesando datos en el banco de clientes...");
-    
+    console.log("========================================");
     try {
       const responses = [];
+      let procesados = 0;
+      let errores = 0;
       
-      for (const factura of facturasInfo) {
-        console.log(`Procesando cliente: ${factura.rfc}`);
+      for (let i = 0; i < facturasInfo.length; i++) {
+        const factura = facturasInfo[i];
+        procesados++;
         
-        const response = await fetch('http://localhost:8081/api/cdp/procesar-factura', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+        const requestBody = {
+          rfc: factura.rfc,
+          nombre: factura.nombre,
+          primerApellido: factura.primerApellido,
+          segundoApellido: factura.segundoApellido,
+          curp: factura.curp,
+          calle: factura.calle,
+          numExt: factura.numExt,
+          numInt: factura.numInt,
+          colonia: factura.colonia,
+          localidad: factura.localidad,
+          municipio: factura.municipio,
+          entidadFederativa: factura.entidadFederativa,
+          entreCalle: factura.entreCalle,
+          yCalle: factura.yCalle,
+          cp: factura.cp,
+          email: 'cliente@ejemplo.com',
+          regimenesFiscales: factura.regimenesFiscales
+        };
+        
+        try {
+          const response = await fetch(pacUrl('/cdp/procesar-factura'), {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody)
+          });
+          
+          if (!response.ok) {
+            let errorMessage = `Error ${response.status}: ${response.statusText}`;
+            let errorDetails = '';
+            
+            try {
+              const errorText = await response.text();
+              console.error('Cuerpo de error:', errorText);
+              
+              if (errorText) {
+                try {
+                  const errorJson = JSON.parse(errorText);
+                  errorDetails = JSON.stringify(errorJson, null, 2);
+                  errorMessage = errorJson.message || errorJson.error || errorMessage;
+                } catch {
+                  errorDetails = errorText;
+                }
+              }
+            } catch (e) {
+              console.error('No se pudo leer el cuerpo de error:', e);
+            }
+            
+            console.error(`Error al procesar cliente ${factura.rfc}:`, {
+              status: response.status,
+              statusText: response.statusText,
+              url: pacUrl('/cdp/procesar-factura'),
+              details: errorDetails
+            });
+            
+            errores++;
+            responses.push({
+              exitoso: false,
+              rfc: factura.rfc,
+              error: errorMessage,
+              detalles: errorDetails
+            });
+            
+            continue; // Continuar con el siguiente cliente
+          }
+          
+          const result = await response.json();
+          responses.push(result);
+          
+        } catch (fetchError) {
+          console.error(`Error de red al procesar cliente ${factura.rfc}:`, fetchError);
+          
+          errores++;
+          responses.push({
+            exitoso: false,
             rfc: factura.rfc,
-            nombre: factura.nombre,
-            primerApellido: factura.primerApellido,
-            segundoApellido: factura.segundoApellido,
-            curp: factura.curp,
-            calle: factura.calle,
-            numExt: factura.numExt,
-            numInt: factura.numInt,
-            colonia: factura.colonia,
-            localidad: factura.localidad,
-            municipio: factura.municipio,
-            entidadFederativa: factura.entidadFederativa,
-            entreCalle: factura.entreCalle,
-            yCalle: factura.yCalle,
-            cp: factura.cp,
-            email: 'cliente@ejemplo.com', // Email por defecto, se puede modificar
-            regimenesFiscales: factura.regimenesFiscales
-          })
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Error al procesar cliente ${factura.rfc}: ${response.statusText}`);
+            error: fetchError instanceof Error ? fetchError.message : 'Error de conexión desconocido',
+            tipo: 'NETWORK_ERROR'
+          });
         }
-        
-        const result = await response.json();
-        responses.push(result);
-        
-        console.log(`Cliente ${factura.rfc} procesado:`, result);
       }
       
-      console.log('Todos los clientes procesados:', responses);
-      
-      // Mostrar resumen de resultados
       const exitosos = responses.filter(r => r.exitoso).length;
       const existentes = responses.filter(r => r.clienteExistente).length;
       const nuevos = exitosos - existentes;
+      const fallidos = responses.filter(r => !r.exitoso).length;
       
-      alert(`✅ Procesamiento completado!\n\n` +
-            `📊 Resumen:\n` +
-            `• Total procesados: ${responses.length}\n` +
-            `• Clientes nuevos: ${nuevos}\n` +
-            `• Clientes existentes actualizados: ${existentes}\n\n` +
-            `🎉 Los datos han sido guardados en el banco de clientes.`);
+      if (fallidos > 0) {
+        const clientesConError = responses
+          .filter(r => !r.exitoso)
+          .map(r => `  • ${r.rfc}: ${r.error || 'Error desconocido'}`)
+          .join('\n');
+        
+        alert(`Procesamiento completado con errores\n\n` +
+              `Resumen:\n` +
+              `• Total procesados: ${responses.length}\n` +
+              `• Exitosos: ${exitosos}\n` +
+              `• Fallidos: ${fallidos}\n` +
+              `• Clientes nuevos: ${nuevos}\n` +
+              `• Clientes actualizados: ${existentes}\n\n` +
+              `Errores:\n${clientesConError}\n\n` +
+              `Revisa la consola para más detalles.`);
+      } else {
+        alert(`Procesamiento completado exitosamente!\n\n` +
+              `Resumen:\n` +
+              `• Total procesados: ${responses.length}\n` +
+              `• Clientes nuevos: ${nuevos}\n` +
+              `• Clientes existentes actualizados: ${existentes}\n\n` +
+              `Los datos han sido guardados en el banco de clientes.`);
+      }
       
     } catch (error) {
-      console.error('Error al procesar datos:', error);
-      alert(`❌ Error al procesar los datos: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      console.error('ERROR CRÍTICO EN PROCESAMIENTO');
+      console.error('Tipo de error:', error instanceof Error ? error.constructor.name : typeof error);
+      console.error('Mensaje:', error instanceof Error ? error.message : String(error));
+      console.error('Stack:', error instanceof Error ? error.stack : 'N/A');
+      
+      alert(`Error crítico al procesar los datos\n\n` +
+            `Mensaje: ${error instanceof Error ? error.message : 'Error desconocido'}\n\n` +
+            `Revisa la consola del navegador (F12) para más detalles.`);
     }
   };
 
@@ -165,7 +237,7 @@ const RegistroCFDIPage: React.FC = () => {
     });
 
     try {
-      const response = await fetch("http://localhost:8080/api/factura/procesar-pdfs", {
+      const response = await fetch(apiUrl('/factura/procesar-pdfs'), {
         method: "POST",
         body: formData,
       });
@@ -201,15 +273,15 @@ const RegistroCFDIPage: React.FC = () => {
 
       // Mostrar mensaje de éxito
       if (facturasConEditing.length > 0) {
-        alert(`✅ Se procesaron ${facturasConEditing.length} archivo(s) correctamente.`);
+        alert(`Se procesaron ${facturasConEditing.length} archivo(s) correctamente.`);
       } else {
-        alert("⚠️ Se procesaron los archivos pero no se encontraron datos válidos.");
+        alert("Se procesaron los archivos pero no se encontraron datos válidos.");
       }
 
     } catch (error) {
       console.error("Error durante la carga:", error);
       const errorMessage = error instanceof Error ? error.message : "Error desconocido al subir los archivos";
-      alert(`❌ Hubo un error al subir los archivos:\n\n${errorMessage}\n\nPor favor, verifica que:\n- Los archivos sean PDFs válidos\n- El backend esté corriendo\n- Los archivos contengan constancias fiscales válidas`);
+      alert(`Hubo un error al subir los archivos:\n\n${errorMessage}\n\nPor favor, verifica que:\n- Los archivos sean PDFs válidos\n- El backend esté corriendo\n- Los archivos contengan constancias fiscales válidas`);
     } finally {
       setIsUploading(false);
     }

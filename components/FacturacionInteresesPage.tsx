@@ -59,7 +59,7 @@ export const FacturacionInteresesPage: React.FC = () => {
   const [alertType, setAlertType] = useState<'success' | 'error' | ''>('');
   const [receptorValido, setReceptorValido] = useState<boolean>(false);
   const [rfcBloqueado, setRfcBloqueado] = useState<boolean>(false);
-  const [idReceptor, setIdReceptor] = useState<string | null>(null);
+  const [_idReceptor, setIdReceptor] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<'rfc' | 'correoElectronico' | 'razonSocial' | 'nombre' | 'paterno' | 'materno' | 'domicilioFiscal' | 'regimenFiscal' | 'usoCfdi', string>>>({});
   const [consultaIntereses, setConsultaIntereses] = useState<{
     financiero: number;

@@ -1,9 +1,10 @@
 
-import React, { useContext } from 'react';
-import { ThemeContext } from '../App';
+import React from 'react';
+// import { useContext } from 'react';
+// import { ThemeContext } from '../App';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'danger' | 'neutral';
+  variant?: 'primary' | 'secondary' | 'danger' | 'neutral' | 'outline';
   size?: 'sm' | 'md' | 'lg';
   children: React.ReactNode;
 }
@@ -15,7 +16,7 @@ export const Button: React.FC<ButtonProps> = ({
   className = '',
   ...props
 }) => {
-  const { theme } = useContext(ThemeContext);
+  // const { theme } = useContext(ThemeContext); // No utilizado actualmente
 
   let baseStyle = 'rounded-md font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed';
   
@@ -44,6 +45,8 @@ export const Button: React.FC<ButtonProps> = ({
   const lightModeNeutral = 'bg-gray-200 text-gray-800 hover:bg-gray-300 focus:ring-gray-400';
   const darkModeNeutral = 'dark:bg-gray-600 dark:text-gray-100 dark:hover:bg-gray-500 dark:focus:ring-gray-500';
 
+  const lightModeOutline = 'border-2 border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-gray-400 bg-transparent';
+  const darkModeOutline = 'dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:focus:ring-gray-500';
 
   switch (variant) {
     case 'primary':
@@ -57,6 +60,9 @@ export const Button: React.FC<ButtonProps> = ({
       break;
     case 'neutral':
       baseStyle += ` ${lightModeNeutral} ${darkModeNeutral}`;
+      break;
+    case 'outline':
+      baseStyle += ` ${lightModeOutline} ${darkModeOutline}`;
       break;
   }
 

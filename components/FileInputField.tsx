@@ -1,5 +1,6 @@
-import React, { useState, useRef, useContext } from 'react';
-import { ThemeContext } from '../App';
+import React, { useState, useRef } from 'react';
+// import { useContext } from 'react';
+// import { ThemeContext } from '../App';
 import { Button } from './Button';
 
 interface FileInputFieldProps {
@@ -21,7 +22,7 @@ export const FileInputField: React.FC<FileInputFieldProps> = ({
   className = '',
   helpText,
 }) => {
-  const { theme } = useContext(ThemeContext);
+  // const { theme } = useContext(ThemeContext); // No utilizado actualmente
   const [fileName, setFileName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 

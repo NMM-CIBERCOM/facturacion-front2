@@ -11,11 +11,11 @@ import { pdfService } from '../services/pdfService';
 import { facturaService } from '../services/facturaService';
 import { correoService } from '../services/correoService';
 import { configuracionCorreoService } from '../services/configuracionCorreoService';
-import { apiUrl } from '../services/api';
+import { apiUrl, getHeadersWithUsuario } from '../services/api';
 
 // Base URL para endpoints de notas de crédito (no usan /api)
 const CREDIT_NOTES_BASE_URL: string = (
-  (import.meta as any)?.env?.VITE_CREDIT_NOTES_BASE_URL || 'http://localhost:8080'
+  (import.meta as any)?.env?.VITE_CREDIT_NOTES_BASE_URL || 'http://174.136.25.157:8080/facturacion-backend-0.0.1-SNAPSHOT'
 ).replace(/\/+$/,'');
 interface ConceptoForm {
   descripcion: string;
@@ -443,7 +443,7 @@ ${tieneImpuestos ? `  <cfdi:Impuestos TotalImpuestosTrasladados="${notaData.iva.
 
       const resp = await fetch(`${CREDIT_NOTES_BASE_URL}/credit-notes/guardar`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeadersWithUsuario(),
         body: JSON.stringify(payload),
       });
       const data = await resp.json();
@@ -459,7 +459,7 @@ ${tieneImpuestos ? `  <cfdi:Impuestos TotalImpuestosTrasladados="${notaData.iva.
 
       const respTimbrar = await fetch(`${CREDIT_NOTES_BASE_URL}/credit-notes/timbrar`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeadersWithUsuario(),
         body: JSON.stringify(payload),
       });
       const dataTimbrar = await respTimbrar.json();
@@ -508,7 +508,7 @@ ${tieneImpuestos ? `  <cfdi:Impuestos TotalImpuestosTrasladados="${notaData.iva.
       const facturaData = convertirANotaDataParaPDF(notaData as any);
       const response = await fetch(apiUrl('/factura/generar-pdf'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeadersWithUsuario(),
         body: JSON.stringify({ facturaData, logoConfig: logoConfigFinal })
       });
 
@@ -558,7 +558,7 @@ ${tieneImpuestos ? `  <cfdi:Impuestos TotalImpuestosTrasladados="${notaData.iva.
 
       if (correoResp.success) {
         setMensaje({ tipo: 'success', texto: correoResp.message || 'Correo enviado exitosamente' });
-        alert(`✅ PDF de nota de crédito enviado exitosamente al correo: ${formData.correoElectronico}`);
+        alert(`PDF de nota de crédito enviado exitosamente al correo: ${formData.correoElectronico}`);
         return true;
       } else {
         setMensaje({ tipo: 'error', texto: correoResp.message || 'Error al enviar el correo' });
@@ -586,7 +586,7 @@ ${tieneImpuestos ? `  <cfdi:Impuestos TotalImpuestosTrasladados="${notaData.iva.
       const timbrado = await guardarNotaCreditoEnBD(notaData, rfcReceptor);
       if (timbrado.ok) {
         setMensaje({ tipo: 'success', texto: 'Nota de crédito guardada y timbrada correctamente con Finkok demo' });
-        alert(`✅ Factura emitida y timbrada exitosamente\nUUID: ${timbrado.uuid || 'SIN-UUID'}`);
+        alert(`Factura emitida y timbrada exitosamente\nUUID: ${timbrado.uuid || 'SIN-UUID'}`);
         if (window.confirm('¿Desea enviar la factura al correo?')) {
           await enviarNotaPorCorreo(notaData, rfcReceptor, timbrado);
         }
@@ -664,7 +664,7 @@ ${tieneImpuestos ? `  <cfdi:Impuestos TotalImpuestosTrasladados="${notaData.iva.
       const facturaData = convertirANotaDataParaPDF(notaData as any);
       const response = await fetch(apiUrl('/factura/generar-pdf'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeadersWithUsuario(),
         body: JSON.stringify({ facturaData, logoConfig: logoConfigFinal })
       });
 
@@ -706,6 +706,36 @@ ${tieneImpuestos ? `  <cfdi:Impuestos TotalImpuestosTrasladados="${notaData.iva.
     }
   };
 
+  const handleVistaPrevia = async () => {
+    setMensaje(null);
+    const prepared = await prepararNotaCredito();
+    if (!prepared) return;
+    const { notaData } = prepared;
+
+    try {
+      const logoConfigFinal = await obtenerLogoConfigFinal();
+      const facturaData = convertirANotaDataParaPDF(notaData as any);
+      const response = await fetch(apiUrl('/factura/generar-pdf'), {
+        method: 'POST',
+        headers: getHeadersWithUsuario(),
+        body: JSON.stringify({ facturaData, logoConfig: logoConfigFinal })
+      });
+      if (!response.ok) throw new Error('Error al generar PDF en el servidor');
+      const pdfBlob = await response.blob();
+      const url = window.URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (e: any) {
+      setMensaje({ tipo: 'error', texto: e?.message || 'Error al generar vista previa' });
+    }
+  };
+
   const handleDescargarPDF = async () => {
     setMensaje(null);
     const prepared = await prepararNotaCredito();
@@ -723,7 +753,7 @@ ${tieneImpuestos ? `  <cfdi:Impuestos TotalImpuestosTrasladados="${notaData.iva.
       const facturaData = convertirANotaDataParaPDF(notaData as any);
       const response = await fetch(apiUrl('/factura/generar-pdf'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeadersWithUsuario(),
         body: JSON.stringify({ facturaData, logoConfig: logoConfigFinal })
       });
       if (!response.ok) throw new Error('Error al generar PDF en el servidor');
@@ -803,6 +833,9 @@ ${tieneImpuestos ? `  <cfdi:Impuestos TotalImpuestosTrasladados="${notaData.iva.
       </Card>
 
       <div className="flex justify-end mt-4">
+        <Button type="button" variant="secondary" onClick={handleVistaPrevia} disabled={generando || enviandoCorreo}>
+          Vista Previa
+        </Button>
         <Button type="button" variant="secondary" onClick={handleGuardarFactura} disabled={generando || enviandoCorreo}>
           Guardar factura
         </Button>

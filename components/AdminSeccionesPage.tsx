@@ -132,7 +132,7 @@ export const AdminSeccionesPage: React.FC = () => {
               <SelectField
                 label="Filtrar por origen:"
                 value={filtroOrigen}
-                onChange={(e) => {
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                   setFiltroOrigen(e.target.value);
                   setCurrentPage(1);
                 }}

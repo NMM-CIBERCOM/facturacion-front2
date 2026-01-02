@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card } from './Card';
 import { FormField } from './FormField';
 import { SelectField } from './SelectField';
@@ -6,20 +6,26 @@ import { CheckboxField } from './CheckboxField';
 import { Button } from './Button';
 import { ArrowDownTrayIcon } from './icons/ArrowDownTrayIcon';
 import { EnviarCorreoModal } from './EnviarCorreoModal';
+import { RfcAutocomplete } from './RfcAutocomplete';
+import { AltaClienteModal, ClienteFormData } from './AltaClienteModal';
+import { SeleccionarProductoServicioModal } from './SeleccionarProductoServicioModal';
 import { useEmpresa } from '../context/EmpresaContext';
 import { correoService } from '../services/correoService';
-import { configuracionCorreoService } from '../services/configuracionCorreoService';
+// import { configuracionCorreoService } from '../services/configuracionCorreoService'; // No utilizado
 import { facturaService } from '../services/facturaService';
 import { ticketService, Ticket, TicketSearchFilters } from '../services/ticketService';
+import { ClienteDatos } from '../services/clienteCatalogoService';
+import { codigoPostalService } from '../services/codigoPostalService';
 import {
   PAIS_OPTIONS,
   REGIMEN_FISCAL_OPTIONS,
   USO_CFDI_OPTIONS,
   TIENDA_OPTIONS,
   MEDIO_PAGO_OPTIONS,
-  FORMA_PAGO_OPTIONS
+  FORMA_PAGO_OPTIONS,
+  MOTIVO_SUSTITUCION_OPTIONS
 } from '../constants';
-import { pacUrl } from '../services/api';
+import { apiUrl, pacUrl, getHeadersWithUsuario } from '../services/api';
 
 interface FormData {
   rfc: string;
@@ -29,6 +35,13 @@ interface FormData {
   paterno: string;
   materno: string;
   pais: string;
+  codigoPostal: string;
+  estado: string;
+  municipio: string;
+  colonia: string;
+  calle: string;
+  numeroExterior: string;
+  numeroInterior: string;
   noRegistroIdentidadTributaria: string;
   domicilioFiscal: string;
   regimenFiscal: string;
@@ -41,7 +54,12 @@ interface FormData {
   medioPago: string;
   formaPago: string;
   iepsDesglosado: boolean;
+  declaraIeps: boolean;
+  telefono: string;
   uuid: string;
+  modoDetalle: 'automatico' | 'manual';
+  uuidCfdiRelacionado: string;
+  tipoRelacion: string;
 }
 
 interface Factura {
@@ -72,6 +90,13 @@ const initialFormData: FormData = {
   paterno: '',
   materno: '',
   pais: PAIS_OPTIONS[0].value,
+  codigoPostal: '',
+  estado: '',
+  municipio: '',
+  colonia: '',
+  calle: '',
+  numeroExterior: '',
+  numeroInterior: '',
   noRegistroIdentidadTributaria: '',
   domicilioFiscal: '',
   regimenFiscal: REGIMEN_FISCAL_OPTIONS[0].value,
@@ -84,7 +109,12 @@ const initialFormData: FormData = {
   medioPago: MEDIO_PAGO_OPTIONS[0].value,
   formaPago: FORMA_PAGO_OPTIONS[0].value,
   iepsDesglosado: false,
+  declaraIeps: false,
+  telefono: '',
   uuid: '',
+  modoDetalle: 'manual',
+  uuidCfdiRelacionado: '',
+  tipoRelacion: '',
 };
 
 export const InvoiceForm: React.FC = () => {
@@ -115,6 +145,22 @@ export const InvoiceForm: React.FC = () => {
   const { empresaInfo } = useEmpresa();
   const [tipoPersona, setTipoPersona] = useState<'fisica' | 'moral' | null>(null);
   const tipoPersonaAnteriorRef = useRef<'fisica' | 'moral' | null>(null);
+  const [mostrarAltaCliente, setMostrarAltaCliente] = useState(false);
+  const [colonias, setColonias] = useState<string[]>([]);
+  const [cargandoCP, setCargandoCP] = useState(false);
+  const [mostrarModalProductos, setMostrarModalProductos] = useState(false);
+  const [productosAgregados, setProductosAgregados] = useState<Array<{
+    id: number;
+    claveProdServ: string;
+    cantidad: number;
+    unidad: string;
+    claveUnidad?: string;
+    descripcion: string;
+    objetoImpuesto: string;
+    valorUnitario: number;
+    importe: number;
+    tasaIVA: number;
+  }>>([]);
 
   // Funciones para determinar el tipo de persona según el RFC
   const esPersonaMoral = (rfc: string): boolean => {
@@ -160,21 +206,266 @@ export const InvoiceForm: React.FC = () => {
     }
   }, [formData.rfc]);
 
-  // Función para formatear fechas con milisegundos
+  // Función auxiliar para parsear el domicilio fiscal
+  // Formato esperado: "Calle NumExt Int. NumInt, Colonia, Municipio, Estado, C.P. 12345, País"
+  const parsearDomicilioFiscal = (domicilioFiscal: string | undefined) => {
+    if (!domicilioFiscal) {
+      return { codigoPostal: '', calle: '', numeroExterior: '', numeroInterior: '', colonia: '', municipio: '', estado: '' };
+    }
+    
+    const resultado: any = {
+      codigoPostal: '',
+      calle: '',
+      numeroExterior: '',
+      numeroInterior: '',
+      colonia: '',
+      municipio: '',
+      estado: '',
+    };
+
+    // Extraer código postal (formato: "C.P. 12345" o "CP 12345")
+    const cpMatch = domicilioFiscal.match(/(?:C\.?P\.?\s*)?(\d{5})(?:\s|$|,)/i);
+    if (cpMatch) {
+      resultado.codigoPostal = cpMatch[1];
+    }
+
+    // Dividir por comas para extraer partes
+    const partes = domicilioFiscal.split(',').map(p => p.trim());
+    
+    if (partes.length > 0) {
+      // La primera parte generalmente contiene: Calle NumExt Int. NumInt
+      const primeraParte = partes[0];
+      // Intentar extraer número exterior e interior
+      const numExtMatch = primeraParte.match(/(\d+[A-Za-z]?|MZ\s*\d+|LT\s*\d+|EDIF\s*\w+)/i);
+      if (numExtMatch) {
+        resultado.numeroExterior = numExtMatch[1];
+        const antesNumExt = primeraParte.substring(0, numExtMatch.index).trim();
+        resultado.calle = antesNumExt;
+      } else {
+        resultado.calle = primeraParte;
+      }
+      
+      // Buscar "Int." para número interior
+      const numIntMatch = primeraParte.match(/Int\.\s*(\S+)/i);
+      if (numIntMatch) {
+        resultado.numeroInterior = numIntMatch[1];
+      }
+    }
+
+    // Buscar colonia, municipio, estado antes del código postal
+    let encontradoCP = false;
+    for (let i = 1; i < partes.length && !encontradoCP; i++) {
+      const parte = partes[i];
+      if (parte.match(/C\.?P\.?\s*\d{5}/i)) {
+        encontradoCP = true;
+        // La parte anterior al CP puede ser el estado
+        if (i > 1) {
+          resultado.estado = partes[i - 1];
+        }
+        // La parte anterior al estado puede ser el municipio
+        if (i > 2) {
+          resultado.municipio = partes[i - 2];
+        }
+        // La parte anterior al municipio puede ser la colonia
+        if (i > 3) {
+          resultado.colonia = partes[i - 3];
+        }
+        break;
+      }
+    }
+
+    // Si no encontramos el CP pero hay partes, asignar las últimas partes como estado/municipio/colonia
+    if (!encontradoCP && partes.length >= 3) {
+      resultado.colonia = partes[partes.length - 3] || '';
+      resultado.municipio = partes[partes.length - 2] || '';
+      resultado.estado = partes[partes.length - 1] || '';
+    }
+
+    return resultado;
+  };
+
+  // Manejar selección de cliente desde autocompletado
+  const handleClienteSelect = async (cliente: ClienteDatos) => {
+    // Parsear domicilio fiscal para extraer campos individuales
+    const domicilioParseado = parsearDomicilioFiscal(cliente.domicilioFiscal);
+    
+    setFormData(prev => ({
+      ...prev,
+      rfc: cliente.rfc,
+      razonSocial: cliente.razonSocial || prev.razonSocial,
+      nombre: cliente.nombre || prev.nombre,
+      paterno: cliente.paterno || prev.paterno,
+      materno: cliente.materno || prev.materno,
+      correoElectronico: cliente.correoElectronico || prev.correoElectronico,
+      pais: cliente.pais || prev.pais,
+      domicilioFiscal: cliente.domicilioFiscal || prev.domicilioFiscal,
+      regimenFiscal: cliente.regimenFiscal || prev.regimenFiscal,
+      usoCfdi: cliente.usoCfdi || prev.usoCfdi,
+      // Campos de dirección parseados
+      codigoPostal: domicilioParseado.codigoPostal || prev.codigoPostal,
+      calle: domicilioParseado.calle || prev.calle,
+      numeroExterior: domicilioParseado.numeroExterior || prev.numeroExterior,
+      numeroInterior: domicilioParseado.numeroInterior || prev.numeroInterior,
+      colonia: domicilioParseado.colonia || prev.colonia,
+      municipio: domicilioParseado.municipio || prev.municipio,
+      estado: domicilioParseado.estado || prev.estado,
+    }));
+
+    // Si se pudo parsear un código postal, cargar los datos del CP
+    if (domicilioParseado.codigoPostal && domicilioParseado.codigoPostal.length === 5) {
+      await cargarDatosCP(domicilioParseado.codigoPostal);
+      // Si el estado/municipio no se parsearon bien, usar los datos del CP
+      if (!domicilioParseado.estado || !domicilioParseado.municipio) {
+        const datosCP = await codigoPostalService.obtenerDatosCP(domicilioParseado.codigoPostal);
+        if (datosCP) {
+          setFormData(prev => ({
+            ...prev,
+            estado: prev.estado || datosCP.estado,
+            municipio: prev.municipio || datosCP.municipio,
+            colonia: prev.colonia || datosCP.colonias[0] || '',
+          }));
+          setColonias(datosCP.colonias || []);
+        }
+      }
+    }
+  };
+
+  // Manejar cuando no se encuentra el RFC
+  const handleRfcNotFound = () => {
+    setMostrarAltaCliente(true);
+  };
+
+  // Guardar cliente desde modal de alta
+  const handleGuardarCliente = async (clienteData: ClienteFormData) => {
+    try {
+      // Construir objeto cliente para el backend
+      const clientePayload: any = {
+        rfc: clienteData.rfc,
+        razon_social: clienteData.razonSocial,
+        nombre: clienteData.nombre,
+        paterno: clienteData.apellidoPaterno,
+        materno: clienteData.apellidoMaterno,
+        correo_electronico: clienteData.correoElectronico,
+        telefono: clienteData.telefono,
+        codigo_postal: clienteData.codigoPostal,
+        estado: clienteData.estado,
+        municipio: clienteData.municipio,
+        colonia: clienteData.colonia,
+        calle: clienteData.calle,
+        numero_exterior: clienteData.numeroExterior,
+        numero_interior: clienteData.numeroInterior,
+        pais: clienteData.pais,
+        regimen_fiscal: clienteData.regimenFiscal,
+        uso_cfdi: clienteData.usoCfdi,
+        registro_tributario: clienteData.esExtranjero ? 'EXT' : null,
+      };
+
+      // Guardar cliente en el backend usando el endpoint POST /catalogo-clientes
+      const response = await fetch(apiUrl('/catalogo-clientes'), {
+        method: 'POST',
+        headers: getHeadersWithUsuario(),
+        body: JSON.stringify(clientePayload),
+      });
+
+      const responseData = await response.json();
+      
+      if (!response.ok || responseData.error) {
+        throw new Error(responseData.error || 'Error al guardar cliente');
+      }
+
+      // Actualizar formulario con los datos del cliente
+      setFormData(prev => ({
+        ...prev,
+        rfc: clienteData.rfc,
+        razonSocial: clienteData.razonSocial,
+        nombre: clienteData.nombre || prev.nombre,
+        paterno: clienteData.apellidoPaterno || prev.paterno,
+        materno: clienteData.apellidoMaterno || prev.materno,
+        correoElectronico: clienteData.correoElectronico,
+        telefono: clienteData.telefono || prev.telefono,
+        codigoPostal: clienteData.codigoPostal,
+        estado: clienteData.estado,
+        municipio: clienteData.municipio,
+        colonia: clienteData.colonia,
+        calle: clienteData.calle,
+        numeroExterior: clienteData.numeroExterior,
+        numeroInterior: clienteData.numeroInterior,
+        pais: clienteData.pais,
+        regimenFiscal: clienteData.regimenFiscal,
+        usoCfdi: clienteData.usoCfdi,
+        declaraIeps: clienteData.declaraIeps,
+      }));
+
+      setMostrarAltaCliente(false);
+    } catch (error) {
+      console.error('Error al guardar cliente:', error);
+      throw error;
+    }
+  };
+
+  // Cargar datos de código postal
+  const cargarDatosCP = async (cp: string) => {
+    if (!cp || cp.length !== 5) {
+      setColonias([]);
+      setFormData(prev => ({ ...prev, estado: '', municipio: '', colonia: '' }));
+      return;
+    }
+
+    setCargandoCP(true);
+    try {
+      console.log('Buscando datos para código postal:', cp);
+      const data = await codigoPostalService.obtenerDatosCP(cp);
+      console.log('Datos recibidos del servicio:', data);
+      
+      if (data) {
+        setFormData(prev => {
+          const nuevoEstado = {
+            ...prev,
+            estado: data.estado || prev.estado || '',
+            municipio: data.municipio || prev.municipio || '',
+            colonia: prev.colonia || '', // Mantener colonia si ya estaba seleccionada
+          };
+          console.log('Actualizando formulario con:', { estado: nuevoEstado.estado, municipio: nuevoEstado.municipio });
+          return nuevoEstado;
+        });
+        setColonias(data.colonias || []);
+        console.log('Colonias cargadas:', data.colonias?.length || 0);
+      } else {
+        console.warn('No se recibieron datos del código postal');
+        setColonias([]);
+        setFormData(prev => ({ ...prev, estado: '', municipio: '', colonia: '' }));
+      }
+    } catch (error) {
+      console.error('Error al cargar código postal:', error);
+      setColonias([]);
+      setFormData(prev => ({ ...prev, estado: '', municipio: '', colonia: '' }));
+    } finally {
+      setCargandoCP(false);
+    }
+  };
+
+  // Manejar cambio de código postal
+  const handleCodigoPostalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const cp = e.target.value.replace(/\D/g, '').slice(0, 5);
+    setFormData(prev => ({ ...prev, codigoPostal: cp }));
+    
+    if (cp.length === 5) {
+      cargarDatosCP(cp);
+    } else {
+      setColonias([]);
+      setFormData(prev => ({ ...prev, estado: '', municipio: '', colonia: '' }));
+    }
+  };
+
   const formatearFechaConMilisegundos = (fecha: string | null): string => {
     if (!fecha) return 'N/A';
     try {
-      console.log('🔍 Formateando fecha:', fecha, 'tipo:', typeof fecha);
       const date = new Date(fecha);
-      console.log('🔍 Fecha parseada:', date);
       
-      // Verificar si la fecha es válida
       if (isNaN(date.getTime())) {
-        console.error('❌ Fecha inválida:', fecha);
         return 'N/A';
       }
       
-      // Extraer milisegundos directamente del string si está disponible
       let milisegundos = '000';
       if (fecha.includes('.')) {
         const milisegundosPart = fecha.split('.')[1];
@@ -194,40 +485,22 @@ export const InvoiceForm: React.FC = () => {
         second: '2-digit'
       });
       
-      const resultado = `${fechaFormateada}.${milisegundos}`;
-      console.log('✅ Fecha formateada:', resultado);
-      return resultado;
+      return `${fechaFormateada}.${milisegundos}`;
     } catch (error) {
-      console.error('❌ Error al formatear fecha:', error, 'fecha original:', fecha);
+      console.error('Error al formatear fecha:', error);
       return 'N/A';
     }
   };
 
   const cargarFacturas = useCallback(async () => {
-    console.log('📥 Iniciando carga de facturas...');
     setCargandoFacturas(true);
     try {
-      // Consulta todas las facturas usando el endpoint GET
-      const response = await fetch(`http://localhost:8080/api/factura/consultar-por-empresa`);
+      const response = await fetch(apiUrl('/factura/consultar-por-empresa'));
       const data = await response.json();
 
       if (data.exitoso && data.facturas) {
-        console.log(`📊 Facturas recibidas del servidor: ${data.facturas.length}`);
-        console.log('🔍 Primera factura recibida:', data.facturas[0]);
-        console.log('🔍 Tipos de fechas:', {
-          fechaFactura: typeof data.facturas[0]?.fechaFactura,
-          fechaGeneracion: typeof data.facturas[0]?.fechaGeneracion,
-          fechaTimbrado: typeof data.facturas[0]?.fechaTimbrado
-        });
-        console.log('🔍 Valores de fechas:', {
-          fechaFactura: data.facturas[0]?.fechaFactura,
-          fechaGeneracion: data.facturas[0]?.fechaGeneracion,
-          fechaTimbrado: data.facturas[0]?.fechaTimbrado
-        });
-        
         const facturasFormateadas = data.facturas.map((factura: any) => ({
           ...factura,
-          // Mapear campos del backend nuevo a los usados en UI
           fechaFactura: formatearFechaConMilisegundos(
             factura.fechaFactura || factura.fechaGeneracion || factura.fechaTimbrado || factura.fechaEmision
           ),
@@ -242,29 +515,20 @@ export const InvoiceForm: React.FC = () => {
           estado: factura.estado || factura.estatusFacturacion || 'DESCONOCIDO',
           rfc: factura.rfc || factura.rfcReceptor || factura.rfcEmisor || '',
           razonSocial: factura.razonSocial || factura.nombreCliente || '',
-          // Mantener fechas originales para ordenamiento
           fechaOriginal: factura.fechaFactura || factura.fechaGeneracion || factura.fechaTimbrado || factura.fechaEmision
         }));
         
-        // Verificar duplicaciones por UUID
         const uuids = facturasFormateadas.map((f: any) => f.uuid);
         const uuidsUnicos = [...new Set(uuids)];
-        console.log(`✅ Facturas formateadas: ${facturasFormateadas.length}`);
-        console.log(`🔍 UUIDs únicos: ${uuidsUnicos.length}`);
-        console.log(`⚠️ Duplicaciones detectadas: ${facturasFormateadas.length - uuidsUnicos.length}`);
         
         let facturasFinales = facturasFormateadas;
         
         if (uuids.length !== uuidsUnicos.length) {
-          console.warn('🚨 DUPLICACIONES DETECTADAS - Eliminando duplicados');
-          // Eliminar duplicados manteniendo solo la primera ocurrencia
           facturasFinales = facturasFormateadas.filter((factura: any, index: number, self: any[]) => 
             index === self.findIndex((f: any) => f.uuid === factura.uuid)
           );
-          console.log(`✅ Facturas sin duplicados: ${facturasFinales.length}`);
         }
         
-        // Ordenar facturas de la más reciente a la más antigua
         facturasFinales.sort((a: any, b: any) => {
           const fechaA = a.fechaOriginal;
           const fechaB = b.fechaOriginal;
@@ -276,20 +540,18 @@ export const InvoiceForm: React.FC = () => {
           const dateA = new Date(fechaA);
           const dateB = new Date(fechaB);
           
-          return dateB.getTime() - dateA.getTime(); // Orden descendente (más reciente primero)
+          return dateB.getTime() - dateA.getTime();
         });
         
-        console.log(`📅 Facturas ordenadas de más reciente a más antigua`);
         setFacturas(facturasFinales);
-        
         setMostrarTabla(true);
-        setPaginaActual(1); // Resetear a la primera página
+        setPaginaActual(1);
       } else {
-        console.error('❌ Error al cargar facturas:', data.error);
+        console.error('Error al cargar facturas:', data.error);
         setFacturas([]);
       }
     } catch (error) {
-      console.error('❌ Error al cargar facturas:', error);
+      console.error('Error al cargar facturas:', error);
       setFacturas([]);
     } finally {
       setCargandoFacturas(false);
@@ -297,10 +559,6 @@ export const InvoiceForm: React.FC = () => {
   }, []);
 
   // Cargar facturas sólo bajo demanda desde el botón; evitar carga automática al montar
-  // useEffect(() => {
-  //   console.log('🔄 useEffect ejecutado - cargando facturas');
-  //   cargarFacturas();
-  // }, [cargarFacturas]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -312,9 +570,30 @@ export const InvoiceForm: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validar que en modo manual haya productos agregados
+    if (formData.modoDetalle === 'manual' && productosAgregados.length === 0) {
+      alert('Por favor agregue al menos un producto o servicio antes de generar la factura.');
+      return;
+    }
+    
     try {
+      // Construir domicilio fiscal a partir de los campos de dirección
+      const partesDomicilio = [
+        formData.calle,
+        formData.numeroExterior,
+        formData.numeroInterior,
+        formData.colonia,
+        formData.municipio,
+        formData.estado,
+        formData.codigoPostal,
+        formData.pais,
+      ].filter(Boolean);
+      const domicilioFiscal = partesDomicilio.join(', ') || formData.domicilioFiscal;
+
       // Transformar los datos del frontend al formato que espera el backend (FacturaFrontendRequest)
-      const facturaRequest = {
+      // Solo incluir campos que existen en el DTO del backend
+      const facturaRequest: any = {
         rfc: formData.rfc,
         correoElectronico: formData.correoElectronico,
         razonSocial: formData.razonSocial,
@@ -323,7 +602,7 @@ export const InvoiceForm: React.FC = () => {
         materno: formData.materno,
         pais: formData.pais,
         noRegistroIdentidadTributaria: formData.noRegistroIdentidadTributaria,
-        domicilioFiscal: formData.domicilioFiscal,
+        domicilioFiscal: domicilioFiscal,
         regimenFiscal: formData.regimenFiscal,
         usoCfdi: formData.usoCfdi,
         codigoFacturacion: formData.codigoFacturacion,
@@ -334,14 +613,33 @@ export const InvoiceForm: React.FC = () => {
         medioPago: formData.medioPago,
         formaPago: formData.formaPago,
         iepsDesglosado: formData.iepsDesglosado,
-        guardarEnMongo: true,
+        guardarEnMongo: false, // Desactivado porque el servidor usa Oracle, no MongoDB
+        uuidCfdiRelacionado: formData.uuidCfdiRelacionado || null,
+        tipoRelacion: formData.tipoRelacion || null,
+        // Campos eliminados porque no existen en FacturaFrontendRequest:
+        // codigoPostal, estado, municipio, colonia, calle, numeroExterior, numeroInterior
+        // declaraIeps, telefono, modoDetalle
       };
 
-      console.log('📤 Enviando datos al backend (frontend):', facturaRequest);
+      // Si es modo manual, agregar los conceptos del catálogo
+      if (formData.modoDetalle === 'manual' && productosAgregados.length > 0) {
+        facturaRequest.conceptos = productosAgregados.map(producto => ({
+          descripcion: producto.descripcion,
+          cantidad: producto.cantidad,
+          unidad: producto.unidad,
+          precioUnitario: producto.valorUnitario,
+          importe: producto.importe,
+          claveProdServ: producto.claveProdServ,
+          claveUnidad: producto.claveUnidad || producto.unidad, // Usar claveUnidad del catálogo si existe
+          objetoImp: producto.objetoImpuesto || '02', // El DTO usa objetoImp, no objetoImpuesto
+          tasaIva: producto.tasaIVA / 100, // Convertir porcentaje a decimal (ej: 16 -> 0.16)
+        }));
+      }
 
-      const response = await fetch('http://localhost:8080/api/factura/generar/frontend', {
+
+      const response = await fetch(apiUrl('/factura/generar/frontend'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeadersWithUsuario(),
         body: JSON.stringify(facturaRequest),
       });
 
@@ -351,12 +649,11 @@ export const InvoiceForm: React.FC = () => {
       }
       
       const data = await response.json();
-      console.log('📥 Respuesta del servidor:', data);
       
       const uuid = data.uuid || data.datos?.folioFiscal || data.datosFactura?.uuid;
 
       if (data.exitoso) {
-        alert(`✅ ${data.mensaje}\nUUID: ${uuid}\nFactura guardada en base de datos`);
+        alert(`${data.mensaje}\nUUID: ${uuid}\nFactura guardada en base de datos`);
         // Persistir el UUID en el formulario para acciones rápidas
         setFormData(prev => ({ ...prev, uuid: uuid || prev.uuid }));
         if (uuid) {
@@ -372,14 +669,12 @@ export const InvoiceForm: React.FC = () => {
           }
         }
         
-        // Recargar facturas después de guardar una nueva
-        console.log('🔄 Recargando facturas después de guardar nueva factura');
         cargarFacturas();
       } else {
-        alert(`❌ ${data.mensaje}\nErrores: ${data.errores || data.error}`);
+        alert(`${data.mensaje}\nErrores: ${data.errores || data.error}`);
       }
     } catch (error) {
-      console.error('❌ Error en el envío:', error);
+      console.error('Error en el envío:', error);
       alert(`Hubo un error al enviar el formulario: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     }
   };
@@ -439,25 +734,53 @@ export const InvoiceForm: React.FC = () => {
     alert('Formulario reiniciado');
   };
 
-  const handleAgregarBoleta = () => {
-    alert(`Boleta agregada: Código ${formData.codigoFacturacion}, Tienda ${formData.tienda}, Fecha ${formData.fecha}`);
-  };
+  // Función no utilizada - comentada para evitar error de TypeScript
+  // const handleAgregarBoleta = () => {
+  //   alert(`Boleta agregada: Código ${formData.codigoFacturacion}, Tienda ${formData.tienda}, Fecha ${formData.fecha}`);
+  // };
 
   const handleBuscarTicket = async () => {
     try {
       setCargandoTickets(true);
+      
+      // En modo automático, buscar solo por folio usando el campo codigoFacturacion
+      const codigoIngresado = formData.codigoFacturacion?.trim();
+      
+      if (!codigoIngresado) {
+        alert('Por favor ingrese un folio para buscar.');
+        return;
+      }
+      
+      const folioNumerico = Number(codigoIngresado);
+      
+      if (isNaN(folioNumerico) || folioNumerico <= 0) {
+        alert('El folio debe ser un número válido.');
+        return;
+      }
+      
+      console.log('Buscando ticket con folio:', folioNumerico);
+      
+      // En modo automático, buscar SOLO por folio sin otros filtros
       const filtros: TicketSearchFilters = {
-        codigoTienda: formData.tienda,
-        terminalId: formData.terminal ? Number(formData.terminal) : undefined,
-        fecha: formData.fecha,
-        folio: formData.boleta ? Number(formData.boleta) : undefined,
+        // codigoTienda: formData.tienda || undefined, // Comentado: no usar filtro de tienda
+        // terminalId: formData.terminal ? Number(formData.terminal) : undefined, // Comentado: no usar filtro de terminal
+        // fecha: formData.fecha || undefined, // Comentado: no usar filtro de fecha
+        folio: folioNumerico,
       };
+      
+      console.log('Filtros enviados al backend:', filtros);
+      
       const resultados = await ticketService.buscarTickets(filtros);
+      
+      console.log('Resultados recibidos:', resultados);
+      
       setTickets(resultados);
       // Mostrar tabla solo si hay múltiples resultados
       setMostrarTabla(resultados && resultados.length > 1);
+      
       if (!resultados || resultados.length === 0) {
-        alert('No se encontraron tickets con los filtros proporcionados.');
+        alert(`No se encontraron tickets con el folio ${folioNumerico}. Verifica que el folio exista en la base de datos.`);
+        setTicketSeleccionado(null);
       } else {
         if (resultados.length === 1) {
           setTicketSeleccionado(resultados[0]);
@@ -467,8 +790,9 @@ export const InvoiceForm: React.FC = () => {
         }
       }
     } catch (error) {
-      console.error('❌ Error al consultar tickets:', error);
-      alert('Error al consultar tickets. Revisa la consola para más detalles.');
+      console.error('Error al consultar tickets:', error);
+      const mensajeError = error instanceof Error ? error.message : 'Error desconocido';
+      alert(`Error al consultar tickets: ${mensajeError}. Revisa la consola para más detalles.`);
     } finally {
       setCargandoTickets(false);
     }
@@ -510,11 +834,11 @@ export const InvoiceForm: React.FC = () => {
     }
   };
 
-  const descargarXml = async (uuid: string, codigoFacturacion: string) => {
+  const descargarXml = async (uuid: string, _codigoFacturacion: string) => {
     try {
       await facturaService.generarYDescargarXML(uuid);
     } catch (error) {
-      console.error('❌ Error al descargar XML:', error);
+      console.error('Error al descargar XML:', error);
       alert('Error al descargar el XML. Intenta nuevamente.');
     }
   };
@@ -523,7 +847,7 @@ export const InvoiceForm: React.FC = () => {
     try {
       await facturaService.generarYDescargarPDF(uuid);
     } catch (error) {
-      console.error('❌ Error al descargar PDF:', error);
+      console.error('Error al descargar PDF:', error);
       alert(`Error al descargar PDF: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     }
   };
@@ -555,12 +879,12 @@ export const InvoiceForm: React.FC = () => {
         mensaje,
       });
       if (resp.success) {
-        alert(`✅ Correo enviado exitosamente a: ${correo}`);
+        alert(`Correo enviado exitosamente a: ${correo}`);
       } else {
-        alert(`⚠️ Error al enviar correo: ${resp.message || 'Desconocido'}`);
+        alert(`Error al enviar correo: ${resp.message || 'Desconocido'}`);
       }
     } catch (error) {
-      console.error('❌ Error al enviar correo:', error);
+      console.error('Error al enviar correo:', error);
       alert(`Error al enviar correo: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     }
   };
@@ -593,6 +917,92 @@ export const InvoiceForm: React.FC = () => {
     await enviarCorreoDirectoConUuid(uuidActivo);
   };
 
+  const handleVistaPrevia = async () => {
+    try {
+      // Validar campos básicos
+      if (!formData.rfc || !formData.rfc.trim()) {
+        alert('Por favor ingrese el RFC del receptor.');
+        return;
+      }
+
+      // Construir domicilio fiscal a partir de los campos de dirección
+      const partesDomicilio = [
+        formData.calle,
+        formData.numeroExterior,
+        formData.numeroInterior,
+        formData.colonia,
+        formData.municipio,
+        formData.estado,
+        formData.codigoPostal,
+        formData.pais,
+      ].filter(Boolean);
+      const domicilioFiscal = partesDomicilio.join(', ') || formData.domicilioFiscal;
+
+      // Construir request similar al que se envía al generar
+      const facturaRequest: any = {
+        rfc: formData.rfc,
+        correoElectronico: formData.correoElectronico,
+        razonSocial: formData.razonSocial,
+        nombre: formData.nombre,
+        paterno: formData.paterno,
+        materno: formData.materno,
+        pais: formData.pais,
+        noRegistroIdentidadTributaria: formData.noRegistroIdentidadTributaria,
+        domicilioFiscal: domicilioFiscal,
+        regimenFiscal: formData.regimenFiscal,
+        usoCfdi: formData.usoCfdi,
+        codigoFacturacion: formData.codigoFacturacion,
+        tienda: formData.tienda,
+        fecha: formData.fecha,
+        terminal: formData.terminal,
+        boleta: formData.boleta,
+        medioPago: formData.medioPago,
+        formaPago: formData.formaPago,
+        iepsDesglosado: formData.iepsDesglosado,
+      };
+
+      // Si es modo manual, agregar los conceptos del catálogo
+      if (formData.modoDetalle === 'manual' && productosAgregados.length > 0) {
+        facturaRequest.conceptos = productosAgregados.map(producto => ({
+          descripcion: producto.descripcion,
+          cantidad: producto.cantidad,
+          unidad: producto.unidad,
+          precioUnitario: producto.valorUnitario,
+          importe: producto.importe,
+          claveProdServ: producto.claveProdServ,
+          claveUnidad: producto.claveUnidad || producto.unidad,
+          objetoImp: producto.objetoImpuesto || '02',
+          tasaIva: producto.tasaIVA / 100, // Convertir porcentaje a decimal (ej: 16 -> 0.16)
+        }));
+      }
+
+      const response = await fetch(apiUrl('/factura/preview-pdf'), {
+        method: 'POST',
+        headers: getHeadersWithUsuario(),
+        body: JSON.stringify(facturaRequest),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Error HTTP ${response.status}: ${errorText}`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error al generar vista previa:', error);
+      alert(`Error al generar vista previa: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    }
+  };
+
   const enviarCorreoPorFactura = async (factura: Factura) => {
     const uuidActivo = (factura.uuid || '').trim();
     if (!uuidActivo) {
@@ -619,36 +1029,62 @@ export const InvoiceForm: React.FC = () => {
   const facturasPaginadas = facturas.slice(indiceInicio, indiceFin);
 
   console.log(`�� Paginación - Total facturas: ${facturas.length}, Página actual: ${paginaActual}, Elementos por página: ${elementosPorPagina}`);
-  console.log(`📄 Índices - Inicio: ${indiceInicio}, Fin: ${indiceFin}, Mostrando: ${facturasPaginadas.length}`);
-  console.log(`📄 UUIDs de facturas paginadas:`, facturasPaginadas.map(f => f.uuid));
-
   const cambiarPagina = (nuevaPagina: number) => {
-    console.log(`🔄 Cambiando de página ${paginaActual} a ${nuevaPagina}`);
     setPaginaActual(nuevaPagina);
   };
 
   const irAPrimeraPagina = () => {
-    console.log('🔄 Yendo a primera página');
     setPaginaActual(1);
   };
 
   const irAUltimaPagina = () => {
-    console.log(`🔄 Yendo a última página: ${totalPaginas}`);
     setPaginaActual(totalPaginas);
   };
 
   const irAPaginaAnterior = () => {
     if (paginaActual > 1) {
-      console.log(`🔄 Yendo a página anterior: ${paginaActual - 1}`);
       setPaginaActual(paginaActual - 1);
     }
   };
 
   const irAPaginaSiguiente = () => {
     if (paginaActual < totalPaginas) {
-      console.log(`🔄 Yendo a página siguiente: ${paginaActual + 1}`);
       setPaginaActual(paginaActual + 1);
     }
+  };
+
+  // Manejar selección de producto/servicio desde el modal
+  const handleSeleccionarProducto = (producto: {
+    id: number;
+    claveProdServ: string;
+    cantidad: number;
+    unidad: string;
+    descripcion: string;
+    objetoImpuesto: string;
+    valorUnitario: number;
+    importe: number;
+    tasaIVA: number;
+  }) => {
+    // Agregar el producto a la lista (permitir duplicados si el usuario lo desea)
+    setProductosAgregados(prev => [...prev, { ...producto }]);
+  };
+
+  // Eliminar producto de la lista
+  const handleEliminarProducto = (index: number) => {
+    setProductosAgregados(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Calcular totales
+  const calcularTotales = () => {
+    const subtotal = productosAgregados.reduce((sum, p) => sum + p.importe, 0);
+    const iva = productosAgregados.reduce((sum, p) => {
+      if (p.tasaIVA > 0) {
+        return sum + (p.importe * p.tasaIVA / 100);
+      }
+      return sum;
+    }, 0);
+    const total = subtotal + iva;
+    return { subtotal, iva, total };
   };
 
   return (
@@ -659,25 +1095,89 @@ export const InvoiceForm: React.FC = () => {
             Estado de timbrado: {timbradoStatus || 'Desconocido'}
           </div>
         )}
-        <Card title="Datos Fiscales">
+        <Card>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <FormField name="rfc" label="RFC *" value={formData.rfc} onChange={handleChange} required />
-            <FormField name="correoElectronico" label="Correo Electrónico *" type="email" value={formData.correoElectronico} onChange={handleChange} required />
+            <div className="md:col-span-2 lg:col-span-3">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                RFC *
+              </label>
+              <RfcAutocomplete
+                value={formData.rfc}
+                onChange={(rfc) => setFormData(prev => ({ ...prev, rfc }))}
+                onSelect={handleClienteSelect}
+                onNotFound={handleRfcNotFound}
+                required
+              />
+            </div>
+            
+            <div className="md:col-span-2 lg:col-span-3">
+              <CheckboxField
+                name="declaraIeps"
+                label="Declaro IEPS **"
+                checked={formData.declaraIeps}
+                onChange={handleChange}
+              />
+            </div>
+
             {(tipoPersona === 'moral' || tipoPersona === null) && (
               <FormField name="razonSocial" label="Razón Social *" value={formData.razonSocial} onChange={handleChange} required={tipoPersona === 'moral'} />
             )}
-            {(tipoPersona === 'fisica' || tipoPersona === null) && (
-              <>
-                <FormField name="nombre" label="Nombre" value={formData.nombre} onChange={handleChange} required={tipoPersona === 'fisica'} />
-                <FormField name="paterno" label="Paterno" value={formData.paterno} onChange={handleChange} required={tipoPersona === 'fisica'} />
-                <FormField name="materno" label="Materno" value={formData.materno} onChange={handleChange} />
-              </>
+            
+            <FormField
+              name="codigoPostal"
+              label="Código Postal *"
+              value={formData.codigoPostal}
+              onChange={handleCodigoPostalChange}
+              required
+              maxLength={5}
+            />
+            {cargandoCP && (
+              <div className="text-sm text-gray-500 flex items-center">Cargando datos...</div>
             )}
+            
             <SelectField name="pais" label="País" value={formData.pais} onChange={handleChange} options={PAIS_OPTIONS} />
-            <FormField name="noRegistroIdentidadTributaria" label="No. Registro Identidad Tributaria" value={formData.noRegistroIdentidadTributaria} onChange={handleChange} />
-            <FormField name="domicilioFiscal" label="Domicilio Fiscal *" value={formData.domicilioFiscal} onChange={handleChange} required />
+            <FormField name="estado" label="Estado" value={formData.estado} onChange={handleChange} />
+            <FormField name="municipio" label="Municipio/Delegación" value={formData.municipio} onChange={handleChange} />
+            <SelectField
+              name="colonia"
+              label="Colonia"
+              value={formData.colonia}
+              onChange={handleChange}
+              options={colonias.map(c => ({ value: c, label: c }))}
+              disabled={colonias.length === 0}
+            />
+            <FormField name="calle" label="Calle" value={formData.calle} onChange={handleChange} />
+            <FormField
+              name="numeroExterior"
+              label="Número exterior"
+              value={formData.numeroExterior}
+              onChange={handleChange}
+              placeholder="Ej: 123, MZ 5, LT 10"
+            />
+            <FormField
+              name="numeroInterior"
+              label="Número interior"
+              value={formData.numeroInterior}
+              onChange={handleChange}
+              placeholder="Ej: EDIF A, DEP 101"
+            />
+            
             <SelectField name="regimenFiscal" label="Régimen Fiscal *" value={formData.regimenFiscal} onChange={handleChange} options={REGIMEN_FISCAL_OPTIONS} required />
             <SelectField name="usoCfdi" label="Uso CFDI *" value={formData.usoCfdi} onChange={handleChange} options={USO_CFDI_OPTIONS} required />
+            
+            <div className="text-xs text-gray-500 dark:text-gray-400 md:col-span-2 lg:col-span-3">
+              Los campos marcados con: * son obligatorios, **Aplica sólo para vinos y licores.
+            </div>
+          </div>
+        </Card>
+
+        <Card title="Datos de Contacto">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <FormField name="nombre" label="Nombre" value={formData.nombre} onChange={handleChange} />
+            <FormField name="paterno" label="Apellido Paterno" value={formData.paterno} onChange={handleChange} />
+            <FormField name="materno" label="Apellido Materno" value={formData.materno} onChange={handleChange} />
+            <FormField name="correoElectronico" label="Correo Electrónico *" type="email" value={formData.correoElectronico} onChange={handleChange} required />
+            <FormField name="telefono" label="Teléfono para WhatsApp" value={formData.telefono} onChange={handleChange} />
           </div>
         </Card>
 
@@ -724,22 +1224,223 @@ export const InvoiceForm: React.FC = () => {
           </Card>
         )}
 
-        <Card title="Consultar Ticket">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 items-end">
-            <FormField name="codigoFacturacion" label="Código de Facturación" value={formData.codigoFacturacion} onChange={handleChange} />
-            <SelectField name="tienda" label="Tienda" value={formData.tienda} onChange={handleChange} options={TIENDA_OPTIONS} />
-            <FormField name="fecha" label="Fecha" type="date" value={formData.fecha} onChange={handleChange} />
-            <FormField name="terminal" label="Terminal" value={formData.terminal} onChange={handleChange} />
-            <FormField name="boleta" label="Ticket (Folio)" value={formData.boleta} onChange={handleChange} />
+        <Card title="Detalle de la Factura">
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Modo de Captura
+            </label>
+            <div className="flex gap-4">
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="modoDetalle"
+                  value="automatico"
+                  checked={formData.modoDetalle === 'automatico'}
+                  onChange={() => setFormData(prev => ({ ...prev, modoDetalle: 'automatico' }))}
+                  className="mr-2"
+                />
+                Automático
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="modoDetalle"
+                  value="manual"
+                  checked={formData.modoDetalle === 'manual'}
+                  onChange={() => setFormData(prev => ({ ...prev, modoDetalle: 'manual' }))}
+                  className="mr-2"
+                />
+                Manual
+              </label>
+            </div>
           </div>
-          <div className="mt-6 flex justify-end">
-            <Button type="button" onClick={handleBuscarTicket} variant="secondary" disabled={cargandoTickets}>
-              {cargandoTickets ? 'Buscando…' : 'Buscar Ticket'}
-            </Button>
-          </div>
+
+          {formData.modoDetalle === 'automatico' ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 sm:gap-4">
+                <FormField
+                  name="codigoFacturacion"
+                  label="Código de Facturación o Prefactura"
+                  value={formData.codigoFacturacion}
+                  onChange={handleChange}
+                  placeholder="Ingrese código de facturación o prefactura"
+                />
+                <div className="flex items-end">
+                  <Button
+                    type="button"
+                    onClick={handleBuscarTicket}
+                    variant="secondary"
+                    disabled={cargandoTickets}
+                    className="w-full sm:w-auto whitespace-nowrap"
+                  >
+                    {cargandoTickets ? 'Buscando…' : 'Buscar'}
+                  </Button>
+                </div>
+              </div>
+              {ticketSeleccionado && (
+                <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-md">
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    Ticket encontrado: Tienda {ticketSeleccionado.codigoTienda}, 
+                    Folio {ticketSeleccionado.folio}, 
+                    Total: ${ticketSeleccionado.total?.toFixed(2)}
+                  </p>
+                </div>
+              )}
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Los botones de agregar y eliminar están bloqueados en modo automático.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4">
+                <h4 className="text-md font-medium text-gray-900 dark:text-white">
+                  Productos y Servicios
+                </h4>
+                <Button
+                  type="button"
+                  onClick={() => setMostrarModalProductos(true)}
+                  variant="primary"
+                  className="text-sm w-full sm:w-auto whitespace-nowrap"
+                >
+                  + Agregar Producto/Servicio
+                </Button>
+              </div>
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                <p>Catálogo de artículos: nombre, descripción</p>
+                <p>Acceso al catálogo de Clave de Producto o Servicio (Ej: Catálogo del SAT)</p>
+              </div>
+              
+              {/* Tabla de productos agregados */}
+              {productosAgregados.length > 0 && (
+                <div className="border-t pt-4 mt-4">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                      <thead className="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Clave
+                          </th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Descripción
+                          </th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Unidad
+                          </th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Cantidad
+                          </th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Valor Unitario
+                          </th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            IVA
+                          </th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Importe
+                          </th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Acción
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        {productosAgregados.map((producto, index) => (
+                          <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                              {producto.claveProdServ}
+                            </td>
+                            <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200">
+                              {producto.descripcion}
+                            </td>
+                            <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">
+                              {producto.unidad}
+                            </td>
+                            <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">
+                              {producto.cantidad.toFixed(6)}
+                            </td>
+                            <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">
+                              {new Intl.NumberFormat('es-MX', {
+                                style: 'currency',
+                                currency: 'MXN'
+                              }).format(producto.valorUnitario)}
+                            </td>
+                            <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">
+                              {producto.tasaIVA > 0 ? `${producto.tasaIVA}%` : 'Exento'}
+                            </td>
+                            <td className="px-4 py-2 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-gray-100">
+                              {new Intl.NumberFormat('es-MX', {
+                                style: 'currency',
+                                currency: 'MXN'
+                              }).format(producto.importe)}
+                            </td>
+                            <td className="px-4 py-2 whitespace-nowrap text-sm">
+                              <Button
+                                type="button"
+                                onClick={() => handleEliminarProducto(index)}
+                                variant="secondary"
+                                className="text-xs px-2 py-1 bg-red-600 hover:bg-red-700 text-white"
+                              >
+                                Eliminar
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-gray-50 dark:bg-gray-700 font-semibold">
+                        <tr>
+                          <td colSpan={6} className="px-4 py-2 text-right text-sm text-gray-700 dark:text-gray-300">
+                            Subtotal:
+                          </td>
+                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                            {new Intl.NumberFormat('es-MX', {
+                              style: 'currency',
+                              currency: 'MXN'
+                            }).format(calcularTotales().subtotal)}
+                          </td>
+                          <td></td>
+                        </tr>
+                        <tr>
+                          <td colSpan={6} className="px-4 py-2 text-right text-sm text-gray-700 dark:text-gray-300">
+                            IVA:
+                          </td>
+                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                            {new Intl.NumberFormat('es-MX', {
+                              style: 'currency',
+                              currency: 'MXN'
+                            }).format(calcularTotales().iva)}
+                          </td>
+                          <td></td>
+                        </tr>
+                        <tr>
+                          <td colSpan={6} className="px-4 py-2 text-right text-sm text-gray-700 dark:text-gray-300">
+                            Total:
+                          </td>
+                          <td className="px-4 py-2 whitespace-nowrap text-sm text-lg text-gray-900 dark:text-gray-100">
+                            {new Intl.NumberFormat('es-MX', {
+                              style: 'currency',
+                              currency: 'MXN'
+                            }).format(calcularTotales().total)}
+                          </td>
+                          <td></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
+              
+              {productosAgregados.length === 0 && (
+                <div className="border-t pt-4 mt-4">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                    No hay productos agregados. Haz clic en "Agregar Producto/Servicio" para comenzar.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </Card>
 
-        {ticketSeleccionado && (
+        {formData.modoDetalle === 'automatico' && ticketSeleccionado && (
           <Card title="Información del Ticket">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
@@ -795,22 +1496,96 @@ export const InvoiceForm: React.FC = () => {
           </div>
         </Card>
 
-        <div className="flex justify-end space-x-4 mt-8">
-          <Button type="button" onClick={descargarXmlActual} variant="secondary">
-            Descargar XML
-          </Button>
-          <Button type="button" onClick={descargarPdfActual} variant="secondary">
-            Descargar PDF
-          </Button>
-          <Button type="button" onClick={enviarCorreoActual} variant="secondary">
-            Enviar por Correo
-          </Button>
-          <Button type="button" onClick={handleCancel} variant="neutral">
-            Cancelar
-          </Button>
-          <Button type="submit" variant="primary">
-            Guardar
-          </Button>
+        <Card title="Relación con CFDI (Sustitución)">
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Si esta factura sustituye a otra, captura el UUID del CFDI original y el tipo de relación.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormField
+                name="uuidCfdiRelacionado"
+                label="UUID del CFDI a sustituir"
+                value={formData.uuidCfdiRelacionado}
+                onChange={handleChange}
+                placeholder="Ej: A055BE36-AA6D-5F3C-99FE-6A8AD176AD16"
+              />
+              <SelectField
+                name="tipoRelacion"
+                label="Tipo de relación"
+                value={formData.tipoRelacion}
+                onChange={handleChange}
+                options={MOTIVO_SUSTITUCION_OPTIONS}
+              />
+            </div>
+            {formData.uuidCfdiRelacionado && !formData.tipoRelacion && (
+              <div className="p-3 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 rounded">
+                Si capturaste un UUID de CFDI relacionado, debes seleccionar el tipo de relación.
+              </div>
+            )}
+          </div>
+        </Card>
+
+        <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-4 mt-8">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 w-full sm:w-auto">
+            <Button 
+              type="button" 
+              onClick={handleCancel} 
+              variant="neutral"
+              className="w-full sm:w-auto"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={() => alert('Funcionalidad de Prefactura - pendiente implementar')}
+              variant="secondary"
+              className="w-full sm:w-auto whitespace-nowrap"
+            >
+              Prefactura
+            </Button>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 w-full sm:w-auto">
+            <Button 
+              type="button" 
+              onClick={descargarXmlActual} 
+              variant="secondary"
+              className="w-full sm:w-auto whitespace-nowrap"
+            >
+              Descargar XML
+            </Button>
+            <Button 
+              type="button" 
+              onClick={descargarPdfActual} 
+              variant="secondary"
+              className="w-full sm:w-auto whitespace-nowrap"
+            >
+              Descargar PDF
+            </Button>
+            <Button 
+              type="button" 
+              onClick={enviarCorreoActual} 
+              variant="secondary"
+              className="w-full sm:w-auto whitespace-nowrap"
+            >
+              Enviar por Correo
+            </Button>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 w-full sm:w-auto">
+            <Button 
+              type="button" 
+              onClick={handleVistaPrevia}
+              className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
+            >
+              Vista Previa
+            </Button>
+            <Button 
+              type="submit" 
+              variant="primary"
+              className="w-full sm:w-auto"
+            >
+              Generar
+            </Button>
+          </div>
         </div>
       </form>
 
@@ -1060,7 +1835,21 @@ export const InvoiceForm: React.FC = () => {
         correoInicial={modalCorreo.correoInicial}
         rfcReceptor={modalCorreo.rfcReceptor}
       />
-      {/* Modal eliminado: envío directo activo */}
+
+      {/* Modal de Alta de Cliente */}
+      <AltaClienteModal
+        isOpen={mostrarAltaCliente}
+        onClose={() => setMostrarAltaCliente(false)}
+        onSave={handleGuardarCliente}
+        rfcInicial={formData.rfc}
+      />
+
+      {/* Modal de Selección de Productos/Servicios */}
+      <SeleccionarProductoServicioModal
+        isOpen={mostrarModalProductos}
+        onClose={() => setMostrarModalProductos(false)}
+        onSelect={handleSeleccionarProducto}
+      />
     </div>
   );
 };

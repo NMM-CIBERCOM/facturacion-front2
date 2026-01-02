@@ -1,6 +1,7 @@
 import React from 'react';
-import ReactDatePicker from 'react-datepicker';
-import "react-datepicker/dist/react-datepicker.css";
+// import ReactDatePicker from 'react-datepicker';
+// import "react-datepicker/dist/react-datepicker.css";
+// Nota: react-datepicker no está instalado. Instalar con: npm install react-datepicker @types/react-datepicker
 
 interface DatePickerProps {
   selected: Date | null;
@@ -9,13 +10,16 @@ interface DatePickerProps {
 }
 
 export const DatePicker: React.FC<DatePickerProps> = ({ selected, onChange, className }) => {
+  // Implementación temporal hasta instalar react-datepicker
   return (
-    <ReactDatePicker
-      selected={selected}
-      onChange={onChange}
+    <input
+      type="datetime-local"
+      value={selected ? new Date(selected.getTime() - selected.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}
+      onChange={(e) => {
+        const date = e.target.value ? new Date(e.target.value) : null;
+        onChange(date);
+      }}
       className={`w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary ${className}`}
-      dateFormat="dd/MM/yyyy HH:mm"
-      showTimeInput
     />
   );
 };

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { FaGripVertical, FaSpinner, FaCog, FaTimes, FaEye, FaEyeSlash } from 'react-icons/fa';
 import { ThemeContext } from '../App';
 import { Card } from './Card';
+import { apiUrl } from '../services/api';
 
 // Mapeo de nombres de BD a nombres de UI para consistencia
 const mapeoPantallasUI: { [key: string]: string } = {
@@ -56,7 +57,7 @@ const ConfiguracionMenusPage: React.FC = () => {
     try {
       setIsLoading(true);
       setMensaje(null); // Limpiar mensajes previos
-      const response = await fetch('http://localhost:8080/api/menu-config/perfiles');
+      const response = await fetch(apiUrl('/menu-config/perfiles'));
       
       if (!response.ok) {
         let errorMessage = 'Error al cargar perfiles';
@@ -95,7 +96,7 @@ const ConfiguracionMenusPage: React.FC = () => {
     try {
       setIsLoading(true);
       // Cargar solo pestañas principales (MENU_PATH es NULL)
-      const responsePestañas = await fetch(`http://localhost:8080/api/menu-config/perfil/${idPerfil}`);
+      const responsePestañas = await fetch(apiUrl(`/menu-config/perfil/${idPerfil}`));
       if (!responsePestañas.ok) {
         let errorMessage = 'Error al cargar pestañas';
         try {
@@ -116,7 +117,7 @@ const ConfiguracionMenusPage: React.FC = () => {
       setConfiguraciones(pestañasPrincipales);
 
       // Cargar pantallas específicas (con MENU_PATH)
-      const responsePantallas = await fetch(`http://localhost:8080/api/menu-config/pantallas/${idPerfil}`);
+      const responsePantallas = await fetch(apiUrl(`/menu-config/pantallas/${idPerfil}`));
       if (!responsePantallas.ok) {
         let errorMessage = 'Error al cargar pantallas';
         try {
@@ -149,7 +150,7 @@ const ConfiguracionMenusPage: React.FC = () => {
       setIsSaving(true);
       setMensaje(null); // Limpiar mensajes previos
       
-      const response = await fetch(`http://localhost:8080/api/menu-config/visibilidad/${idConfig}`, {
+      const response = await fetch(apiUrl(`/menu-config/visibilidad/${idConfig}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -204,30 +205,19 @@ const ConfiguracionMenusPage: React.FC = () => {
   };
 
   const toggleVisibilidadPantalla = async (idConfig: number, isVisible: boolean) => {
-    // Prevenir múltiples clics mientras se está guardando
     if (isSaving) {
-      console.log('⏸️ Ya hay una operación en curso, ignorando clic');
       return;
     }
     
     try {
       setIsSaving(true);
-      setMensaje(null); // Limpiar mensajes previos
+      setMensaje(null);
       
-      // Log para debug - CRÍTICO para verificar el valor que se envía
-      console.log(`🔄 ACTUALIZANDO VISIBILIDAD - ID_CONFIG: ${idConfig}, isVisible: ${isVisible} (tipo: ${typeof isVisible})`);
-      console.log(`📤 Valor booleano que se enviará: ${isVisible}`);
-      console.log(`📤 Valor como string: ${String(isVisible)}`);
-      
-      // Asegurar que isVisible sea un booleano explícito
       const isVisibleBoolean = Boolean(isVisible);
-      console.log(`📤 Valor booleano explícito: ${isVisibleBoolean}`);
-      
       const requestBody = { isVisible: isVisibleBoolean };
       const requestBodyString = JSON.stringify(requestBody);
-      console.log(`📤 Request body completo: ${requestBodyString}`);
       
-      const response = await fetch(`http://localhost:8080/api/menu-config/pantalla-visibilidad/${idConfig}`, {
+      const response = await fetch(apiUrl(`/menu-config/pantalla-visibilidad/${idConfig}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -236,36 +226,28 @@ const ConfiguracionMenusPage: React.FC = () => {
         body: requestBodyString
       });
 
-      console.log(`📡 Respuesta HTTP - Status: ${response.status} ${response.statusText}`);
-
       if (!response.ok) {
         let errorMessage = 'Error al actualizar visibilidad de pantalla';
         try {
           const errorData = await response.json();
           errorMessage = errorData.message || errorData.error || errorMessage;
-          console.error('❌ Error del backend:', errorData);
+          console.error('Error del backend:', errorData);
         } catch {
           errorMessage = `Error ${response.status}: ${response.statusText}`;
-          console.error('❌ Error al parsear respuesta de error:', errorMessage);
+          console.error('Error al parsear respuesta de error:', errorMessage);
         }
         throw new Error(errorMessage);
       }
 
       const data = await response.json();
-      console.log('📥 Respuesta completa del backend:', JSON.stringify(data, null, 2));
       
       if (data.success) {
-        console.log(`✅ ÉXITO - ID_CONFIG: ${idConfig}, isVisible enviado: ${isVisibleBoolean}, isVisibleInt en BD: ${data.isVisibleInt}`);
-        
-        // Actualizar el estado local INMEDIATAMENTE
         setPantallasConfig(prev => {
           const updated = prev.map(config => 
             config.idConfig === idConfig 
               ? { ...config, isVisible: isVisibleBoolean } 
               : config
           );
-          const updatedItem = updated.find(c => c.idConfig === idConfig);
-          console.log('🔄 Estado local actualizado:', updatedItem);
           return updated;
         });
         
@@ -275,29 +257,26 @@ const ConfiguracionMenusPage: React.FC = () => {
         
         setMensaje({ tipo: 'success', texto: `Visibilidad actualizada: ${isVisibleBoolean ? 'Visible' : 'Oculto'}` });
         
-        // Limpiar mensaje de éxito después de 3 segundos
         setTimeout(() => {
           setMensaje(null);
         }, 3000);
         
-        // Recargar configuraciones en segundo plano (sin bloquear)
         if (perfilSeleccionado) {
           setTimeout(() => {
-            cargarConfiguraciones(perfilSeleccionado, false).catch(error => {
+            cargarConfiguraciones(perfilSeleccionado).catch(error => {
               console.error('Error al recargar configuraciones:', error);
             });
           }, 500);
         }
       } else {
-        console.error(`❌ FALLO - ID_CONFIG: ${idConfig}, mensaje: ${data.message}`);
+        console.error(`FALLO - ID_CONFIG: ${idConfig}, mensaje: ${data.message}`);
         setMensaje({ tipo: 'error', texto: data.message || 'Error al actualizar visibilidad de pantalla' });
       }
     } catch (error) {
-      console.error('❌ EXCEPCIÓN al actualizar visibilidad:', error);
+      console.error('EXCEPCIÓN al actualizar visibilidad:', error);
       const errorMessage = error instanceof Error ? error.message : 'Error al actualizar la visibilidad de la pantalla';
       setMensaje({ tipo: 'error', texto: errorMessage });
     } finally {
-      console.log('🔓 Finalizando - estableciendo isSaving en false');
       setIsSaving(false);
     }
   };
@@ -348,9 +327,9 @@ const ConfiguracionMenusPage: React.FC = () => {
   const getPantallasPorPestaña = (pestañaLabel: string) => {
     // Mapear nombres de pestañas a sus pantallas correspondientes
     const mapeoPestañas: { [key: string]: string[] } = {
-      'Facturación': ['Artículos', 'Intereses', 'Carta Factura', 'Global', 'Monederos', 'Captura Libre', 'Cancelación Masiva', 'Nóminas'],
-      'Consultas': ['Facturas', 'SKU', 'Boletas', 'Tickets'], // Incluir tanto 'Boletas' como 'Tickets' para compatibilidad
-      'Administración': ['Empleados', 'Tiendas', 'Períodos Perfil', 'Períodos Plataforma', 'Kioscos', 'Excepciones', 'Secciones'],
+      'Facturación': ['Artículos', 'Intereses', 'Carta Factura', 'Global', 'Monederos', 'Cancelación Masiva', 'Nóminas'],
+      'Consultas': ['Facturas', 'Boletas', 'Tickets'], // Incluir tanto 'Boletas' como 'Tickets' para compatibilidad
+      'Administración': ['Empleados', 'Tiendas', 'Períodos Perfil', 'Períodos Plataforma', 'Secciones'],
       'Reportes Facturación Fiscal': [
         // 11 pantallas originales
         'Boletas No Auditadas',
@@ -434,7 +413,7 @@ const ConfiguracionMenusPage: React.FC = () => {
               {mensaje.texto}
               {mensaje.tipo === 'error' && mensaje.texto.includes('perfiles') && (
                 <p className="text-sm mt-2 opacity-90">
-                  Verifique que el servidor backend esté ejecutándose en http://localhost:8080
+                  Verifique que el servidor backend esté ejecutándose en http://174.136.25.157:8080
                 </p>
               )}
             </div>

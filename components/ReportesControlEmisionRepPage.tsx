@@ -4,7 +4,7 @@ import { FormField } from './FormField';
 import { SelectField } from './SelectField';
 import { Button } from './Button';
 import { MES_OPTIONS, EMPRESA_OPTIONS_CONSULTAS } from '../constants';
-import { utils, writeFile } from 'xlsx';
+// import { utils, writeFile } from 'xlsx'; // No utilizado actualmente
 
 interface ControlEmisionRepFormData {
   mes: string;
@@ -40,16 +40,17 @@ export const ReportesControlEmisionRepPage: React.FC = () => {
     // alert('Búsqueda de Control de Emisión de REP simulada. Ver consola.');
   };
 
-  const handleExcel = () => {
-    if (resultados.length === 0) {
-      alert('No hay datos para exportar.');
-      return;
-    }
-    const ws = utils.json_to_sheet(resultados);
-    const wb = utils.book_new();
-    utils.book_append_sheet(wb, ws, 'ControlEmisionREP');
-    writeFile(wb, 'control_emision_rep.xlsx');
-  };
+  // Función no utilizada - comentada para evitar error de TypeScript
+  // const handleExcel = () => {
+  //   if (resultados.length === 0) {
+  //     alert('No hay datos para exportar.');
+  //     return;
+  //   }
+  //   const ws = utils.json_to_sheet(resultados);
+  //   const wb = utils.book_new();
+  //   utils.book_append_sheet(wb, ws, 'ControlEmisionREP');
+  //   writeFile(wb, 'control_emision_rep.xlsx');
+  // };
 
   return (
     <form onSubmit={handleBuscar} className="space-y-6">

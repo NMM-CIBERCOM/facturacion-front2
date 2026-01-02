@@ -8,17 +8,16 @@ import { MagnifyingGlassIcon } from './components/icons/MagnifyingGlassIcon';
 import { WrenchScrewdriverIcon } from './components/icons/WrenchScrewdriverIcon';
 import { ChartBarIcon } from './components/icons/ChartBarIcon';
 import { CurrencyDollarIcon } from './components/icons/CurrencyDollarIcon';
-import { TruckIcon } from './components/icons/TruckIcon';
-import { GiftIcon } from './components/icons/GiftIcon';
+// import { TruckIcon } from './components/icons/TruckIcon'; // No utilizado
+// import { GiftIcon } from './components/icons/GiftIcon'; // No utilizado
 import { StopIcon } from './components/icons/StopIcon';
-import { ChevronDoubleRightIcon } from './components/icons/ChevronDoubleRightIcon';
 import { CogIcon } from './components/icons/CogIcon';
 import { PaintBrushIcon } from './components/icons/PaintBrushIcon';
 import { 
   FaUser, FaStore, FaCalendarAlt, FaLaptop, FaExclamationTriangle, FaLayerGroup, 
-  FaChartBar, FaFileAlt, FaUsers, FaExchangeAlt, FaClipboardCheck, FaSyncAlt, FaFileSignature, FaHistory, FaEnvelope
+  FaChartBar, FaFileAlt, FaUsers, FaExchangeAlt, FaClipboardCheck, FaSyncAlt, FaFileSignature, FaHistory, FaEnvelope, FaTh
 } from 'react-icons/fa';
-import { FiFileText, FiUsers, FiRepeat, FiSettings } from 'react-icons/fi';
+import { FiFileText, FiUsers, FiSettings } from 'react-icons/fi';
 import { ChartPieIcon } from './components/icons/ChartPieIcon';
 import { SignalIcon } from './components/icons/SignalIcon';
 import { DocumentMagnifyingGlassIcon } from './components/icons/DocumentMagnifyingGlassIcon';
@@ -41,18 +40,23 @@ export const NAV_ITEMS: NavItem[] = [
     icon: HomeIcon,
   },
   {
-    label: 'Facturación',
+    label: 'Emisión',
     icon: DocumentTextIcon,
     children: [
-      { label: 'Artículos', path: 'facturacion-articulos', icon: CubeIcon },
+      { label: 'Facturar', path: 'facturacion-articulos', icon: CubeIcon },
       { label: 'Notas de crédito', path: 'notas-credito', icon: CurrencyDollarIcon },
       { label: 'Complemento de pagos', path: 'facturacion-complemento-pagos', icon: FaExchangeAlt },
       { label: 'Retención de pagos', path: 'facturacion-retencion-pagos', icon: FaClipboardCheck },
       { label: 'Carta Porte', path: 'facturacion-carta-porte', icon: DocumentTextIcon },
-      { label: 'Captura Libre', path: 'facturacion-captura', icon: ChevronDoubleRightIcon },
-      { label: 'Factura Global', path: 'facturacion-global', icon: DocumentTextIcon },
-      { label: 'Cancelación Masiva', path: 'facturacion-cancelacion', icon: StopIcon },
       { label: 'Nóminas', path: 'facturacion-nominas', icon: FaUsers },
+      { label: 'Factura Global', path: 'facturacion-global', icon: DocumentTextIcon },
+    ],
+  },
+  {
+    label: 'Cancelación',
+    icon: FaEnvelope,
+    children: [
+      { label: 'Cancelación Masiva', path: 'facturacion-cancelacion', icon: StopIcon },
     ],
   },
   {
@@ -64,6 +68,15 @@ export const NAV_ITEMS: NavItem[] = [
       { label: 'Tickets', path: 'consultas-tickets', icon: DocumentTextIcon },
       { label: 'Reportes', path: 'consultas-reportes', icon: ChartBarIcon },
       { label: 'REPs Sustituidos', path: 'consultas-reps-sustituidos', icon: DocumentTextIcon },
+    ],
+  },
+  {
+    label: 'Catálogos',
+    icon: FaTh,
+    children: [
+      { label: 'Productos o Servicios', path: 'catalogos-productos-servicios', icon: CubeIcon },
+      { label: 'Clientes', path: 'catalogos-clientes', icon: FaUsers },
+      { label: 'Registro de Constancias', path: 'registro-cfdi', icon: DocumentTextIcon },
     ],
   },
   {
@@ -80,7 +93,7 @@ export const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
-    label: 'Reportes Facturación Fiscal',
+    label: 'Reportes',
     icon: FaChartBar,
     children: [
       { label: 'Boletas No Auditadas', path: 'reportes-boletas-no-auditadas', icon: FaFileAlt },
@@ -108,13 +121,6 @@ export const NAV_ITEMS: NavItem[] = [
       { label: 'Permisos', path: 'monitor-permisos', icon: FiSettings },
       { label: 'Test PDF', path: 'test-pdf', icon: DocumentTextIcon },
       { label: 'Test iText PDF', path: 'test-itext-pdf', icon: DocumentTextIcon },
-    ],
-  },
-  {
-    label: 'Registro CFDI',
-    icon: DocumentTextIcon,
-    children: [
-      { label: 'Registro de Constancias', path: 'registro-cfdi', icon: DocumentTextIcon },
     ],
   },
   {
@@ -260,6 +266,19 @@ export const MOTIVO_SUSTITUCION_OPTIONS = [
     { value: '03', label: 'No se llevó a cabo la operación' },
     { value: '04', label: 'Operación nominativa relacionada en una factura global' },
     { value: 'menu', label: 'Sustitución por menú de artículos' },
+];
+
+export const TIPO_RELACION_CFDI_OPTIONS = [
+    { value: '', label: '- Selecciona -' },
+    { value: '01', label: '01 - Nota de crédito de los documentos relacionados' },
+    { value: '02', label: '02 - Nota de débito de los documentos relacionados' },
+    { value: '03', label: '03 - Devolución de mercancía sobre facturas o traslados previos' },
+    { value: '04', label: '04 - Sustitución de los CFDI previos' },
+    { value: '05', label: '05 - Traslados de mercancías facturados previamente' },
+    { value: '06', label: '06 - Facturación de operaciones con consecutivo para pre-pagos' },
+    { value: '07', label: '07 - CFDI por aplicación de anticipo' },
+    { value: '08', label: '08 - Factura o comprobante fiscal con saldo insoluto de pagos en parcialidades' },
+    { value: '09', label: '09 - Por cuenta de terceros' },
 ];
 
 export const MES_OPTIONS = [

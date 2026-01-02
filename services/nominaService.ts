@@ -1,4 +1,4 @@
-import { apiUrl } from './api';
+import { apiUrl, getHeadersWithUsuario } from './api';
 
 export interface NominaFormPayload {
   rfcEmisor: string;
@@ -71,7 +71,7 @@ export async function guardarNomina(
 
   const resp = await fetch(apiUrl('/nominas/guardar'), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getHeadersWithUsuario(),
     body: JSON.stringify(payload),
   });
 

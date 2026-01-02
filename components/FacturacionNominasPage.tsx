@@ -3,7 +3,7 @@ import { Card } from './Card'; // O ajusta según tu estructura
 import { Button } from './Button';
 import { guardarNomina, NominaFormPayload, consultarHistorialNominas, NominaHistorialRecord } from '../services/nominaService';
 import { facturaService } from '../services/facturaService';
-import { apiUrl } from '../services/api';
+import { apiUrl, getHeadersWithUsuario } from '../services/api';
 import { correoService } from '../services/correoService';
 import { usuarioService, EmpleadoConsulta } from '../services/usuarioService';
 import { calcularDeduccionISR, formatMoney2 } from '../services/isrService';
@@ -68,28 +68,28 @@ const initialNominaFormData: NominaFormData = {
 
 // --- DATOS DUMMY PARA LA DEMOSTRACIÓN ---
 
-// Datos del empleado que se cargarán en el formulario
-const dummyEmployeeData: NominaFormData = {
-  rfcEmisor: 'EJE900101M8A', // RFC de la empresa (tomado de la captura)
-  rfcReceptor: 'VECJ880315H1A',
-  nombre: 'JUAN CARLOS PEREZ GOMEZ',
-  curp: 'PEGC880315HDFRZA05',
-  periodoPago: '2024-06-01 al 2024-06-15',
-  fechaPago: '2024-06-30', // Fecha en formato YYYY-MM-DD para el input type="date"
-  percepciones: '10000.00',
-  deducciones: '1500.50',
-  total: '8499.50',
-  tipoNomina: 'O', // 'O' para Ordinaria
-  usoCfdi: 'CN01', // 'CN01' para Nómina
-  correo: 'juan.perez@example.com',
-};
+// Datos del empleado que se cargarán en el formulario - no utilizado
+// const dummyEmployeeData: Partial<NominaFormData> = {
+//   rfcEmisor: 'EJE900101M8A', // RFC de la empresa (tomado de la captura)
+//   rfcReceptor: 'VECJ880315H1A',
+//   nombre: 'JUAN CARLOS PEREZ GOMEZ',
+//   curp: 'PEGC880315HDFRZA05',
+//   periodoPago: '2024-06-01 al 2024-06-15',
+//   fechaPago: '2024-06-30', // Fecha en formato YYYY-MM-DD para el input type="date"
+//   percepciones: '10000.00',
+//   deducciones: '1500.50',
+//   total: '8499.50',
+//   tipoNomina: 'O', // 'O' para Ordinaria
+//   usoCfdi: 'CN01', // 'CN01' para Nómina
+//   correo: 'juan.perez@example.com',
+// };
 
-// Historial de facturas para este empleado
-const dummyHistoryData: HistoryRecord[] = [
-  { id: 1, fecha: '2024-05-30', idEmpleado: 'EMP123', estado: 'Timbrada' },
-  { id: 2, fecha: '2024-05-15', idEmpleado: 'EMP123', estado: 'Timbrada' },
-  { id: 3, fecha: '2024-04-30', idEmpleado: 'EMP123', estado: 'Cancelada' },
-];
+// Historial de facturas para este empleado - no utilizado
+// const dummyHistoryData: HistoryRecord[] = [
+//   { id: 1, fecha: '2024-05-30', idEmpleado: 'EMP123', estado: 'Timbrada' },
+//   { id: 2, fecha: '2024-05-15', idEmpleado: 'EMP123', estado: 'Timbrada' },
+//   { id: 3, fecha: '2024-04-30', idEmpleado: 'EMP123', estado: 'Cancelada' },
+// ];
 
 
 export const FacturacionNominasPage: React.FC = () => {
@@ -230,6 +230,64 @@ export const FacturacionNominasPage: React.FC = () => {
     }
   };
 
+  const handleVistaPrevia = async () => {
+    try {
+      // Validar campos básicos
+      if (!formData.rfcReceptor || !formData.rfcReceptor.trim()) {
+        alert('Por favor ingrese el RFC del receptor.');
+        return;
+      }
+
+      const fechaNomina = searchDate || new Date().toISOString().split('T')[0];
+      const payload: NominaFormPayload = {
+        rfcEmisor: formData.rfcEmisor,
+        rfcReceptor: formData.rfcReceptor,
+        nombre: formData.nombre,
+        curp: formData.curp,
+        periodoPago: formData.periodoPago,
+        fechaPago: formData.fechaPago,
+        percepciones: formData.percepciones,
+        deducciones: formData.deducciones,
+        total: formData.total,
+        tipoNomina: formData.tipoNomina,
+        usoCfdi: formData.usoCfdi,
+        correoElectronico: formData.correo,
+        domicilioFiscalReceptor: formData.domicilioFiscalReceptor,
+        numSeguridadSocial: formData.numSeguridadSocial,
+        fechaInicioRelLaboral: formData.fechaInicioRelLaboral,
+        antiguedad: formData.antiguedad,
+        riesgoPuesto: formData.riesgoPuesto,
+        salarioDiarioIntegrado: formData.salarioDiarioIntegrado,
+      };
+
+      const response = await fetch(apiUrl('/nominas/preview-pdf'), {
+        method: 'POST',
+        headers: getHeadersWithUsuario(),
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Error HTTP ${response.status}: ${errorText}`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error en vista previa:', error);
+      const mensaje = error instanceof Error ? error.message : 'Error desconocido';
+      alert(`Error al generar vista previa: ${mensaje}`);
+    }
+  };
+
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -257,7 +315,13 @@ export const FacturacionNominasPage: React.FC = () => {
       };
       const resp = await guardarNomina(payload, employeeId, fechaNomina);
       if (resp.ok) {
-        alert(`Guardado correctamente. UUID: ${resp.uuidFactura}\nID_FACTURA: ${resp.idFactura}\nID_FACTURA_NOMINA: ${resp.idFacturaNomina}`);
+        const uuidObtenido = resp.uuidFactura || '';
+        alert(`Nómina timbrada exitosamente\nUUID: ${uuidObtenido || 'N/A'}`);
+        
+        // Preguntar si desea enviar por correo
+        if (confirm('¿Desea enviar el PDF de la nómina al correo del receptor?')) {
+          await enviarCorreoNomina(uuidObtenido);
+        }
       } else {
         const msg = resp.message || 'Error al guardar nómina';
         alert(`Error: ${msg}`);
@@ -478,7 +542,10 @@ export const FacturacionNominasPage: React.FC = () => {
               </div>
             ))}
           </div>
-          <div className="flex justify-end mt-6">
+          <div className="flex justify-end mt-6 gap-2">
+            <Button type="button" variant="secondary" onClick={handleVistaPrevia}>
+              Vista Previa
+            </Button>
             <Button type="submit" variant="primary">Guardar Nómina</Button>
           </div>
         </Card>

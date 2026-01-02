@@ -68,13 +68,22 @@ export const ConsultasBoletasPage: React.FC = () => {
     }
   };
 
-  const handleMassSubmit = (e: React.FormEvent) => {
+  const handleMassSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (massFile) {
       console.log('Consultando Boletas Masiva, Archivo:', massFile.name);
-      // Simulamos que el archivo contiene todas las boletas de muestra
-      setResultados(boletasMuestra);
-      setMostrarResultados(true);
+      setErrorMsg(null);
+      setBuscando(true);
+      setMostrarResultados(false);
+      try {
+        // TODO: Implementar procesamiento masivo de archivo
+        // Por ahora, solo mostramos un mensaje
+        setErrorMsg('Funcionalidad de consulta masiva pendiente de implementar');
+      } catch (err: any) {
+        setErrorMsg(err?.message || 'Error al procesar archivo masivo');
+      } finally {
+        setBuscando(false);
+      }
     } else {
       alert('Por favor, seleccione un archivo para la consulta masiva.');
     }

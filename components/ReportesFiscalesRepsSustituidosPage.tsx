@@ -5,7 +5,8 @@ import { SelectField } from './SelectField';
 import { CheckboxField } from './CheckboxField';
 import { Button } from './Button';
 import { TextareaField } from './TextareaField';
-import { MES_OPTIONS, EMPRESA_OPTIONS_CONSULTAS, TIENDA_OPTIONS_REPORTS, TIENDA_OPTIONS } from '../constants';
+import { MES_OPTIONS, EMPRESA_OPTIONS_CONSULTAS, TIENDA_OPTIONS } from '../constants';
+// import { TIENDA_OPTIONS_REPORTS } from '../constants'; // No utilizado
 import { utils, writeFile } from 'xlsx';
 
 interface FiscalRepsSustituidosFormData {
@@ -92,7 +93,7 @@ export const ReportesFiscalesRepsSustituidosPage: React.FC = () => {
     writeFile(wb, 'fiscales_reps_sustituidos.xlsx');
   };
   
-  const checkboxContainerClass = "border border-gray-300 dark:border-gray-600 rounded-md p-2 h-32 overflow-y-auto text-sm";
+  // const checkboxContainerClass = "border border-gray-300 dark:border-gray-600 rounded-md p-2 h-32 overflow-y-auto text-sm"; // No utilizado
   const prioridadClass = "w-24 text-xs mt-6 text-gray-500 dark:text-gray-400 self-end pb-1 px-1"; // For "prioridad x" text display
 
 

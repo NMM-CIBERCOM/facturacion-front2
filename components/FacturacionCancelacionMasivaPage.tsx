@@ -4,7 +4,7 @@ import { Button } from './Button';
 import * as XLSX from 'xlsx';
 import { apiUrl, pacUrl } from '../services/api';
 import { facturaService } from '../services/facturaService';
-import { correoService } from '../services/correoService';
+// import { correoService } from '../services/correoService'; // No utilizado
 import { EnviarCorreoModal } from './EnviarCorreoModal';
 
 interface FacturaCancelacion {
@@ -498,7 +498,7 @@ export const FacturacionCancelacionMasivaPage: React.FC = () => {
   };
 
   // Descargar PDF de una factura
-  const handleDescargarPDF = async (uuid: string, folio: string) => {
+  const handleDescargarPDF = async (uuid: string, _folio: string) => {
     try {
       setDescargandoPdf(uuid);
       await facturaService.generarYDescargarPDF(uuid);
@@ -514,7 +514,7 @@ export const FacturacionCancelacionMasivaPage: React.FC = () => {
   const handleVistaPrevia = async (uuid: string) => {
     try {
       setVistaPreviaUuid(uuid);
-      const factura = await facturaService.obtenerFacturaPorUUID(uuid);
+      // const factura = await facturaService.obtenerFacturaPorUUID(uuid); // No utilizado
       // Aquí podrías abrir un modal con los datos de la factura
       // Por ahora, abrimos el PDF en una nueva ventana
       const pdfUrl = apiUrl(`/factura/descargar-pdf/${uuid}`);

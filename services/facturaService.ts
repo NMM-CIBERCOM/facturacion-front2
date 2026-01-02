@@ -1,4 +1,4 @@
-import { apiUrl, pacUrl, API_BASE_URL } from './api';
+import { apiUrl, pacUrl, API_BASE_URL, getHeadersWithUsuario } from './api';
 import { logoService } from './logoService';
 
 // Interfaz para los datos de factura para PDF
@@ -850,7 +850,7 @@ export class FacturaService {
 
       const resp = await fetch(`${this.baseUrl}/factura/generar/frontend`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeadersWithUsuario(),
         body: JSON.stringify(frontendPayload)
       });
 

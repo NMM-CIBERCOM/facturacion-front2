@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Button } from './Button';
 import { Card } from './Card';
 import { REPORT_BUTTON_LIST } from '../constants';
+import { DocumentTextIcon } from './icons';
+import { FaUser } from 'react-icons/fa';
 
 interface Reporte {
   id: number;
@@ -73,7 +75,11 @@ const reportesMuestra: Reporte[] = [
   }
 ];
 
-export const ConsultasReportesPage: React.FC = () => {
+export interface ConsultasReportesPageProps {
+  setActivePage?: (page: string) => void;
+}
+
+export const ConsultasReportesPage: React.FC<ConsultasReportesPageProps> = ({ setActivePage }) => {
   const [reporteSeleccionado, setReporteSeleccionado] = useState<string>('');
   const [resultados, setResultados] = useState<Reporte[]>([]);
   const [mostrarResultados, setMostrarResultados] = useState(false);
@@ -114,11 +120,39 @@ export const ConsultasReportesPage: React.FC = () => {
 
   const numColumns = Math.min(REPORT_BUTTON_LIST.length, 4);
 
+  const handleIrAFacturasSustituidas = () => {
+    if (setActivePage) {
+      setActivePage('facturas-sustituidas');
+    }
+  };
+
   return (
     <Card>
-      <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">
-        Seleccione un reporte:
-      </h3>
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-semibold text-primary dark:text-secondary">
+          Seleccione un reporte:
+        </h3>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="primary"
+            onClick={handleIrAFacturasSustituidas}
+            className="flex items-center gap-2"
+          >
+            <DocumentTextIcon className="w-4 h-4" />
+            Facturas Sustituidas
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            onClick={() => setActivePage && setActivePage('facturas-por-usuario')}
+            className="flex items-center gap-2"
+          >
+            <FaUser className="w-4 h-4" />
+            Facturas por Usuario
+          </Button>
+        </div>
+      </div>
       <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-${numColumns} gap-3`}>
         {REPORT_BUTTON_LIST.map((reportName) => (
           <Button

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from './Card';
-import { FormField } from './FormField';
+// import { FormField } from './FormField'; // No utilizado
 import { Button } from './Button';
 import { ProtectedMessageEditor } from './ProtectedMessageEditor';
 import { configuracionCorreoService } from '../services/configuracionCorreoService';

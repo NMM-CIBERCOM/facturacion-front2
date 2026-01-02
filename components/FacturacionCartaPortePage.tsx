@@ -5,9 +5,8 @@ import { Button } from './Button';
 import { DatosFiscalesSection } from './DatosFiscalesSection';
 import { TextareaField } from './TextareaField';
 import { SelectField } from './SelectField';
-import { REGIMEN_FISCAL_OPTIONS, USO_CFDI_OPTIONS } from '../constants';
 import { useEmpresa } from '../context/EmpresaContext';
-import { apiUrl } from '../services/api';
+import { apiUrl, getHeadersWithUsuario } from '../services/api';
 import { facturaService } from '../services/facturaService';
 import { correoService } from '../services/correoService';
 
@@ -156,9 +155,9 @@ const createInitialFormData = (): CartaPorteFormData => ({
   materno: '',
   pais: 'México',
   noRegistroIdentidadTributaria: '',
-  domicilioFiscal: '44100',
-  regimenFiscal: REGIMEN_FISCAL_OPTIONS[0]?.value || '626',
-  usoCfdi: USO_CFDI_OPTIONS[0]?.value || 'G03',
+  domicilioFiscal: '45638',
+  regimenFiscal: '605', // Sueldos y Salarios e Ingresos Asimilados a Salarios
+  usoCfdi: 'G01', // Adquisición de mercancías
   tipoPersona: null,
   descripcion: '',
   fechaInformacion: new Date().toISOString().split('T')[0].replace(/-/g, ''),
@@ -175,25 +174,25 @@ const createInitialFormData = (): CartaPorteFormData => ({
       {
         tipoUbicacion: 'Origen',
         idUbicacion: 'OR000001',
-        rfcRemitenteDestinatario: '',
+        rfcRemitenteDestinatario: 'CUSC850516316',
         fechaHoraSalidaLlegada: nowLocal(),
         tipoEstacion: '01',
         domicilio: {
           estado: 'Jalisco',
           pais: 'MEX',
-          codigoPostal: '44100',
+          codigoPostal: '45638',
         },
       },
       {
         tipoUbicacion: 'Destino',
         idUbicacion: 'DE000001',
-        rfcRemitenteDestinatario: '',
+        rfcRemitenteDestinatario: 'CUSC850516316',
         fechaHoraSalidaLlegada: nowLocal(),
         tipoEstacion: '03',
         domicilio: {
           estado: 'Jalisco',
           pais: 'MEX',
-          codigoPostal: '44100',
+          codigoPostal: '45638',
         },
       },
     ],
@@ -231,10 +230,11 @@ const createInitialFormData = (): CartaPorteFormData => ({
         {
           tipoFigura: '01',
           nombreFigura: '',
+          rfcFigura: 'CUSC850516316',
           domicilio: {
             estado: 'Jalisco',
             pais: 'MEX',
-            codigoPostal: '44100',
+            codigoPostal: '45638',
           },
         },
       ],
@@ -567,9 +567,9 @@ export const FacturacionCartaPortePage: React.FC = () => {
     ejemplo.tipoPersona = 'fisica';
     ejemplo.pais = 'México';
     ejemplo.noRegistroIdentidadTributaria = '';
-    ejemplo.domicilioFiscal = '44100'; // Código postal válido - Guadalajara, Jalisco
-    ejemplo.regimenFiscal = '626'; // Uno de los códigos de la imagen (605, 606, 607, 608, 610, 611, 612, 614, 615, 616, 621, 625, 626)
-    ejemplo.usoCfdi = 'G03';
+    ejemplo.domicilioFiscal = '45638'; // Código postal válido
+    ejemplo.regimenFiscal = '605'; // Sueldos y Salarios e Ingresos Asimilados a Salarios
+    ejemplo.usoCfdi = 'G01'; // Adquisición de mercancías
     
     // Información general
     ejemplo.descripcion = 'Servicio de transporte terrestre de productos alimenticios';
@@ -585,7 +585,7 @@ export const FacturacionCartaPortePage: React.FC = () => {
       {
         tipoUbicacion: 'Origen',
         idUbicacion: 'ORIGEN1',
-        rfcRemitenteDestinatario: empresaInfo?.rfc || 'XAXX010101000',
+        rfcRemitenteDestinatario: 'CUSC850516316',
         nombreRemitenteDestinatario: empresaInfo?.nombre || 'EMPRESA DISTRIBUIDORA SA DE CV',
         fechaHoraSalidaLlegada: new Date().toISOString().slice(0, 16),
         tipoEstacion: '01',
@@ -594,7 +594,7 @@ export const FacturacionCartaPortePage: React.FC = () => {
           numeroExterior: '100',
           estado: 'Jalisco',
           pais: 'MEX',
-          codigoPostal: '44100',
+          codigoPostal: '45638',
         },
       },
       {
@@ -610,7 +610,7 @@ export const FacturacionCartaPortePage: React.FC = () => {
           numeroExterior: '500',
           estado: 'Jalisco',
           pais: 'MEX',
-          codigoPostal: '44130',
+          codigoPostal: '45638',
         },
       },
     ];
@@ -654,12 +654,7 @@ export const FacturacionCartaPortePage: React.FC = () => {
           aseguraRespCivil: 'GRUPO NACIONAL PROVINCIAL SA',
           polizaRespCivil: 'GNP' + String(Math.floor(Math.random() * 10000000)).padStart(10, '0'),
         },
-        remolques: [
-          {
-            subTipoRem: 'CTR003', // Subtipo válido: Semirremolque
-            placa: 'DEF' + String(Math.floor(Math.random() * 1000)).padStart(3, '0') + 'Y',
-          },
-        ],
+        remolques: [],
       },
     };
     
@@ -669,14 +664,14 @@ export const FacturacionCartaPortePage: React.FC = () => {
         {
           tipoFigura: '01', // Transportista
           nombreFigura: empresaInfo?.nombre || 'TRANSPORTES Y LOGISTICA INTEGRAL SA DE CV',
-          rfcFigura: empresaInfo?.rfc || 'XAXX010101000',
+          rfcFigura: 'CUSC850516316',
           numLicencia: 'LT' + String(Math.floor(Math.random() * 10000000)).padStart(10, '0'),
           domicilio: {
             calle: 'Avenida Lopez Mateos',
             numeroExterior: '2500',
             estado: 'Jalisco',
             pais: 'MEX',
-            codigoPostal: '44190',
+            codigoPostal: '45638',
           },
         },
       ],
@@ -730,6 +725,69 @@ export const FacturacionCartaPortePage: React.FC = () => {
     return true;
   };
 
+  const [uuidCartaPorteTimbrada, setUuidCartaPorteTimbrada] = useState<string>('');
+
+  const handleVistaPrevia = async () => {
+    try {
+      if (!validarFormulario()) return;
+      
+      // CRÍTICO: Normalizar el payload para preservar remolques y otros datos
+      const { normalizeCartaPortePayload } = await import('../services/cartaPorteService');
+      const formDataConVersion = { ...formData, versionCartaPorte: '3.1' as const } as any;
+      const formDataNormalizado = normalizeCartaPortePayload(formDataConVersion);
+      
+      const payload = {
+        versionComplemento: '3.1',
+        rfcIniciales: formDataNormalizado.rfcIniciales,
+        rfcFecha: formDataNormalizado.rfcFecha,
+        rfcHomoclave: formDataNormalizado.rfcHomoclave,
+        correoElectronico: formDataNormalizado.correoElectronico,
+        razonSocial: formDataNormalizado.razonSocial,
+        nombre: formDataNormalizado.nombre,
+        paterno: formDataNormalizado.paterno,
+        materno: formDataNormalizado.materno,
+        domicilioFiscal: formDataNormalizado.domicilioFiscal,
+        regimenFiscal: formDataNormalizado.regimenFiscal,
+        usoCfdi: formDataNormalizado.usoCfdi,
+        descripcion: formDataNormalizado.descripcion,
+        fechaInformacion: formDataNormalizado.fechaInformacion,
+        numeroSerie: formDataNormalizado.numeroSerie,
+        precio: formDataNormalizado.precio,
+        personaAutoriza: formDataNormalizado.personaAutoriza,
+        puesto: formDataNormalizado.puesto,
+        tipoTransporte: formDataNormalizado.tipoTransporte,
+        tipoPersona: formDataNormalizado.tipoPersona,
+        complemento: formDataNormalizado.complemento,
+      };
+
+      const response = await fetch(apiUrl('/carta-porte/preview-pdf'), {
+        method: 'POST',
+        headers: getHeadersWithUsuario(),
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Error HTTP ${response.status}: ${errorText}`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error en vista previa:', error);
+      const mensaje = error instanceof Error ? error.message : 'Error desconocido';
+      alert(`Error al generar vista previa: ${mensaje}`);
+    }
+  };
+
   const handleGuardarEnBD = async () => {
     if (!validarFormulario()) return;
     try {
@@ -765,7 +823,7 @@ export const FacturacionCartaPortePage: React.FC = () => {
       
       const response = await fetch(apiUrl('/carta-porte/guardar'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeadersWithUsuario(),
         body: JSON.stringify(payload),
       });
       
@@ -775,10 +833,17 @@ export const FacturacionCartaPortePage: React.FC = () => {
       }
       
       const result = await response.json();
-      alert(`✅ Carta Porte timbrada exitosamente\nUUID: ${result.uuid || 'N/A'}`);
+      const uuidObtenido = result.uuid || '';
+      
+      // Guardar el UUID para evitar timbrados duplicados
+      if (uuidObtenido) {
+        setUuidCartaPorteTimbrada(uuidObtenido);
+      }
+      
+      alert(`Carta Porte timbrada exitosamente\nUUID: ${uuidObtenido || 'N/A'}`);
       
       if (confirm('¿Desea enviar los archivos timbrados al correo del receptor?')) {
-        handleEnviarCorreo();
+        handleEnviarCorreo(uuidObtenido);
       }
     } catch (err) {
       console.error('Error guardando Carta Porte:', err);
@@ -788,7 +853,7 @@ export const FacturacionCartaPortePage: React.FC = () => {
     }
   };
 
-  const handleEnviarCorreo = async () => {
+  const handleEnviarCorreo = async (uuidPrevio?: string) => {
     if (!validarFormulario()) return;
     try {
       setEnviandoCorreo(true);
@@ -798,12 +863,7 @@ export const FacturacionCartaPortePage: React.FC = () => {
         return;
       }
 
-      const logoConfig = await facturaService.obtenerConfiguracionLogos();
-      if (!logoConfig.exitoso) {
-        throw new Error('No se pudo obtener configuración de logos');
-      }
-
-      // CRÍTICO: Normalizar el payload para preservar remolques y otros datos
+      // CRÍTICO: Normalizar el payload para preservar remolques y otros datos (siempre necesario para XML)
       const { normalizeCartaPortePayload } = await import('../services/cartaPorteService');
       const formDataConVersion = { ...formData, versionCartaPorte: '3.1' as const } as any;
       const formDataNormalizado = normalizeCartaPortePayload(formDataConVersion);
@@ -832,74 +892,38 @@ export const FacturacionCartaPortePage: React.FC = () => {
         complemento: formDataNormalizado.complemento,
       };
 
-      // Primero guardar y timbrar
-      const guardarResponse = await fetch(apiUrl('/carta-porte/guardar'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!guardarResponse.ok) {
-        throw new Error('Error al timbrar la Carta Porte');
-      }
-
-      await guardarResponse.json();
+      // CRÍTICO: Si ya se timbró antes, usar ese UUID. NO timbrar de nuevo.
+      let uuidCartaPorte = uuidPrevio || uuidCartaPorteTimbrada;
       
-      // Generar PDF
-      const facturaData = {
-        serie: 'CP',
-        folio: formData.numeroSerie,
-        rfcEmisor: empresaInfo?.rfc || 'XAXX010101000',
-        nombreEmisor: empresaInfo?.nombre || 'EMISOR',
-        rfcReceptor: `${formData.rfcIniciales}${formData.rfcFecha}${formData.rfcHomoclave}`.toUpperCase(),
-        nombreReceptor: formData.razonSocial || `${formData.nombre} ${formData.paterno} ${formData.materno}`,
-        subtotal: (parseFloat(formData.precio) || 0).toFixed(2),
-        iva: (parseFloat(formData.precio) * 0.16 || 0).toFixed(2),
-        total: (parseFloat(formData.precio) * 1.16 || 0).toFixed(2),
-      };
+      if (!uuidCartaPorte || uuidCartaPorte.trim() === '') {
+        const guardarResponse = await fetch(apiUrl('/carta-porte/guardar'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
 
-      const pdfResponse = await fetch(apiUrl('/factura/generar-pdf'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          facturaData,
-          logoConfig: {
-            logoUrl: logoConfig.logoUrl,
-            logoBase64: logoConfig.logoBase64,
-            customColors: logoConfig.customColors,
-          },
-        }),
-      });
+        if (!guardarResponse.ok) {
+          throw new Error('Error al timbrar la Carta Porte');
+        }
 
-      if (!pdfResponse.ok) {
-        throw new Error('Error al generar PDF');
+        const guardarData = await guardarResponse.json();
+        uuidCartaPorte = guardarData?.uuid || '';
+        
+        if (uuidCartaPorte) {
+          setUuidCartaPorteTimbrada(uuidCartaPorte);
+        }
       }
-
-      const pdfBlob = await pdfResponse.blob();
-      const pdfBase64 = await blobToBase64(pdfBlob);
-
-      // Obtener XML
-      const xmlResponse = await fetch(apiUrl('/carta-porte/preview-xml'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!xmlResponse.ok) {
-        throw new Error('Error al obtener XML');
-      }
-
-      const xmlData = await xmlResponse.json();
-      const xmlBase64 = await blobToBase64(new Blob([xmlData.xml], { type: 'application/xml' }));
-
-      await correoService.enviarPdfDirecto({
-        pdfBase64,
+      
+      // Usar el método correcto que genera el PDF internamente con la lógica de Carta Porte
+      const asunto = `Carta Porte CP-${formData.numeroSerie}`;
+      const mensaje = 'Estimado(a),\n\nAdjuntamos la Carta Porte generada.\n\nSaludos.';
+      
+      // El servicio obtendrá el logoBase64 desde localStorage si no se proporciona
+      await correoService.enviarCorreoConPdfAdjunto({
+        uuidFactura: uuidCartaPorte,
         correoReceptor: correo,
-        asunto: `Carta Porte CP-${formData.numeroSerie}`,
-        mensaje: 'Estimado(a),\n\nAdjuntamos la Carta Porte generada.\n\nSaludos.',
-        nombreAdjunto: `CartaPorte_CP-${formData.numeroSerie}.pdf`,
-        xmlBase64,
-        nombreAdjuntoXml: `CartaPorte_CP-${formData.numeroSerie}.xml`,
+        asunto,
+        mensaje,
       });
 
       alert('Carta Porte enviada por correo exitosamente');
@@ -1049,7 +1073,7 @@ export const FacturacionCartaPortePage: React.FC = () => {
                   label="Tipo de Ubicación"
                   name={`ubicacion-tipo-${index}`}
                   value={ubicacion.tipoUbicacion}
-                  onChange={(e) => updateUbicacion(index, { tipoUbicacion: e.target.value as any })}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => updateUbicacion(index, { tipoUbicacion: e.target.value as 'Origen' | 'Destino' | 'Intermedia' })}
                   options={[
                     { value: 'Origen', label: 'Origen' },
                     { value: 'Destino', label: 'Destino' },
@@ -1060,27 +1084,27 @@ export const FacturacionCartaPortePage: React.FC = () => {
                   label="ID Ubicación"
                   name={`ubicacion-id-${index}`}
                   value={ubicacion.idUbicacion || ''}
-                  onChange={(e) => updateUbicacion(index, { idUbicacion: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateUbicacion(index, { idUbicacion: e.target.value })}
                 />
                 <FormField
                   label="RFC Remitente/Destinatario"
                   name={`ubicacion-rfc-${index}`}
                   value={ubicacion.rfcRemitenteDestinatario}
-                  onChange={(e) => updateUbicacion(index, { rfcRemitenteDestinatario: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateUbicacion(index, { rfcRemitenteDestinatario: e.target.value })}
                   required
                 />
                 <FormField
                   label="Nombre"
                   name={`ubicacion-nombre-${index}`}
                   value={ubicacion.nombreRemitenteDestinatario || ''}
-                  onChange={(e) => updateUbicacion(index, { nombreRemitenteDestinatario: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateUbicacion(index, { nombreRemitenteDestinatario: e.target.value })}
                 />
                 <FormField
                   label="Fecha / Hora"
                   type="datetime-local"
                   name={`ubicacion-fecha-${index}`}
                   value={ubicacion.fechaHoraSalidaLlegada}
-                  onChange={(e) => updateUbicacion(index, { fechaHoraSalidaLlegada: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateUbicacion(index, { fechaHoraSalidaLlegada: e.target.value })}
                   required
                 />
                 {formData.tipoTransporte === '04' && (
@@ -1088,7 +1112,7 @@ export const FacturacionCartaPortePage: React.FC = () => {
                     label="Tipo de estación"
                     name={`ubicacion-tipoEstacion-${index}`}
                     value={ubicacion.tipoEstacion || ''}
-                    onChange={(e) => updateUbicacion(index, { tipoEstacion: e.target.value })}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => updateUbicacion(index, { tipoEstacion: e.target.value })}
                     options={TIPO_ESTACION_OPTIONS}
                   />
                 )}
@@ -1097,7 +1121,7 @@ export const FacturacionCartaPortePage: React.FC = () => {
                   name={`ubicacion-distancia-${index}`}
                   type="number"
                   value={ubicacion.distanciaRecorrida || ''}
-                  onChange={(e) => updateUbicacion(index, { distanciaRecorrida: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateUbicacion(index, { distanciaRecorrida: e.target.value })}
                 />
               </div>
               {ubicacion.domicilio && (
@@ -1264,7 +1288,7 @@ export const FacturacionCartaPortePage: React.FC = () => {
             label="Tipo de Transporte"
             name="tipoTransporte"
             value={formData.tipoTransporte}
-            onChange={(e) => handleTipoTransporteChange(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleTipoTransporteChange(e.target.value)}
             options={TIPO_TRANSPORTE_OPTIONS}
           />
         </div>
@@ -1382,7 +1406,7 @@ export const FacturacionCartaPortePage: React.FC = () => {
               </div>
               {formData.complemento.mercancias.autotransporte.remolques.length === 0 && (
                 <p className="text-sm text-yellow-600 dark:text-yellow-400 mb-2">
-                  ⚠️ Si su ConfigVehicular requiere remolque (ej: C2, C3), debe agregar al menos un remolque.
+                  Si su ConfigVehicular requiere remolque (ej: C2, C3), debe agregar al menos un remolque.
                 </p>
               )}
               <div className="space-y-3">
@@ -1392,7 +1416,7 @@ export const FacturacionCartaPortePage: React.FC = () => {
                       label="Subtipo Remolque"
                       name={`remolque-subtipo-${index}`}
                       value={remolque.subTipoRem}
-                      onChange={(e) =>
+                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
                         updateAutotransporte({
                           remolques: formData.complemento.mercancias.autotransporte!.remolques.map((r, idx) =>
                             idx === index ? { ...r, subTipoRem: e.target.value } : r
@@ -1631,6 +1655,14 @@ export const FacturacionCartaPortePage: React.FC = () => {
         </Button>
         <Button
           type="button"
+          variant="secondary"
+          onClick={handleVistaPrevia}
+          disabled={guardandoBD || enviandoCorreo}
+        >
+          Vista Previa
+        </Button>
+        <Button
+          type="button"
           variant="primary"
           onClick={handleGuardarEnBD}
           disabled={guardandoBD || enviandoCorreo}
@@ -1640,7 +1672,7 @@ export const FacturacionCartaPortePage: React.FC = () => {
         <Button
           type="button"
           variant="primary"
-          onClick={handleEnviarCorreo}
+          onClick={() => handleEnviarCorreo()}
           disabled={enviandoCorreo || guardandoBD}
         >
           {enviandoCorreo ? 'Enviando...' : 'Enviar al correo'}

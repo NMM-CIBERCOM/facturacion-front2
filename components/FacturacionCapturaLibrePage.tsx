@@ -9,7 +9,7 @@ import { TextareaField } from './TextareaField';
 import { RadioGroupField } from './RadioGroupField';
 import { correoService } from '../services/correoService';
 import { clienteCatalogoService } from '../services/clienteCatalogoService';
-import { boletaService } from '../services/boletaService';
+// import { boletaService } from '../services/boletaService'; // No utilizado directamente
 import { facturaService } from '../services/facturaService';
 import type { CfdiConsultaResponse } from '../services/facturaService';
 import { 
@@ -29,7 +29,7 @@ import {
 import { useTiendasOptions } from '../hooks/useTiendasOptions';
 import { useJustificacionesOptions } from '../hooks/useJustificacionesOptions';
 import { conceptoService } from '../services/conceptoService';
-import { apiUrl, pacUrl } from '../services/api';
+import { apiUrl, pacUrl, getHeadersWithUsuario } from '../services/api';
 
 interface Concepto {
   sku: string;
@@ -67,8 +67,11 @@ interface CapturaLibreFormData {
   justificacion: string;
   tipoDocumento: string;
   uuid: string;
+  serie?: string;
+  folio?: string;
   emisor: string;
-  fechaEmision: string;  concepto: Concepto;
+  fechaEmision: string;
+  concepto: Concepto;
   medioPago: string;
   formaPago: string;
   descuentoTotal: string;
@@ -135,7 +138,7 @@ export const FacturacionCapturaLibrePage: React.FC = () => {
   const [formData, setFormData] = useState<CapturaLibreFormData>(initialCapturaLibreFormData);
   const { options: tiendasOpts, loading: tiendasLoading, error: tiendasError } = useTiendasOptions();
   const { options: justificacionesOpts, loading: justLoading, error: justError } = useJustificacionesOptions();
-  const [consultaCfdi, setConsultaCfdi] = useState<CfdiConsultaResponse | null>(null);
+  const [_consultaCfdi, setConsultaCfdi] = useState<CfdiConsultaResponse | null>(null);
   const [consultaError, setConsultaError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [timbradoStatus, setTimbradoStatus] = useState<string | null>(null);
@@ -256,25 +259,22 @@ export const FacturacionCapturaLibrePage: React.FC = () => {
 
   const handleAgregarBoleta = async () => {
     const rfc = clienteCatalogoService.buildRfc(formData.rfcIniciales, formData.rfcFecha, formData.rfcHomoclave);
-    const payload = {
-      tiendaBoleta: formData.tiendaBoleta,
-      terminalBoleta: formData.terminalBoleta,
-      numeroBoleta: formData.numeroBoleta,
-      rfcReceptor: rfc,
-      fechaEmision: formData.fechaEmision,
-    };
+    // Payload no utilizado actualmente - funcionalidad pendiente de implementar
+    void rfc; // Evitar error de variable no utilizada
     try {
-      const resp = await boletaService.buscarBoleta(payload);
+      // TODO: Implementar buscarBoleta en boletaService
+      // const resp = await boletaService.buscarBoleta(payload);
+      const resp = { ok: false, error: 'Funcionalidad no implementada' } as any;
       if (!resp.ok) {
         alert(resp.error || 'No se pudo agregar boleta');
         return;
       }
       setFormData(prev => ({
         ...prev,
-        serie: resp.serie || prev['serie' as any],
-        folio: resp.folio || prev['folio' as any],
+        serie: resp.serie || prev.serie,
+        folio: resp.folio || prev.folio,
         uuid: resp.uuid || prev.uuid,
-      } as any));
+      }));
       alert('Boleta agregada exitosamente');
     } catch (e: any) {
       alert(e?.message || 'Error al agregar boleta');
@@ -306,8 +306,8 @@ export const FacturacionCapturaLibrePage: React.FC = () => {
       if (tipo === 'I' || tipo === 'E') {
         setFormData(prev => ({
           ...prev,
-          ['serie' as any]: basicos.serie || prev['serie' as any],
-          ['folio' as any]: basicos.folio || prev['folio' as any],
+          serie: basicos.serie || prev.serie,
+          folio: basicos.folio || prev.folio,
           medioPago: normalizeFormaPagoCode(basicos.formaPago) || prev.medioPago,
           formaPago: normalizeMetodoPago(basicos.metodoPago) || prev.formaPago,
           usoCfdi: normalizeUsoCfdi(basicos.usoCfdi) || prev.usoCfdi,
@@ -323,8 +323,8 @@ export const FacturacionCapturaLibrePage: React.FC = () => {
       } else if (tipo === 'P') {
         setFormData(prev => ({
           ...prev,
-          ['serie' as any]: basicos.serie || prev['serie' as any],
-          ['folio' as any]: basicos.folio || prev['folio' as any],
+          serie: basicos.serie || prev.serie,
+          folio: basicos.folio || prev.folio,
           medioPago: normalizeFormaPagoCode(basicos.formaPago) || prev.medioPago,
           formaPago: normalizeMetodoPago(basicos.metodoPago) || prev.formaPago,
           usoCfdi: normalizeUsoCfdi(basicos.usoCfdi) || prev.usoCfdi,
@@ -515,7 +515,7 @@ export const FacturacionCapturaLibrePage: React.FC = () => {
     try {
       const resp = await fetch(apiUrl('/factura/generar/frontend'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeadersWithUsuario(),
         body: JSON.stringify(payload)
       });
       const data = await resp.json().catch(() => null);
@@ -709,7 +709,7 @@ export const FacturacionCapturaLibrePage: React.FC = () => {
       setFormData(prev => ({ ...prev, uuid: result.uuid }));
       
       // Primera alerta de éxito
-      alert(`✅ Factura procesada y guardada exitosamente\nUUID: ${result.uuid || 'N/A'}\nFactura guardada en base de datos`);
+      alert(`Factura procesada y guardada exitosamente\nUUID: ${result.uuid || 'N/A'}\nFactura guardada en base de datos`);
       
       // Segunda alerta para preguntar sobre envío del PDF
       const enviarPdf = confirm('¿Desea enviar los archivos al correo del receptor?');
@@ -898,7 +898,7 @@ export const FacturacionCapturaLibrePage: React.FC = () => {
         <Button type="button" onClick={handleDescargarPdf} variant="secondary">
           Descargar PDF
         </Button>
-        <Button type="button" onClick={handleEnviarCorreo} variant="secondary">
+        <Button type="button" onClick={() => handleEnviarCorreo()} variant="secondary">
           Enviar por Correo
         </Button>
         <Button type="button" onClick={handleGuardarEnBD} variant="primary" disabled={guardandoBD}>
@@ -938,19 +938,20 @@ function normalizeMetodoPago(v?: string): string {
   return s;
 }
 
-function unidadTextoFromCode(code?: string): string {
-  const c = (code || '').toUpperCase();
-  const map: Record<string, string> = {
-    H87: 'Pieza',
-    KGM: 'Kilogramo',
-    EA: 'Cada uno',
-    ACT: 'Actividad',
-    E48: 'Unidad de servicio',
-  };
-  return map[c] || c || 'Unidad';
-}
+// Funciones no utilizadas - comentadas para evitar error de TypeScript
+// function unidadTextoFromCode(code?: string): string {
+//   const c = (code || '').toUpperCase();
+//   const map: Record<string, string> = {
+//     H87: 'Pieza',
+//     KGM: 'Kilogramo',
+//     EA: 'Cada uno',
+//     ACT: 'Actividad',
+//     E48: 'Unidad de servicio',
+//   };
+//   return map[c] || c || 'Unidad';
+// }
 
-function extractPostalCode(text?: string): string | null {
-  const match = (text || '').match(/\b\d{5}\b/);
-  return match ? match[0] : null;
-}
+// function extractPostalCode(text?: string): string | null {
+//   const match = (text || '').match(/\b\d{5}\b/);
+//   return match ? match[0] : null;
+// }

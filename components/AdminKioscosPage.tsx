@@ -169,7 +169,7 @@ export const AdminKioscosPage: React.FC = () => {
               <SelectField
                 label="Filtrar por tienda:"
                 value={filtroTienda}
-                onChange={(e) => {
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                   setFiltroTienda(e.target.value);
                   setSessionCodigoTienda(e.target.value);
                   setCurrentPage(1);

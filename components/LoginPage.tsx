@@ -1,6 +1,7 @@
 
-import React, { useState, useContext } from 'react';
-import { ThemeContext } from '../App';
+import React, { useState } from 'react';
+// import { useContext } from 'react';
+// import { ThemeContext } from '../App';
 import { Button } from './Button';
 import { FormField } from './FormField';
 
@@ -15,7 +16,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin, logoUrl, appName 
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { theme } = useContext(ThemeContext);
+  // const { theme } = useContext(ThemeContext); // No utilizado actualmente
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

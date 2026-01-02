@@ -191,11 +191,12 @@ export const MonitorGraficasPage: React.FC = () => {
     return () => clearInterval(intervalo);
   }, [refreshTime]); // Actualizar cuando cambie el tiempo de refresco
 
-  // Colores para los gráficos
-  const colores = [
-    'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-red-500', 
-    'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500'
-  ];
+  // Colores para los gráficos - no utilizado
+  // Colores para los gráficos - no utilizado
+  // const colores = [
+  //   'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-red-500', 
+  //   'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500'
+  // ];
   const coloresPie = [
     '#3B82F6', '#10B981', '#F59E0B', '#EF4444', 
     '#8B5CF6', '#EC4899', '#6366F1', '#14B8A6'

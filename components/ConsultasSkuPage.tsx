@@ -119,7 +119,7 @@ export const ConsultasSkuPage: React.FC = () => {
   const [mostrarResultados, setMostrarResultados] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
+    const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 

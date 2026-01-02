@@ -35,7 +35,7 @@ export interface UsuarioLogin {
   nombrePerfil: string;
   idPerfil: number | null;
   estatusUsuario: string;
-  idDfi: number | null;
+  idDfi: number | null; // ID numérico del usuario en la tabla DFI/empleados - USAR ESTE COMO ID PRINCIPAL
   idEstacionamiento: number | null;
   modificaUbicacion: string | null;
 }
@@ -45,5 +45,10 @@ export interface LoginResponse {
   message: string;
   token?: string | null;
   usuario?: UsuarioLogin | null;
+}
+
+export interface SelectOption {
+  value: string | number;
+  label: string;
 }
     

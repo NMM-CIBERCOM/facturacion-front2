@@ -178,16 +178,18 @@ export const ReportesConciliacionPage: React.FC = () => {
               <MagnifyingGlassIcon className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" />
             </div>
             <SelectField
+              label=""
               placeholder="Filtrar por tipo"
               value={selectedTipo}
-              onChange={(e) => setSelectedTipo(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedTipo(e.target.value)}
               options={[{ value: '', label: 'Todos los tipos' }, ...tipoOptions]}
               className="w-full md:w-48"
             />
             <SelectField
+              label=""
               placeholder="Filtrar por estatus"
               value={selectedEstatus}
-              onChange={(e) => setSelectedEstatus(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedEstatus(e.target.value)}
               options={[{ value: '', label: 'Todos los estatus' }, ...estatusOptions]}
               className="w-full md:w-48"
             />
