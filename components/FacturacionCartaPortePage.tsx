@@ -7,7 +7,6 @@ import { TextareaField } from './TextareaField';
 import { SelectField } from './SelectField';
 import { useEmpresa } from '../context/EmpresaContext';
 import { apiUrl, getHeadersWithUsuario } from '../services/api';
-import { facturaService } from '../services/facturaService';
 import { correoService } from '../services/correoService';
 
 // Interfaces según XSD CartaPorte31-2.xml
@@ -242,17 +241,6 @@ const createInitialFormData = (): CartaPorteFormData => ({
   },
 });
 
-const blobToBase64 = (blob: Blob) =>
-  new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = reader.result as string;
-      const base64 = result.split(',')[1] || '';
-      resolve(base64);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
 
 export const FacturacionCartaPortePage: React.FC = () => {
   const { empresaInfo } = useEmpresa();

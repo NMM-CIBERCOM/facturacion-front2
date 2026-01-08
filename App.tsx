@@ -54,6 +54,7 @@ import { MonitorDisponibilidadPage } from './components/MonitorDisponibilidadPag
 import { MonitorLogsPage } from './components/MonitorLogsPage';
 import { MonitorDecodificadorPage } from './components/MonitorDecodificadorPage';
 import { MonitorPermisosPage } from './components/MonitorPermisosPage';
+import { MonitorConexionesPage } from './components/MonitorConexionesPage';
 import TestPdfPage from './components/TestPdfPage';
 import ITextPdfTest from './components/ITextPdfTest';
 import RegistroCFDIPage from './components/RegistroCFDIPage';
@@ -524,6 +525,8 @@ export const App: React.FC = () => {
         return <MonitorDecodificadorPage />;
       case 'monitor-permisos':
         return <MonitorPermisosPage />;
+      case 'monitor-conexiones':
+        return <MonitorConexionesPage />;
       case 'test-pdf':
         return <TestPdfPage />;
       case 'test-itext-pdf':

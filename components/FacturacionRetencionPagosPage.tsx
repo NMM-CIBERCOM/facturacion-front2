@@ -473,9 +473,6 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
     try {
       // Construir payload similar al que se envía al guardar
       const tipoPersona = formData.rfcReceptor.trim().length === 12 ? 'moral' : 'fisica';
-      const nombreReceptor = tipoPersona === 'moral' 
-        ? formData.razonSocial.trim()
-        : `${formData.nombre.trim()} ${formData.paterno.trim()} ${formData.materno.trim()}`.trim();
       
       // Calcular ISR e IVA retenidos desde impRetenidos
       let isrRetenido = 0;

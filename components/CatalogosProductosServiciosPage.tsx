@@ -555,7 +555,6 @@ export const CatalogosProductosServiciosPage: React.FC = () => {
             onChange={handleChange}
             options={UNIDAD_OPTIONS}
             required
-            helpText="Código del catálogo SAT c_ClaveUnidad (ej: E48, H87, MTR)"
           />
 
           <div className="md:col-span-2 lg:col-span-3">

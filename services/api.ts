@@ -38,11 +38,11 @@ function getDefaultPacBaseUrl(): string {
   
   if (isLocalhost) {
     // En desarrollo local, el backend no usa context-path
-    return 'http://localhost:8080/api';
+    return 'http://localhost:8081/api';
   }
   
   // Por defecto, usar producción
-  return 'http://174.136.25.157:8080/cib-ms-cdp-0.0.1-SNAPSHOT/api';
+  return 'http://174.136.25.157:8080/cib-ms-cdp/api';
 }
 
 export const PAC_BASE_URL: string = getDefaultPacBaseUrl().replace(/\/+$/,'');

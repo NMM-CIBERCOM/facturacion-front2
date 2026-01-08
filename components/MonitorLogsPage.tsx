@@ -45,12 +45,26 @@ export const MonitorLogsPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<string>('');
-  const [baseDir, setBaseDir] = useState<string>(() => localStorage.getItem('logsBaseDir') || '');
+  const [baseDir, setBaseDir] = useState<string>(() => {
+    const stored = localStorage.getItem('logsBaseDir');
+    // Ignorar si es "<null>" o está vacío, y limpiar localStorage si contiene "<null>"
+    if (stored === '<null>') {
+      localStorage.removeItem('logsBaseDir');
+      return '';
+    }
+    return (stored && stored.trim() !== '') ? stored : '';
+  });
   const [pickerOpen, setPickerOpen] = useState(false);
   const [files, setFiles] = useState<ListedFile[]>([]);
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [errorFiles, setErrorFiles] = useState<string | null>(null);
-  const apiBase = (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_URL) ? (import.meta as any).env.VITE_API_URL : '';
+  // Usar la variable que sí está definida en .env (VITE_API_BASE_URL) y normalizar para no duplicar /api
+  const rawApiBase =
+    (typeof import.meta !== 'undefined' &&
+      (import.meta as any).env &&
+      ((import.meta as any).env.VITE_API_BASE_URL || (import.meta as any).env.VITE_API_URL)) ||
+    '';
+  const apiBase = rawApiBase.replace(/\/api\/?$/, '');
   
   const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -69,7 +83,10 @@ export const MonitorLogsPage: React.FC = () => {
   const totalPages = Math.max(1, Math.ceil(files.length / parseInt(filters.itemsPerPage)));
 
   const handleDownload = (fileRel: string) => {
-    const baseParam = baseDir ? `&baseDir=${encodeURIComponent(baseDir)}` : '';
+    // Solo incluir baseDir si no es "<null>" o está vacío
+    const baseParam = (baseDir && baseDir !== '<null>' && baseDir.trim() !== '') 
+      ? `&baseDir=${encodeURIComponent(baseDir)}` 
+      : '';
     const url = `${apiBase}/api/logs/download?file=${encodeURIComponent(fileRel)}${baseParam}`;
     window.open(url, '_blank');
   };
@@ -86,7 +103,12 @@ export const MonitorLogsPage: React.FC = () => {
   };
 
   const loadFiles = () => {
-    if (!baseDir) { setFiles([]); return; }
+    // Validar que baseDir no sea "<null>" o esté vacío
+    if (!baseDir || baseDir === '<null>' || baseDir.trim() === '') { 
+      setFiles([]); 
+      setErrorFiles('No se ha configurado el directorio base de logs. Por favor, selecciona una ruta.');
+      return; 
+    }
     setLoadingFiles(true); setErrorFiles(null);
     fetch(`${apiBase}/api/logs/list?baseDir=${encodeURIComponent(baseDir)}`)
       .then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json(); })
@@ -104,7 +126,8 @@ export const MonitorLogsPage: React.FC = () => {
         // formato: yml=...\nsysprop=...\nenv=...\neffective=...
         const match = t.match(/effective=(.*)/);
         const eff = match?.[1]?.trim();
-        if (eff) {
+        // Ignorar si es "<null>" o está vacío
+        if (eff && eff !== '<null>' && eff.length > 0) {
           setBaseDir(eff);
           localStorage.setItem('logsBaseDir', eff);
         }
@@ -149,7 +172,9 @@ export const MonitorLogsPage: React.FC = () => {
                 variant="secondary"
                 onClick={async () => {
                   try {
-                    const resp = await fetch(`${apiBase}/api/logs/pick-dir?start=${encodeURIComponent(baseDir || '')}`);
+                    // Solo enviar baseDir si no es "<null>" o está vacío
+                    const startPath = (baseDir && baseDir !== '<null>' && baseDir.trim() !== '') ? baseDir : '';
+                    const resp = await fetch(`${apiBase}/api/logs/pick-dir?start=${encodeURIComponent(startPath)}`);
                     if (resp.status === 204) return; // cancelado
                     if (!resp.ok) throw new Error(await resp.text());
                     const data = await resp.json();
@@ -166,7 +191,11 @@ export const MonitorLogsPage: React.FC = () => {
                 type="button"
                 variant="secondary"
                 onClick={async () => {
-                  if (!baseDir) { alert('Selecciona una ruta primero'); return; }
+                  // Validar que baseDir no sea "<null>" o esté vacío
+                  if (!baseDir || baseDir === '<null>' || baseDir.trim() === '') { 
+                    alert('Selecciona una ruta primero'); 
+                    return; 
+                  }
                   try {
                     const resp = await fetch(`${apiBase}/api/logs/set-log-dir?baseDir=${encodeURIComponent(baseDir)}&fileName=${encodeURIComponent('server.log')}`, { method: 'POST' });
                     const txt = await resp.text();
@@ -269,7 +298,7 @@ export const MonitorLogsPage: React.FC = () => {
         onClose={() => setPreviewOpen(false)}
         file={previewFile}
         lines={200}
-        baseDir={baseDir || undefined}
+        baseDir={(baseDir && baseDir !== '<null>' && baseDir.trim() !== '') ? baseDir : undefined}
       />
 
       <DirectoryPickerModal

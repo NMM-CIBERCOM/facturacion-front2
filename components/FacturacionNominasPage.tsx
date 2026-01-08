@@ -238,7 +238,6 @@ export const FacturacionNominasPage: React.FC = () => {
         return;
       }
 
-      const fechaNomina = searchDate || new Date().toISOString().split('T')[0];
       const payload: NominaFormPayload = {
         rfcEmisor: formData.rfcEmisor,
         rfcReceptor: formData.rfcReceptor,

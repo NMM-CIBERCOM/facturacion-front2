@@ -9,7 +9,11 @@ interface Props {
 }
 
 export default function LogPreviewModal({ isOpen, onClose, file, lines: linesProp = 200, baseDir }: Props) {
-  const apiBase = (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_URL) ? (import.meta as any).env.VITE_API_URL : '';
+  const apiBase =
+    (typeof import.meta !== 'undefined' &&
+      (import.meta as any).env &&
+      (import.meta as any).env.VITE_API_URL) ||
+    'http://localhost:8080';
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [lines, setLines] = useState<string[]>([]);
@@ -22,7 +26,10 @@ export default function LogPreviewModal({ isOpen, onClose, file, lines: linesPro
       setLoading(true);
       setError(null);
       try {
-        const baseParam = baseDir ? `&baseDir=${encodeURIComponent(baseDir)}` : '';
+        // Solo incluir baseDir si no es "<null>" o está vacío
+        const baseParam = (baseDir && baseDir !== '<null>' && baseDir.trim() !== '') 
+          ? `&baseDir=${encodeURIComponent(baseDir)}` 
+          : '';
         const skip = page * linesProp;
         const res = await fetch(`${apiBase}/api/logs/previewPage?file=${encodeURIComponent(file)}&lines=${linesProp}&skip=${skip}${baseParam}`, { headers: { 'Accept': 'application/json' } });
         if (!res.ok) throw new Error(await res.text());
@@ -51,7 +58,10 @@ export default function LogPreviewModal({ isOpen, onClose, file, lines: linesPro
             <button
               onClick={async () => {
                 try {
-                  const baseParam = baseDir ? `&baseDir=${encodeURIComponent(baseDir)}` : '';
+                  // Solo incluir baseDir si no es "<null>" o está vacío
+                  const baseParam = (baseDir && baseDir !== '<null>' && baseDir.trim() !== '') 
+                    ? `&baseDir=${encodeURIComponent(baseDir)}` 
+                    : '';
                   const res = await fetch(`${apiBase}/api/logs/download?file=${encodeURIComponent(file)}${baseParam}`);
                   if (!res.ok) throw new Error(`HTTP ${res.status}`);
                   const blob = await res.blob();
