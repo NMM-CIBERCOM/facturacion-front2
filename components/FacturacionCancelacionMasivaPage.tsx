@@ -564,6 +564,30 @@ export const FacturacionCancelacionMasivaPage: React.FC = () => {
 
   const fileHelpText = "El archivo debe ser .xlsx o .csv y contener las siguientes columnas: UUID, Folio, Tienda, Fecha. La primera fila se considera encabezado.";
 
+  // Función para descargar plantilla Excel
+  const descargarPlantilla = () => {
+    const datos = [
+      ['UUID', 'FOLIO', 'TIENDA', 'FECHA'],
+      ['12345678-1234-1234-1234-123456789012', 'FAC-001', 'S001', '2024-01-15'],
+      ['23456789-2345-2345-2345-234567890123', 'FAC-002', 'S002', '2024-01-16'],
+      ['34567890-3456-3456-3456-345678901234', 'FAC-003', 'S003', '2024-01-17'],
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(datos);
+    
+    // Ajustar ancho de columnas
+    ws['!cols'] = [
+      { wch: 40 }, // UUID
+      { wch: 15 }, // FOLIO
+      { wch: 10 }, // TIENDA
+      { wch: 12 }, // FECHA
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Cancelaciones');
+    XLSX.writeFile(wb, 'plantilla_cancelacion_masiva.xlsx');
+  };
+
   return (
     <div className="space-y-6 p-4">
       <div className='flex items-center space-x-3'>
@@ -587,7 +611,17 @@ export const FacturacionCancelacionMasivaPage: React.FC = () => {
           <div className="flex flex-col md:flex-row md:items-end gap-4">
             <div className="flex-1">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Archivo de Cancelación Masiva:</label>
-              <input type="file" accept=".xlsx,.csv" onChange={handleFileChange} className="block w-full text-sm text-gray-700 dark:text-gray-100 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary-dark" />
+              <div className="flex gap-2">
+                <input type="file" accept=".xlsx,.csv" onChange={handleFileChange} className="flex-1 block w-full text-sm text-gray-700 dark:text-gray-100 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary-dark" />
+                <Button 
+                  type="button" 
+                  variant="secondary" 
+                  onClick={descargarPlantilla}
+                  title="Descargar plantilla Excel de ejemplo"
+                >
+                  📥 Descargar Plantilla
+                </Button>
+              </div>
             </div>
             <Button type="submit" variant="primary" disabled={isLoading || !selectedFile}>
               {isLoading ? 'Procesando...' : 'Cancelar Masiva'}

@@ -140,8 +140,7 @@ export const NAV_ITEMS: NavItem[] = [
       { label: 'Logs', path: 'monitor-logs', icon: DocumentMagnifyingGlassIcon },
       { label: 'Decodificador', path: 'monitor-decodificador', icon: WrenchScrewdriverIcon },
       { label: 'Permisos', path: 'monitor-permisos', icon: FiSettings },
-      { label: 'Test PDF', path: 'test-pdf', icon: DocumentTextIcon },
-      { label: 'Test iText PDF', path: 'test-itext-pdf', icon: DocumentTextIcon },
+     
       { label: 'Conexiones', path: 'monitor-conexiones', icon: SignalIcon },
     ],
   },

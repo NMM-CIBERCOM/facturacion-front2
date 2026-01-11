@@ -1535,14 +1535,7 @@ export const InvoiceForm: React.FC = () => {
             >
               Cancelar
             </Button>
-            <Button
-              type="button"
-              onClick={() => alert('Funcionalidad de Prefactura - pendiente implementar')}
-              variant="secondary"
-              className="w-full sm:w-auto whitespace-nowrap"
-            >
-              Prefactura
-            </Button>
+            
           </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 w-full sm:w-auto">
             <Button 
