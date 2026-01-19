@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card } from './Card';
 import { ChartBarIcon, DocumentTextIcon, CogIcon } from './icons';
 import { dashboardService, DatoGrafico, EstadisticasRapidas, FacturaResumen } from '../services/dashboardService';
+import { apiUrl } from '../services/api';
 
 // Componente para gráfico de barras con colores múltiples
 interface GraficoBarrasMulticolorProps {
@@ -127,6 +128,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setActivePage }) =
   const [datosGrafico, setDatosGrafico] = useState<DatoGrafico[]>([]);
   const [ultimasFacturas, setUltimasFacturas] = useState<FacturaResumen[]>([]);
   const [cargando, setCargando] = useState(true);
+  const [pdfViewerOpen, setPdfViewerOpen] = useState<boolean>(false);
+  const [pdfViewerUrl, setPdfViewerUrl] = useState<string | null>(null);
+  const [pdfViewerLoading, setPdfViewerLoading] = useState<boolean>(false);
 
   useEffect(() => {
     const cargarDatos = async () => {
@@ -150,8 +154,49 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setActivePage }) =
     cargarDatos();
   }, []);
 
+  // Limpiar URL del PDF cuando se cierra el modal
+  useEffect(() => {
+    if (pdfViewerUrl) {
+      try { window.URL.revokeObjectURL(pdfViewerUrl); } catch {}
+    }
+  }, [pdfViewerUrl]);
+
   const handleNuevaFacturaArticulos = () => {
     setActivePage('Artículos');
+  };
+
+  const handleVerFactura = async (uuid: string) => {
+    if (!uuid) return;
+    
+    setPdfViewerOpen(true);
+    setPdfViewerLoading(true);
+    setPdfViewerUrl(null);
+
+    try {
+      const response = await fetch(apiUrl(`/factura/descargar-pdf/${uuid}`));
+      
+      if (!response.ok) {
+        throw new Error(`Error al obtener PDF (HTTP ${response.status})`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      setPdfViewerUrl(url);
+    } catch (error) {
+      console.error('Error al cargar PDF:', error);
+      alert(`Error al cargar la vista previa: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      setPdfViewerOpen(false);
+    } finally {
+      setPdfViewerLoading(false);
+    }
+  };
+
+  const closePdfViewer = () => {
+    setPdfViewerOpen(false);
+    if (pdfViewerUrl) {
+      window.URL.revokeObjectURL(pdfViewerUrl);
+      setPdfViewerUrl(null);
+    }
   };
 
   const formatearMoneda = (valor: number | undefined): string => {
@@ -238,40 +283,50 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setActivePage }) =
             {cargando ? (
               <div className="text-center py-4 text-gray-500 dark:text-gray-400">Cargando...</div>
             ) : ultimasFacturas.length > 0 ? (
-              <ul className="space-y-2 mt-2">
-                {ultimasFacturas.map((factura, index) => (
-                  <li 
-                    key={factura.uuid || index}
-                    className="text-sm text-gray-600 dark:text-gray-300 p-2 bg-gray-50 dark:bg-gray-700 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="font-medium">
-                          {factura.serie && factura.folio 
-                            ? `Factura ${factura.serie}-${factura.folio}`
-                            : factura.uuid ? `Factura ${factura.uuid.substring(0, 8)}...` 
-                            : `Factura #${index + 1}`}
-                        </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          {factura.receptorRazonSocial || 'Sin receptor'}
-                        </div>
-                        {factura.fechaFactura && (
-                          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                            {formatearFecha(factura.fechaFactura)}
+              <>
+                <ul className="space-y-2 mt-2">
+                  {ultimasFacturas.slice(0, 3).map((factura, index) => (
+                    <li 
+                      key={factura.uuid || index}
+                      onClick={() => factura.uuid && handleVerFactura(factura.uuid)}
+                      className="text-sm text-gray-600 dark:text-gray-300 p-2 bg-gray-50 dark:bg-gray-700 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors cursor-pointer"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-medium">
+                            {factura.serie && factura.folio 
+                              ? `Factura ${factura.serie}-${factura.folio}`
+                              : factura.uuid ? `Factura ${factura.uuid.substring(0, 8)}...` 
+                              : `Factura #${index + 1}`}
                           </div>
-                        )}
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            {factura.receptorRazonSocial || 'Sin receptor'}
+                          </div>
+                          {factura.fechaFactura && (
+                            <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                              {formatearFecha(factura.fechaFactura)}
+                            </div>
+                          )}
+                        </div>
+                        <div className="font-semibold text-gray-700 dark:text-gray-200 ml-2">
+                          {formatearMoneda(factura.total)}
+                        </div>
                       </div>
-                      <div className="font-semibold text-gray-700 dark:text-gray-200 ml-2">
-                        {formatearMoneda(factura.total)}
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+                    </li>
+                  ))}
+                </ul>
+                {ultimasFacturas.length > 3 && (
+                  <button 
+                    onClick={() => setActivePage('consultas-facturas')}
+                    className="mt-4 text-sm text-primary dark:text-secondary-dark hover:underline cursor-pointer"
+                  >
+                    Ver todas las facturas
+                  </button>
+                )}
+              </>
             ) : (
               <div className="text-center py-4 text-gray-500 dark:text-gray-400">No hay facturas recientes</div>
             )}
-            <button className="mt-4 text-sm text-primary dark:text-secondary-dark hover:underline">Ver todas las facturas</button>
           </div>
         </Card>
 
@@ -315,6 +370,37 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setActivePage }) =
           )}
         </div>
       </Card>
+
+      {/* Modal visor PDF */}
+      {pdfViewerOpen && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg w-[95vw] max-w-5xl overflow-hidden">
+            <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700">
+              <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Vista previa PDF</h4>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="px-3 py-1 text-sm rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
+                  onClick={closePdfViewer}
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+            <div className="p-0">
+              {pdfViewerLoading ? (
+                <div className="p-6 text-center text-gray-700 dark:text-gray-200">Cargando PDF…</div>
+              ) : (
+                <iframe
+                  src={pdfViewerUrl || ''}
+                  title="Visor PDF"
+                  className="w-full h-[80vh]"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes fadeIn {

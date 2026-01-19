@@ -8,7 +8,6 @@ import { MagnifyingGlassIcon } from './components/icons/MagnifyingGlassIcon';
 import { WrenchScrewdriverIcon } from './components/icons/WrenchScrewdriverIcon';
 import { ChartBarIcon } from './components/icons/ChartBarIcon';
 import { CurrencyDollarIcon } from './components/icons/CurrencyDollarIcon';
-import { TruckIcon } from './components/icons/TruckIcon';
 import { GiftIcon } from './components/icons/GiftIcon';
 import { StopIcon } from './components/icons/StopIcon';
 import { ChevronDoubleRightIcon } from './components/icons/ChevronDoubleRightIcon';
@@ -18,7 +17,7 @@ import {
   FaUser, FaStore, FaCalendarAlt, FaLaptop, FaExclamationTriangle, FaLayerGroup, 
   FaChartBar, FaFileAlt, FaUsers, FaExchangeAlt, FaClipboardCheck, FaSyncAlt, FaFileSignature, FaHistory, FaEnvelope, FaTh
 } from 'react-icons/fa';
-import { FiFileText, FiUsers, FiRepeat, FiSettings } from 'react-icons/fi';
+import { FiFileText, FiUsers, FiSettings } from 'react-icons/fi';
 import { ChartPieIcon } from './components/icons/ChartPieIcon';
 import { SignalIcon } from './components/icons/SignalIcon';
 import { DocumentMagnifyingGlassIcon } from './components/icons/DocumentMagnifyingGlassIcon';

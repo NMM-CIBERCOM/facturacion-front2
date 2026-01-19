@@ -102,6 +102,9 @@ const LOGO_STORAGE_KEY = 'logoUrl';
 const ACTIVE_PATH_STORAGE_KEY = 'cibercom.activePath';
 const USER_STORAGE_KEY = 'cibercom.user';
 const TOKEN_STORAGE_KEY = 'cibercom.token';
+const SESSION_TIMESTAMP_KEY = 'cibercom.sessionTimestamp';
+// Tiempo de expiración de sesión en milisegundos (3 minutos = 180000 ms)
+const SESSION_TIMEOUT = 30 * 1000; // 3 minutos
 
 const flattenNavItems = (items: NavItem[]): NavItem[] => {
   const result: NavItem[] = [];
@@ -219,7 +222,29 @@ export const App: React.FC = () => {
   );
   const [logoUrl, setLogoUrl] = useState<string>(() => getStoredLogo());
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return localStorage.getItem(AUTH_STORAGE_KEY) === 'true';
+    const auth = localStorage.getItem(AUTH_STORAGE_KEY) === 'true';
+    if (auth) {
+      // Verificar si la sesión ha expirado al cargar
+      const timestampStr = localStorage.getItem(SESSION_TIMESTAMP_KEY);
+      if (timestampStr) {
+        const timestamp = parseInt(timestampStr, 10);
+        const ahora = Date.now();
+        const tiempoTranscurrido = ahora - timestamp;
+        if (tiempoTranscurrido >= SESSION_TIMEOUT) {
+          // Sesión expirada, limpiar
+          localStorage.removeItem(AUTH_STORAGE_KEY);
+          localStorage.removeItem(TOKEN_STORAGE_KEY);
+          localStorage.removeItem(SESSION_TIMESTAMP_KEY);
+          return false;
+        }
+      } else {
+        // No hay timestamp, considerar sesión inválida
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
+        return false;
+      }
+    }
+    return auth;
   });
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   const [activePath, setActivePath] = useState<string>(() => getStoredActivePath());
@@ -312,12 +337,26 @@ export const App: React.FC = () => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   }, []);
 
+  const handleLogout = useCallback(() => {
+    setIsAuthenticated(false);
+    setAuthUser(null);
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(SESSION_TIMESTAMP_KEY);
+    localStorage.removeItem('perfil');
+    localStorage.removeItem('nombreEmpleado');
+    localStorage.removeItem('username');
+    setIsSidebarOpen(false);
+  }, []);
+
   const handleLogin = useCallback(
     async (username: string, password: string) => {
       try {
         const response = await loginService(username, password);
         setIsAuthenticated(true);
         localStorage.setItem(AUTH_STORAGE_KEY, 'true');
+        // Guardar timestamp de inicio de sesión
+        localStorage.setItem(SESSION_TIMESTAMP_KEY, Date.now().toString());
         if (response.token) {
           localStorage.setItem(TOKEN_STORAGE_KEY, response.token);
         } else {
@@ -346,6 +385,7 @@ export const App: React.FC = () => {
         setIsAuthenticated(false);
         localStorage.removeItem(AUTH_STORAGE_KEY);
         localStorage.removeItem(TOKEN_STORAGE_KEY);
+        localStorage.removeItem(SESSION_TIMESTAMP_KEY);
         throw error instanceof Error
           ? error
           : new Error('No se pudo iniciar sesión.');
@@ -354,16 +394,87 @@ export const App: React.FC = () => {
     [],
   );
 
-  const handleLogout = useCallback(() => {
-    setIsAuthenticated(false);
-    setAuthUser(null);
-    localStorage.removeItem(AUTH_STORAGE_KEY);
-    localStorage.removeItem(TOKEN_STORAGE_KEY);
-    localStorage.removeItem('perfil');
-    localStorage.removeItem('nombreEmpleado');
-    localStorage.removeItem('username');
-    setIsSidebarOpen(false);
-  }, []);
+  // Función para verificar si la sesión ha expirado
+  const verificarSesionExpirada = useCallback(() => {
+    if (!isAuthenticated) return false;
+
+    const timestampStr = localStorage.getItem(SESSION_TIMESTAMP_KEY);
+    if (!timestampStr) {
+      // No hay timestamp, considerar sesión inválida
+      handleLogout();
+      return true;
+    }
+
+    const timestamp = parseInt(timestampStr, 10);
+    const ahora = Date.now();
+    const tiempoTranscurrido = ahora - timestamp;
+
+    if (tiempoTranscurrido >= SESSION_TIMEOUT) {
+      // Sesión expirada
+      handleLogout();
+      return true;
+    }
+
+    return false;
+  }, [isAuthenticated, handleLogout]);
+
+  // Función para actualizar el timestamp de la sesión (resetear el timer)
+  const actualizarTimestampSesion = useCallback(() => {
+    if (isAuthenticated) {
+      localStorage.setItem(SESSION_TIMESTAMP_KEY, Date.now().toString());
+    }
+  }, [isAuthenticated]);
+
+  // Verificar sesión al cargar y periódicamente
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    // Verificar inmediatamente al montar
+    verificarSesionExpirada();
+
+    // Verificar cada 30 segundos
+    const intervalId = setInterval(() => {
+      verificarSesionExpirada();
+    }, 30000); // Verificar cada 30 segundos
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [isAuthenticated, verificarSesionExpirada]);
+
+  // Resetear el timer de sesión cuando el usuario interactúa
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const eventos = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    
+    const resetearTimer = () => {
+      actualizarTimestampSesion();
+    };
+
+    // Agregar listeners con throttling para evitar demasiadas actualizaciones
+    let throttleTimer: ReturnType<typeof setTimeout> | null = null;
+    const throttledReset = () => {
+      if (throttleTimer) return;
+      throttleTimer = setTimeout(() => {
+        resetearTimer();
+        throttleTimer = null;
+      }, 1000); // Actualizar máximo una vez por segundo
+    };
+
+    eventos.forEach(evento => {
+      window.addEventListener(evento, throttledReset, { passive: true });
+    });
+
+    return () => {
+      eventos.forEach(evento => {
+        window.removeEventListener(evento, throttledReset);
+      });
+      if (throttleTimer) {
+        clearTimeout(throttleTimer);
+      }
+    };
+  }, [isAuthenticated, actualizarTimestampSesion]);
 
   const toggleSidebar = useCallback(() => {
     setIsSidebarOpen((prev) => !prev);
