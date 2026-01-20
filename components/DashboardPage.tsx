@@ -162,7 +162,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setActivePage }) =
   }, [pdfViewerUrl]);
 
   const handleNuevaFacturaArticulos = () => {
-    setActivePage('Artículos');
+    setActivePage('facturacion-articulos');
   };
 
   const handleVerFactura = async (uuid: string) => {
@@ -318,7 +318,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setActivePage }) =
                 {ultimasFacturas.length > 3 && (
                   <button 
                     onClick={() => setActivePage('consultas-facturas')}
-                    className="mt-4 text-sm text-primary dark:text-secondary-dark hover:underline cursor-pointer"
+                    className="mt-4 text-sm text-primary dark:text-white hover:underline cursor-pointer"
                   >
                     Ver todas las facturas
                   </button>
@@ -331,23 +331,21 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setActivePage }) =
         </Card>
 
         <Card title="Acciones Rápidas">
-          <div className="p-4">
-            <div className="flex items-center mb-3">
-              <CogIcon className="w-8 h-8 mr-3 text-primary dark:text-secondary" />
+          <div className="p-3">
+            <div className="flex items-center mb-2">
+              <CogIcon className="w-6 h-6 mr-2 text-primary dark:text-secondary" />
               <div>
-                <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Accesos Directos</h4>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Tareas comunes.</p>
+                <h4 className="text-base font-semibold text-gray-800 dark:text-gray-100">Accesos Directos</h4>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Tareas comunes.</p>
               </div>
             </div>
-            <div className="space-y-2 mt-2">
+            <div className="mt-2">
               <button
                 className="w-full text-left p-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
                 onClick={handleNuevaFacturaArticulos}
               >
                 Nueva Factura de Artículos
               </button>
-              <button className="w-full text-left p-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors">Buscar Cliente</button>
-              <button className="w-full text-left p-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors">Ver Reporte Mensual</button>
             </div>
           </div>
         </Card>

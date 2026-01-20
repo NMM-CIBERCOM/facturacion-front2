@@ -688,7 +688,7 @@ export const App: React.FC = () => {
     <ThemeContext.Provider value={themeContextValue}>
       <EmpresaProvider>
         {isAuthenticated ? (
-          <div className="flex h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+          <div className="flex h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300 overflow-hidden">
             <Sidebar
               navItems={NAV_ITEMS}
               isOpen={isSidebarOpen}
@@ -697,7 +697,7 @@ export const App: React.FC = () => {
               logoUrl={logoUrl}
               appName={APP_NAME}
             />
-            <div className="flex flex-col flex-1 overflow-hidden">
+            <div className="flex flex-col flex-1 overflow-hidden min-w-0">
               <Header
                 user={headerUser}
                 toggleSidebar={toggleSidebar}

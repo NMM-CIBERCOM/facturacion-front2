@@ -369,37 +369,39 @@ const RegistroCFDIPage: React.FC = () => {
         {/* Results Section */}
         {facturasInfo.length > 0 && (
           <Card title="Datos Extraídos" className="mb-8">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-800">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      RFC
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Nombre
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Apellidos
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Domicilio
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Regímenes Fiscales
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Acciones
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-                  {facturasInfo.map((factura, index) => (
-                    <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
-                        {factura.rfc}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <div className="inline-block min-w-full align-middle">
+                <div className="overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead className="bg-gray-50 dark:bg-gray-800">
+                      <tr>
+                        <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          RFC
+                        </th>
+                        <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Nombre
+                        </th>
+                        <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden md:table-cell">
+                          Apellidos
+                        </th>
+                        <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden lg:table-cell">
+                          Domicilio
+                        </th>
+                        <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden lg:table-cell">
+                          Regímenes Fiscales
+                        </th>
+                        <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Acciones
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                      {facturasInfo.map((factura, index) => (
+                        <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                          <td className="px-3 sm:px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">
+                            <div className="break-words">{factura.rfc}</div>
+                          </td>
+                          <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
                         {factura.editing ? (
                           <input
                             type="text"
@@ -414,41 +416,41 @@ const RegistroCFDIPage: React.FC = () => {
                           factura.nombre
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                        {factura.editing ? (
-                          <div className="space-y-1">
-                            <input
-                              type="text"
-                              placeholder="Primer Apellido"
-                              value={factura.primerApellido || ''}
-                              onChange={(e) => {
-                                factura.primerApellido = e.target.value;
-                                setFacturasInfo([...facturasInfo]);
-                              }}
-                              className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                            />
-                            <input
-                              type="text"
-                              placeholder="Segundo Apellido"
-                              value={factura.segundoApellido || ''}
-                              onChange={(e) => {
-                                factura.segundoApellido = e.target.value;
-                                setFacturasInfo([...facturasInfo]);
-                              }}
-                              className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                            />
-                          </div>
-                        ) : (
-                          <div>
-                            {factura.primerApellido && <div>{factura.primerApellido}</div>}
-                            {factura.segundoApellido && <div>{factura.segundoApellido}</div>}
-                            {!factura.primerApellido && !factura.segundoApellido && (
-                              <span className="text-gray-400 dark:text-gray-500">-</span>
+                          <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 dark:text-gray-100 hidden md:table-cell">
+                            {factura.editing ? (
+                              <div className="space-y-1">
+                                <input
+                                  type="text"
+                                  placeholder="Primer Apellido"
+                                  value={factura.primerApellido || ''}
+                                  onChange={(e) => {
+                                    factura.primerApellido = e.target.value;
+                                    setFacturasInfo([...facturasInfo]);
+                                  }}
+                                  className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Segundo Apellido"
+                                  value={factura.segundoApellido || ''}
+                                  onChange={(e) => {
+                                    factura.segundoApellido = e.target.value;
+                                    setFacturasInfo([...facturasInfo]);
+                                  }}
+                                  className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                                />
+                              </div>
+                            ) : (
+                              <div>
+                                {factura.primerApellido && <div>{factura.primerApellido}</div>}
+                                {factura.segundoApellido && <div>{factura.segundoApellido}</div>}
+                                {!factura.primerApellido && !factura.segundoApellido && (
+                                  <span className="text-gray-400 dark:text-gray-500">-</span>
+                                )}
+                              </div>
                             )}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
+                          </td>
+                          <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 dark:text-gray-100 hidden lg:table-cell">
                         {factura.editing ? (
                           <div className="space-y-1">
                             <input
@@ -534,75 +536,77 @@ const RegistroCFDIPage: React.FC = () => {
                           </div>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
-                        {factura.editing ? (
-                          <select
-                            multiple
-                            value={factura.regimenesFiscales}
-                            onChange={(e) => {
-                              const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
-                              factura.regimenesFiscales = selectedOptions;
-                              setFacturasInfo([...facturasInfo]);
-                            }}
-                            className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                            size={3}
-                          >
-                            {todosRegimenesFiscales.map((regimen, idx) => (
-                              <option key={idx} value={regimen.clave + " - " + regimen.descripcion}>
-                                {regimen.clave} - {regimen.descripcion}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <div>
-                            {factura.regimenesFiscales.length > 0 ? (
-                              <div className="space-y-1">
-                                {factura.regimenesFiscales.map((regimen, idx) => (
-                                  <div key={idx} className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
-                                    {regimen}
-                                  </div>
+                          <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 dark:text-gray-100 hidden lg:table-cell">
+                            {factura.editing ? (
+                              <select
+                                multiple
+                                value={factura.regimenesFiscales}
+                                onChange={(e) => {
+                                  const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
+                                  factura.regimenesFiscales = selectedOptions;
+                                  setFacturasInfo([...facturasInfo]);
+                                }}
+                                className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                                size={3}
+                              >
+                                {todosRegimenesFiscales.map((regimen, idx) => (
+                                  <option key={idx} value={regimen.clave + " - " + regimen.descripcion}>
+                                    {regimen.clave} - {regimen.descripcion}
+                                  </option>
                                 ))}
-                              </div>
+                              </select>
                             ) : (
-                              <span className="text-gray-400 dark:text-gray-500">-</span>
+                              <div>
+                                {factura.regimenesFiscales.length > 0 ? (
+                                  <div className="space-y-1">
+                                    {factura.regimenesFiscales.map((regimen, idx) => (
+                                      <div key={idx} className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded break-words">
+                                        {regimen}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-400 dark:text-gray-500">-</span>
+                                )}
+                              </div>
                             )}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => toggleEdit(factura)}
-                            className={`inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded transition-colors ${
-                              factura.editing
-                                ? 'text-green-600 hover:text-green-500'
-                                : 'text-blue-600 hover:text-blue-500'
-                            }`}
-                          >
-                            {factura.editing ? <FaSave className="mr-1" /> : <FaEdit className="mr-1" />}
-                            {factura.editing ? 'Guardar' : 'Editar'}
-                          </button>
-                          <button
-                            onClick={() => viewDetails(factura)}
-                            className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded text-gray-600 hover:text-gray-500"
-                          >
-                            <FaEye className="mr-1" />
-                            Ver
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                          </td>
+                          <td className="px-3 sm:px-6 py-4 text-sm font-medium">
+                            <div className="flex flex-col sm:flex-row gap-1 sm:gap-2">
+                              <button
+                                onClick={() => toggleEdit(factura)}
+                                className={`inline-flex items-center justify-center px-2 sm:px-3 py-1 border border-transparent text-xs font-medium rounded transition-colors ${
+                                  factura.editing
+                                    ? 'text-green-600 hover:text-green-500'
+                                    : 'text-blue-600 hover:text-blue-500'
+                                }`}
+                              >
+                                {factura.editing ? <FaSave className="mr-1" /> : <FaEdit className="mr-1" />}
+                                <span className="hidden sm:inline">{factura.editing ? 'Guardar' : 'Editar'}</span>
+                              </button>
+                              <button
+                                onClick={() => viewDetails(factura)}
+                                className="inline-flex items-center justify-center px-2 sm:px-3 py-1 border border-transparent text-xs font-medium rounded text-gray-600 hover:text-gray-500"
+                              >
+                                <FaEye className="mr-1" />
+                                <span className="hidden sm:inline">Ver</span>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           </Card>
         )}
 
         {/* Modal */}
         {selectedFactura && (
-          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-            <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white dark:bg-gray-800">
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 p-4">
+            <div className="relative top-4 sm:top-20 mx-auto p-4 sm:p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white dark:bg-gray-800">
               <div className="mt-3">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
@@ -616,7 +620,7 @@ const RegistroCFDIPage: React.FC = () => {
                   </button>
                 </div>
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">RFC</label>
                       <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">{selectedFactura.rfc}</p>
