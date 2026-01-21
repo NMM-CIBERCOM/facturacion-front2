@@ -313,7 +313,7 @@ export const AdminEmpleadosPage: React.FC = () => {
       </h2>
 
       <Card>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
           BUSCAR DATOS DE USUARIO
         </h3>
         <form onSubmit={handleConsultarUsuario} className="space-y-4">
@@ -341,7 +341,7 @@ export const AdminEmpleadosPage: React.FC = () => {
       {/* Tabla de Empleados */}
       <Card>
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-primary dark:text-secondary">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
             DATOS CONSULTADOS
           </h3>
           <Button 
@@ -454,7 +454,7 @@ export const AdminEmpleadosPage: React.FC = () => {
       </Card>
 
       <Card className="bg-accent/10 dark:bg-accent-dark/10 border-accent dark:border-accent-dark">
-        <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-2">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
           Dar de baja usuarios
         </h3>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
@@ -492,7 +492,7 @@ export const AdminEmpleadosPage: React.FC = () => {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
                   Registro de Nuevo Usuario
                 </h3>
                 <button

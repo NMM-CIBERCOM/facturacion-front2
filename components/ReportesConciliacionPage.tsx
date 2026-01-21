@@ -124,7 +124,7 @@ export const ReportesConciliacionPage: React.FC = () => {
       </p>
 
       <Card>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
           --Cargar nuevo documento--
         </h3>
         <form onSubmit={handleCargarDocumento} className="space-y-4">
@@ -163,7 +163,7 @@ export const ReportesConciliacionPage: React.FC = () => {
 
       <Card>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-          <h3 className="text-lg font-semibold text-primary dark:text-secondary">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
             Documentos Cargados
           </h3>
           <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">

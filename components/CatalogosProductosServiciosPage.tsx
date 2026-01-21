@@ -418,7 +418,7 @@ export const CatalogosProductosServiciosPage: React.FC = () => {
         {mostrarResultadosBusqueda && resultadosBusqueda.length > 0 && (
           <div className="mt-4 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
             <div className="bg-gray-50 dark:bg-gray-700 px-4 py-2 border-b border-gray-200 dark:border-gray-600">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
                 Resultados de búsqueda ({resultadosBusqueda.length})
               </h3>
             </div>

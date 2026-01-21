@@ -226,7 +226,7 @@ export const ConsultasRepsSustituidosPage: React.FC = () => {
   return (
     <form onSubmit={handleBuscar} className="space-y-6">
       <Card>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
           Reporte de CFDI enviados para Timbrar (REPS Sustituidos)
         </h3>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
@@ -283,7 +283,7 @@ export const ConsultasRepsSustituidosPage: React.FC = () => {
         </div>
       ) : (
         <Card className="mt-6">
-          <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
             Resultados de la búsqueda
           </h3>
           

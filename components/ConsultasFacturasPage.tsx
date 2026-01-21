@@ -694,7 +694,7 @@ export const ConsultasFacturasPage: React.FC = () => {
         <div className="mt-6 p-4 border border-dashed border-gray-300 dark:border-gray-600 rounded-md min-h-[200px] flex items-center justify-center text-gray-400 dark:text-gray-500">Los resultados de la búsqueda de facturas aparecerán aquí.</div>
       ) : (
         <Card className="mt-6">
-          <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">Resultados de la búsqueda</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Resultados de la búsqueda</h3>
           {resultados.length === 0 ? (
             <div className="p-4 text-center text-gray-500 dark:text-gray-400">No se encontraron facturas que coincidan con los criterios de búsqueda.</div>
           ) : (
@@ -903,7 +903,7 @@ export const ConsultasFacturasPage: React.FC = () => {
       {cancelModal.open && (
         <div className="fixed inset-0 bg-black/40 dark:bg-black/60 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-md p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Confirmar cancelación</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Confirmar cancelación</h3>
             <div className="mt-4 space-y-3">
               <div className="text-sm text-gray-700 dark:text-gray-200">
                 <div><span className="font-medium">UUID:</span> {cancelModal.uuid}</div>

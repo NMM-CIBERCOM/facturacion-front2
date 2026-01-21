@@ -96,7 +96,7 @@ export const ReportesControlCambiosPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <Card>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
           --Crear nueva versión--
         </h3>
         <form onSubmit={handleCrearVersion} className="space-y-4">
@@ -161,7 +161,7 @@ export const ReportesControlCambiosPage: React.FC = () => {
           </div>
         </div>
 
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
           Historial de Cambios
         </h3>
         <div className="overflow-x-auto">

@@ -280,7 +280,7 @@ export const ConfiguracionCorreoPage: React.FC = () => {
           <LogoUploader onLogoChange={handleLogoChange} initialLogo={logo} />
           {/* Panel de configuración */}
           <Card>
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
               Configurar Mensaje de Facturación
             </h3>
             
@@ -481,7 +481,7 @@ export const ConfiguracionCorreoPage: React.FC = () => {
         {/* Panel de vista previa */}
         <div className="space-y-6">
         <Card>
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
             Vista Previa del Mensaje
           </h3>
           

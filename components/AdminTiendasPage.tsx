@@ -280,7 +280,7 @@ export const AdminTiendasPage: React.FC = () => {
       {/* Filtros */}
       <Card className="p-4">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Filtros</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Filtros</h3>
           <Button
             onClick={() => setShowFilters(!showFilters)}
             variant="outline"

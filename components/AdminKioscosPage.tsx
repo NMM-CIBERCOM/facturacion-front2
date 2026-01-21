@@ -113,7 +113,7 @@ export const AdminKioscosPage: React.FC = () => {
 
   const renderForm = () => (
      <Card className="mb-6">
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
           {editingKiosco ? 'Modificar Kiosco' : 'Agregar Nuevo Kiosco'}
         </h3>
         <form onSubmit={handleAddKioscoSubmit} className="space-y-4">
@@ -189,7 +189,7 @@ export const AdminKioscosPage: React.FC = () => {
             )}
           </div>
         </div>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
           Lista de Kiosco
         </h3>
         <div className="overflow-x-auto">

@@ -56,7 +56,7 @@ export const ReportesBoletasNoAuditadasPage: React.FC = () => {
   return (
     <form onSubmit={handleBuscar} className="space-y-6">
       <Card>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
           --Especificar búsqueda--
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4 items-end">

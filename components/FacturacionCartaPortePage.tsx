@@ -1014,7 +1014,7 @@ export const FacturacionCartaPortePage: React.FC = () => {
       />
 
       <Card>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">Información general</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Información general</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <TextareaField
             label="Descripción"
@@ -1042,7 +1042,7 @@ export const FacturacionCartaPortePage: React.FC = () => {
       </Card>
 
       <Card>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">Ubicaciones</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Ubicaciones</h3>
         <div className="space-y-4">
           {formData.complemento.ubicaciones.map((ubicacion, index) => (
             <Card key={ubicacion.idUbicacion || index}>
@@ -1170,7 +1170,7 @@ export const FacturacionCartaPortePage: React.FC = () => {
       </Card>
 
       <Card>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">Mercancías</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Mercancías</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <FormField
             label="Peso Bruto Total (kg)"
@@ -1527,7 +1527,7 @@ export const FacturacionCartaPortePage: React.FC = () => {
       </Card>
 
       <Card>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">Figuras de transporte</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Figuras de transporte</h3>
         <div className="space-y-4">
           {formData.complemento.figuraTransporte.tiposFigura.map((figura, index) => (
             <Card key={`figura-${index}`}>

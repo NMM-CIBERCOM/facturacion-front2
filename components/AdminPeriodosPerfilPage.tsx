@@ -77,7 +77,7 @@ export const AdminPeriodosPerfilPage: React.FC = () => {
       </Card>
 
       <Card>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
           Lista de Reglas de periodos de cancelación y emisión
         </h3>
         <div className="overflow-x-auto">

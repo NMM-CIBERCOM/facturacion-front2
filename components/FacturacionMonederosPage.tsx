@@ -101,7 +101,7 @@ export const FacturacionMonederosPage: React.FC = () => {
       />
 
       <Card>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">Consultar Boleta:</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Consultar Boleta:</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2 items-end">
           <FormField label="Código de Facturación:" name="codigoFacturacion" value={formData.codigoFacturacion} onChange={handleChange} />
           <SelectField label="Tienda:" name="tienda" value={formData.tienda} onChange={handleChange} options={TIENDA_OPTIONS} />
@@ -117,7 +117,7 @@ export const FacturacionMonederosPage: React.FC = () => {
       </Card>
 
       <Card>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">Forma de pago:</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Forma de pago:</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 items-center">
           <SelectField label="Medio de pago:" name="medioPago" value={formData.medioPago} onChange={handleChange} options={MEDIO_PAGO_OPTIONS} />
           <SelectField label="Forma de pago:" name="formaPago" value={formData.formaPago} onChange={handleChange} options={FORMA_PAGO_OPTIONS} />

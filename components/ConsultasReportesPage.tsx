@@ -129,7 +129,7 @@ export const ConsultasReportesPage: React.FC<ConsultasReportesPageProps> = ({ se
   return (
     <Card>
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
           Seleccione un reporte:
         </h3>
         <div className="flex gap-2">
@@ -173,7 +173,7 @@ export const ConsultasReportesPage: React.FC<ConsultasReportesPageProps> = ({ se
         </div>
       ) : (
         <Card className="mt-8">
-          <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
             Reporte: {reporteSeleccionado}
           </h3>
           

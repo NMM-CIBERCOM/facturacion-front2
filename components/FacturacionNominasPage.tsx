@@ -552,7 +552,7 @@ export const FacturacionNominasPage: React.FC = () => {
 
       {/* Historial de facturación */}
       <Card>
-        <h3 className="text-lg font-semibold mb-4 text-primary dark:text-secondary">Historial de Facturación</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Historial de Facturación</h3>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-900">

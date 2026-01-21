@@ -810,7 +810,7 @@ export const FacturacionCapturaLibrePage: React.FC = () => {
       />
 
       <Card>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">Boleta</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Boleta</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-2 items-end">
           <SelectField label="Tienda:" name="tiendaBoleta" value={formData.tiendaBoleta} onChange={handleChange} options={tiendasOpts.length ? tiendasOpts : TIENDA_OPTIONS} className="lg:col-span-1" disabled={tiendasLoading} error={Boolean(tiendasError)} />
           <FormField label="Terminal:" name="terminalBoleta" value={formData.terminalBoleta} onChange={handleChange} className="lg:col-span-1"/>
@@ -820,12 +820,12 @@ export const FacturacionCapturaLibrePage: React.FC = () => {
       </Card>
 
       <Card>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">Justificación</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Justificación</h3>
         <SelectField label="Justificación para utilizar esta funcionalidad:" name="justificacion" value={formData.justificacion} onChange={handleChange} options={justificacionesOpts.length ? justificacionesOpts : JUSTIFICACION_FUNCIONALIDAD_OPTIONS} disabled={justLoading} error={Boolean(justError)} />
       </Card>
       
       <Card>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">Tipo documento</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Tipo documento</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 items-start">
             <RadioGroupField label="Tipo de Documento:" name="tipoDocumento" options={TIPO_DOCUMENTO_CAPTURA_LIBRE_OPTIONS} selectedValue={formData.tipoDocumento} onChange={handleChange} inline />
             <FormField label="UUID:" name="uuid" value={formData.uuid} onChange={handleChange} placeholder="Ingrese UUID si aplica"/>
@@ -847,7 +847,7 @@ export const FacturacionCapturaLibrePage: React.FC = () => {
       </Card>
 
       <Card>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-2">Conceptos (Es necesario agregar al menos uno)</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Conceptos (Es necesario agregar al menos uno)</h3>
         <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Nota: Actualmente se permite un solo concepto. La funcionalidad para múltiples conceptos será implementada.</p>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
             <FormField label="SKU o Clave SAT:" name="concepto.sku" value={formData.concepto.sku} onChange={handleChange} />
@@ -869,7 +869,7 @@ export const FacturacionCapturaLibrePage: React.FC = () => {
       </Card>
       
       <Card>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">Totales</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Totales</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
             <SelectField label="Medio de pago:" name="medioPago" value={formData.medioPago} onChange={handleChange} options={MEDIO_PAGO_OPTIONS} />
             <SelectField label="Forma de pago:" name="formaPago" value={formData.formaPago} onChange={handleChange} options={FORMA_PAGO_OPTIONS} />
@@ -887,7 +887,7 @@ export const FacturacionCapturaLibrePage: React.FC = () => {
       </Card>
 
       <Card>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">Comentarios</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Comentarios</h3>
         <TextareaField label="" name="comentarios" value={formData.comentarios} onChange={handleChange} rows={3} />
       </Card>
 

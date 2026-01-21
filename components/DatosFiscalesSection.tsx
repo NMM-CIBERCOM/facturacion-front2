@@ -60,7 +60,7 @@ export const DatosFiscalesSection: React.FC<DatosFiscalesSectionProps> = ({
 }) => {
   return (
     <>
-      <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">Datos fiscales:</h3>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Datos fiscales:</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
         <RfcField
           label="RFC:"

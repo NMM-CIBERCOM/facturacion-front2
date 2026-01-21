@@ -461,7 +461,7 @@ export const FacturacionInteresesPage: React.FC = () => {
       />
 
       <Card>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">Consulta Factura:</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Consulta Factura:</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
           <FormField label="Cuenta:" name="cuenta" value={formData.cuenta} onChange={handleChange} required />
           <FormField label="Periodo (yyyyMM):" name="periodo" value={formData.periodo} onChange={handleChange} required />

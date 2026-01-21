@@ -101,7 +101,7 @@ export const ConsultasBoletasPage: React.FC = () => {
   return (
     <div className="space-y-8">
       <Card>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
           --Ingresa los datos para consulta de tickets--
         </h3>
         <form onSubmit={handleIndividualSubmit} className="space-y-4">
@@ -128,7 +128,7 @@ export const ConsultasBoletasPage: React.FC = () => {
 
       <Card>
         <form onSubmit={handleMassSubmit} className="space-y-4">
-           <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">
+           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
             Consulta Masiva
             </h3>
           <FileInputField
@@ -152,7 +152,7 @@ export const ConsultasBoletasPage: React.FC = () => {
         </div>
       ) : (
         <Card className="mt-6">
-          <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
             Resultados de la búsqueda
           </h3>
           

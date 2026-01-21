@@ -236,7 +236,7 @@ export const ConsultasSkuPage: React.FC = () => {
         </div>
       ) : (
         <Card className="mt-6">
-          <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
             Resultados de la búsqueda
           </h3>
           

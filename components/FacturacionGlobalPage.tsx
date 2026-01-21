@@ -715,7 +715,7 @@ export const FacturacionGlobalPage: React.FC = () => {
   return (
     <form onSubmit={handleBuscar} className="space-y-6">
       <Card>
-        <h3 className="text-lg font-semibold text-pink-600 mb-4">--Especificar búsqueda--</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">--Especificar búsqueda--</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4 items-end">
           <FormField label="Fecha:" name="fecha" type="date" value={formData.fecha} onChange={handleChange} />
           <SelectField label="Periodo:" name="periodo" value={formData.periodo} onChange={handleChange} options={[{ value: 'DIA', label: 'Día' }, { value: 'SEMANA', label: 'Semana' }, { value: 'MES', label: 'Mes' }]} />
@@ -753,7 +753,7 @@ export const FacturacionGlobalPage: React.FC = () => {
       {aggregatedFacturas.length > 0 && (
         <Card>
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-primary dark:text-secondary">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
               Facturas del Periodo Seleccionado
             </h3>
             <div className="flex items-center gap-4">

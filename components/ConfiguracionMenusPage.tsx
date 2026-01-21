@@ -506,7 +506,7 @@ const ConfiguracionMenusPage: React.FC = () => {
 
                         {/* Información del menú */}
                         <div className="flex-1">
-                          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
                             {config.menuLabel}
                           </h3>
                           {config.menuPath && (

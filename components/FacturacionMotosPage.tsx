@@ -200,7 +200,7 @@ export const FacturacionMotosPage: React.FC = () => {
       />
 
       <Card>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">Boleta</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Boleta</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-2 items-end">
           <SelectField label="Tienda:" name="tiendaBoleta" value={formData.tiendaBoleta} onChange={handleChange} options={TIENDA_OPTIONS} className="lg:col-span-1"/>
           <FormField label="Terminal:" name="terminalBoleta" value={formData.terminalBoleta} onChange={handleChange} className="lg:col-span-1"/>
@@ -242,7 +242,7 @@ export const FacturacionMotosPage: React.FC = () => {
       </Card>
       
       <Card>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">Totales</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Totales</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
             <SelectField label="Medio de pago:" name="medioPago" value={formData.medioPago} onChange={handleChange} options={MEDIO_PAGO_OPTIONS} />
             <SelectField label="Forma de pago:" name="formaPago" value={formData.formaPago} onChange={handleChange} options={FORMA_PAGO_OPTIONS} />
@@ -257,7 +257,7 @@ export const FacturacionMotosPage: React.FC = () => {
       </Card>
 
       <Card>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">Comentarios</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Comentarios</h3>
         <TextareaField label="" name="comentarios" value={formData.comentarios} onChange={handleChange} rows={3} />
       </Card>
 

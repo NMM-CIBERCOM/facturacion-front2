@@ -805,7 +805,7 @@ ${tieneImpuestos ? `  <cfdi:Impuestos TotalImpuestosTrasladados="${notaData.iva.
       />
 
       <Card>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">Detalles de la Nota de crédito</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Detalles de la Nota de crédito</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
           <FormField label="Referencia factura:" name="referenciaFactura" value={formData.referenciaFactura} onChange={handleChange} />
           <SelectField label="Motivo de la nota de crédito:" name="motivo" value={formData.motivo} onChange={handleChange} options={MOTIVO_NC_OPTIONS} />
@@ -817,7 +817,7 @@ ${tieneImpuestos ? `  <cfdi:Impuestos TotalImpuestosTrasladados="${notaData.iva.
       </Card>
 
       <Card>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">Concepto</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Concepto</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
           <SelectField label="Concepto / descripción:" name="descripcion" value={concepto.descripcion} onChange={handleConceptoChange} options={CONCEPTO_DESC_OPTIONS} />
           {concepto.descripcion === 'OTRO' && (

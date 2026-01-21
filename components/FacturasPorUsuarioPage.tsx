@@ -226,7 +226,7 @@ export const FacturasPorUsuarioPage: React.FC = () => {
                     <div className="flex items-center">
                       <FaUser className="w-5 h-5 mr-2 text-primary dark:text-secondary" />
                       <div>
-                        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
                           {usuario.nombreUsuario || usuario.usuario}
                         </h3>
                         <p className="text-sm text-gray-500 dark:text-gray-400">
