@@ -659,7 +659,7 @@ export const ConsultasFacturasPage: React.FC = () => {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <Card>
-        <h3 className="text-lg font-semibold text-primary dark:text-secondary mb-4">--Ingresa los datos para consulta (por grupo):--</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">--Ingresa los datos para consulta (por grupo):--</h3>
         {error && (<div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">{error}</div>)}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
           <FormField label="RFC Receptor:" name="rfcReceptor" value={formData.rfcReceptor} onChange={handleChange} />
