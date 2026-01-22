@@ -20,7 +20,7 @@ export const MonitorDecodificadorPage: React.FC = () => {
   return (
     <div className="flex justify-center items-start min-h-[60vh] p-4">
       <Card className="w-full max-w-3xl mx-auto p-8">
-        <h2 className="text-lg font-semibold text-primary dark:text-secondary mb-6 text-center">Decodificador de Facturas</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Decodificador de Facturas</h2>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
             <div className="md:col-span-2 flex gap-8 justify-center mb-2">

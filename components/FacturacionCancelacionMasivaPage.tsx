@@ -602,7 +602,7 @@ export const FacturacionCancelacionMasivaPage: React.FC = () => {
       </div>
       <form onSubmit={handleSubmit} className="space-y-6">
         <Card>
-          <h2 className="text-xl font-semibold text-primary dark:text-secondary mb-2">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
             Cancelación de Facturas Masiva
           </h2>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">

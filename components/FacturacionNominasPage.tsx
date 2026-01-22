@@ -394,7 +394,7 @@ export const FacturacionNominasPage: React.FC = () => {
       
       {/* Sección de filtros */}
       <Card>
-        <h2 className="text-xl font-semibold mb-4 text-primary dark:text-secondary">Filtro de Nómina</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Filtro de Nómina</h2>
         <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
           <div className="flex flex-col space-y-1">
             <label className="font-medium text-primary dark:text-secondary">Fecha de Nómina:</label>
@@ -436,7 +436,7 @@ export const FacturacionNominasPage: React.FC = () => {
       {/* Sección del formulario de facturación */}
       <form onSubmit={handleFormSubmit}>
         <Card>
-          <h2 className="text-xl font-semibold text-primary dark:text-secondary mb-6 text-center">Datos de Facturación de Nómina</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Datos de Facturación de Nómina</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
             {/* Selector de periodicidad (Quincenal/Mensual) */}
             <div className="flex flex-col">

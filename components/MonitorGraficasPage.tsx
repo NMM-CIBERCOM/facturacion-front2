@@ -237,7 +237,7 @@ export const MonitorGraficasPage: React.FC = () => {
       </Card>
 
       <Card>
-        <h2 className="text-lg font-semibold text-primary dark:text-secondary mb-4">Gráfica de Bitácoras Generados</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Gráfica de Bitácoras Generados</h2>
         <div className="h-64 w-full bg-white dark:bg-gray-700 rounded-lg p-4 border border-gray-300 dark:border-gray-700">
           {datosGenerados.generados.datos.length > 0 ? (
             <GraficoBarras 
@@ -255,7 +255,7 @@ export const MonitorGraficasPage: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
-          <h2 className="text-lg font-semibold text-primary dark:text-secondary mb-4">Gráfica de Bitácoras Cancelados</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Gráfica de Bitácoras Cancelados</h2>
           <div className="h-48 w-full bg-white dark:bg-gray-700 rounded-lg p-4 border border-gray-300 dark:border-gray-700">
             {datosGenerados.cancelados.datos.length > 0 && (
               <GraficoCircular 
@@ -267,7 +267,7 @@ export const MonitorGraficasPage: React.FC = () => {
           </div>
         </Card>
         <Card>
-          <h2 className="text-lg font-semibold text-primary dark:text-secondary mb-4">Gráfica de Bitácoras Sustituidos</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Gráfica de Bitácoras Sustituidos</h2>
           <div className="h-48 w-full bg-white dark:bg-gray-700 rounded-lg p-4 border border-gray-300 dark:border-gray-700">
             {datosGenerados.sustituidos.datos.length > 0 && (
               <GraficoLinea 

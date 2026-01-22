@@ -48,10 +48,10 @@ export const MonitorPermisosPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <Card>
-        <h1 className="text-2xl font-bold text-primary dark:text-secondary mb-6">Lista de Permisos</h1>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Lista de Permisos</h1>
         <form className="space-y-6">
           <div className="mb-6">
-            <label className="block text-sm font-semibold text-primary dark:text-secondary mb-2">Perfil:</label>
+            <label className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Perfil:</label>
             <Select
               value={selectedProfile}
               onChange={(value) => setSelectedProfile(value)}
