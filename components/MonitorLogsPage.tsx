@@ -159,13 +159,13 @@ export const MonitorLogsPage: React.FC = () => {
           />
           <div className="col-span-1 md:col-span-2 lg:col-span-4">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ruta base de logs (servidor)</label>
-            <div className="flex gap-3 items-center">
+            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
               <input
                 type="text"
                 value={baseDir}
                 readOnly
                 placeholder="C:/cibercom/logs"
-                className="flex-1 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
+                className="min-w-0 w-full flex-1 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
               />
               <Button
                 type="button"
@@ -184,6 +184,7 @@ export const MonitorLogsPage: React.FC = () => {
                     setPickerOpen(true);
                   }
                 }}
+                className="w-full sm:w-auto"
               >
                 Elegir ruta
               </Button>
@@ -205,10 +206,18 @@ export const MonitorLogsPage: React.FC = () => {
                     alert('No se pudo reconfigurar logging: ' + (e?.message || ''));
                   }
                 }}
+                className="w-full sm:w-auto"
               >
                 Usar para escribir logs
               </Button>
-              <Button type="button" variant="primary" onClick={handleSaveBaseDir}>Guardar</Button>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={handleSaveBaseDir}
+                className="w-full sm:w-auto"
+              >
+                Guardar
+              </Button>
             </div>
             <p className="mt-1 text-xs text-gray-500">Usa el selector para navegar carpetas en el servidor y establecer la ruta.</p>
           </div>

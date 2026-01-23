@@ -75,7 +75,7 @@ export const MonitorConexionesPage: React.FC = () => {
                 Semáforo de 5 tiendas. Verde = conectada, Rojo = sin conexión.
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 px-3 py-2 rounded-md border border-green-200 dark:border-green-700">
                 <span className="inline-block h-3 w-3 rounded-full bg-green-500" />
                 <span className="text-sm font-semibold text-green-700 dark:text-green-200">
@@ -88,7 +88,12 @@ export const MonitorConexionesPage: React.FC = () => {
                   Offline {totals.offline}
                 </span>
               </div>
-              <Button variant="primary" onClick={loadStatuses} disabled={loading}>
+              <Button
+                variant="primary"
+                onClick={loadStatuses}
+                disabled={loading}
+                className="w-full sm:w-auto"
+              >
                 {loading ? 'Actualizando...' : 'Actualizar semáforo'}
               </Button>
             </div>
