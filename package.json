@@ -7,7 +7,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "build:prod": "tsc && vite build --mode production",
+    "preview": "vite preview",
+    "copy-to-backend": "node -e \"require('child_process').execSync(process.platform === 'win32' ? 'powershell -ExecutionPolicy Bypass -File copy-frontend-to-backend.ps1' : 'bash copy-frontend-to-backend.sh', {stdio: 'inherit', cwd: process.cwd()})\"",
+    "build-and-copy": "npm run build:prod && npm run copy-to-backend"
   },
   "keywords": [
     "react",

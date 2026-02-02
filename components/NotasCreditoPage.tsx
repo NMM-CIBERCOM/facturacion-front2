@@ -4,6 +4,8 @@ import { FormField } from './FormField';
 import { SelectField } from './SelectField';
 import { Button } from './Button';
 import { DatosFiscalesSection } from './DatosFiscalesSection';
+import { RfcAutocomplete } from './RfcAutocomplete';
+import { AltaClienteModal, ClienteFormData } from './AltaClienteModal';
 import { ThemeContext } from '../App';
 import { useEmpresa } from '../context/EmpresaContext';
 import { USO_CFDI_OPTIONS, REGIMEN_FISCAL_OPTIONS, PAIS_OPTIONS } from '../constants';
@@ -12,6 +14,7 @@ import { facturaService } from '../services/facturaService';
 import { correoService } from '../services/correoService';
 import { configuracionCorreoService } from '../services/configuracionCorreoService';
 import { apiUrl, getHeadersWithUsuario } from '../services/api';
+import { ClienteDatos } from '../services/clienteCatalogoService';
 
 // Base URL para endpoints de notas de crédito (no usan /api)
 const CREDIT_NOTES_BASE_URL: string = (
@@ -25,9 +28,7 @@ interface ConceptoForm {
 }
 
 interface NotaCreditoFormData {
-  rfcIniciales: string;
-  rfcFecha: string;
-  rfcHomoclave: string;
+  rfc: string;
   correoElectronico: string;
   razonSocial: string;
   nombre: string;
@@ -95,9 +96,7 @@ const DEFAULT_LUGAR_EXPEDICION = '00000';
 const CP_REGEX = /\b\d{5}\b/;
 
 const initialFormData: NotaCreditoFormData = {
-  rfcIniciales: '',
-  rfcFecha: '',
-  rfcHomoclave: '',
+  rfc: '',
   correoElectronico: '',
   razonSocial: '',
   nombre: '',
@@ -144,6 +143,7 @@ export const NotasCreditoPage: React.FC = () => {
   const [enviandoCorreo, setEnviandoCorreo] = useState(false);
   const [tipoPersona, setTipoPersona] = useState<'fisica' | 'moral' | null>(null);
   const tipoPersonaAnteriorRef = useRef<'fisica' | 'moral' | null>(null);
+  const [mostrarAltaCliente, setMostrarAltaCliente] = useState(false);
 
   // Funciones para determinar el tipo de persona según el RFC
   const esPersonaMoral = (rfc: string): boolean => {
@@ -154,14 +154,192 @@ export const NotasCreditoPage: React.FC = () => {
     return rfc.length === 13;
   };
 
-  // Construir RFC desde las partes
-  const buildRfc = (iniciales: string, fecha: string, homoclave: string): string => {
-    return `${iniciales}${fecha}${homoclave}`.toUpperCase().trim();
+  // Función auxiliar para parsear el domicilio fiscal
+  const parsearDomicilioFiscal = (domicilioFiscal: string | undefined) => {
+    if (!domicilioFiscal) {
+      return { codigoPostal: '', calle: '', numeroExterior: '', numeroInterior: '', colonia: '', municipio: '', estado: '' };
+    }
+    
+    const resultado: any = {
+      codigoPostal: '',
+      calle: '',
+      numeroExterior: '',
+      numeroInterior: '',
+      colonia: '',
+      municipio: '',
+      estado: '',
+    };
+
+    // Extraer código postal (formato: "C.P. 12345" o "CP 12345")
+    const cpMatch = domicilioFiscal.match(/(?:C\.?P\.?\s*)?(\d{5})(?:\s|$|,)/i);
+    if (cpMatch) {
+      resultado.codigoPostal = cpMatch[1];
+    }
+
+    // Dividir por comas para extraer partes
+    const partes = domicilioFiscal.split(',').map(p => p.trim());
+    
+    if (partes.length > 0) {
+      // La primera parte generalmente contiene: Calle NumExt Int. NumInt
+      const primeraParte = partes[0];
+      // Intentar extraer número exterior e interior
+      const numExtMatch = primeraParte.match(/(\d+[A-Za-z]?|MZ\s*\d+|LT\s*\d+|EDIF\s*\w+)/i);
+      if (numExtMatch) {
+        resultado.numeroExterior = numExtMatch[1];
+        const antesNumExt = primeraParte.substring(0, numExtMatch.index).trim();
+        resultado.calle = antesNumExt;
+      } else {
+        resultado.calle = primeraParte;
+      }
+      
+      // Buscar "Int." para número interior
+      const numIntMatch = primeraParte.match(/Int\.\s*(\S+)/i);
+      if (numIntMatch) {
+        resultado.numeroInterior = numIntMatch[1];
+      }
+    }
+
+    // Buscar colonia, municipio, estado antes del código postal
+    let encontradoCP = false;
+    for (let i = 1; i < partes.length && !encontradoCP; i++) {
+      const parte = partes[i];
+      if (parte.match(/C\.?P\.?\s*\d{5}/i)) {
+        encontradoCP = true;
+        // La parte anterior al CP puede ser el estado
+        if (i > 1) {
+          resultado.estado = partes[i - 1];
+        }
+        // La parte anterior al estado puede ser el municipio
+        if (i > 2) {
+          resultado.municipio = partes[i - 2];
+        }
+        // La parte anterior al municipio puede ser la colonia
+        if (i > 3) {
+          resultado.colonia = partes[i - 3];
+        }
+        break;
+      }
+    }
+
+    // Si no encontramos el CP pero hay partes, asignar las últimas partes como estado/municipio/colonia
+    if (!encontradoCP && partes.length >= 3) {
+      resultado.colonia = partes[partes.length - 3] || '';
+      resultado.municipio = partes[partes.length - 2] || '';
+      resultado.estado = partes[partes.length - 1] || '';
+    }
+
+    return resultado;
+  };
+
+  // Manejar selección de cliente desde autocompletado
+  const handleClienteSelect = async (cliente: ClienteDatos) => {
+    const domicilioParseado = parsearDomicilioFiscal(cliente.domicilioFiscal);
+    const domicilioNormalizado = [
+      domicilioParseado.calle,
+      domicilioParseado.numeroExterior,
+      domicilioParseado.numeroInterior,
+      domicilioParseado.colonia,
+      domicilioParseado.municipio,
+      domicilioParseado.estado,
+      domicilioParseado.codigoPostal,
+    ].filter(Boolean).join(', ') || cliente.domicilioFiscal;
+
+    setFormData(prev => ({
+      ...prev,
+      rfc: cliente.rfc,
+      razonSocial: cliente.razonSocial || prev.razonSocial,
+      nombre: cliente.nombre || prev.nombre,
+      paterno: cliente.paterno || prev.paterno,
+      materno: cliente.materno || prev.materno,
+      correoElectronico: cliente.correoElectronico || prev.correoElectronico,
+      pais: cliente.pais || prev.pais,
+      domicilioFiscal: domicilioNormalizado || prev.domicilioFiscal,
+      regimenFiscal: cliente.regimenFiscal || prev.regimenFiscal,
+      usoCfdi: cliente.usoCfdi || prev.usoCfdi,
+    }));
+  };
+
+  // Manejar cuando no se encuentra el RFC
+  const handleRfcNotFound = () => {
+    setMostrarAltaCliente(true);
+  };
+
+  // Guardar cliente desde modal de alta
+  const handleGuardarCliente = async (clienteData: ClienteFormData) => {
+    try {
+      // Construir objeto cliente para el backend
+      const clientePayload: any = {
+        rfc: clienteData.rfc,
+        razon_social: clienteData.razonSocial,
+        nombre: clienteData.nombre,
+        paterno: clienteData.apellidoPaterno,
+        materno: clienteData.apellidoMaterno,
+        correo_electronico: clienteData.correoElectronico,
+        telefono: clienteData.telefono,
+        codigo_postal: clienteData.codigoPostal,
+        estado: clienteData.estado,
+        municipio: clienteData.municipio,
+        colonia: clienteData.colonia,
+        calle: clienteData.calle,
+        numero_exterior: clienteData.numeroExterior,
+        numero_interior: clienteData.numeroInterior,
+        pais: clienteData.pais,
+        regimen_fiscal: clienteData.regimenFiscal,
+        uso_cfdi: clienteData.usoCfdi,
+        registro_tributario: clienteData.esExtranjero ? 'EXT' : null,
+      };
+
+      // Guardar cliente en el backend usando el endpoint POST /catalogo-clientes
+      const response = await fetch(apiUrl('/catalogo-clientes'), {
+        method: 'POST',
+        headers: getHeadersWithUsuario(),
+        body: JSON.stringify(clientePayload),
+      });
+
+      const responseData = await response.json();
+      
+      if (!response.ok || responseData.error) {
+        throw new Error(responseData.error || 'Error al guardar cliente');
+      }
+
+      // Construir domicilio fiscal
+      const partesDomicilio = [
+        clienteData.calle,
+        clienteData.numeroExterior,
+        clienteData.numeroInterior,
+        clienteData.colonia,
+        clienteData.municipio,
+        clienteData.estado,
+        clienteData.codigoPostal,
+        clienteData.pais,
+      ].filter(Boolean);
+      const domicilioFiscal = partesDomicilio.join(', ');
+
+      // Actualizar formulario con los datos del cliente
+      setFormData(prev => ({
+        ...prev,
+        rfc: clienteData.rfc,
+        razonSocial: clienteData.razonSocial,
+        nombre: clienteData.nombre || prev.nombre,
+        paterno: clienteData.apellidoPaterno || prev.paterno,
+        materno: clienteData.apellidoMaterno || prev.materno,
+        correoElectronico: clienteData.correoElectronico,
+        pais: clienteData.pais,
+        domicilioFiscal: domicilioFiscal,
+        regimenFiscal: clienteData.regimenFiscal,
+        usoCfdi: clienteData.usoCfdi,
+      }));
+
+      setMostrarAltaCliente(false);
+    } catch (error) {
+      console.error('Error al guardar cliente:', error);
+      throw error;
+    }
   };
 
   // Detectar tipo de persona cuando cambia el RFC
   useEffect(() => {
-    const rfc = buildRfc(formData.rfcIniciales, formData.rfcFecha, formData.rfcHomoclave);
+    const rfc = (formData.rfc || '').trim().toUpperCase();
     let nuevoTipo: 'fisica' | 'moral' | null = null;
     
     if (rfc && rfc.length >= 12) {
@@ -192,7 +370,7 @@ export const NotasCreditoPage: React.FC = () => {
         }));
       }
     }
-  }, [formData.rfcIniciales, formData.rfcFecha, formData.rfcHomoclave]);
+  }, [formData.rfc]);
 
   const blobToBase64 = (blob: Blob) => new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -216,7 +394,6 @@ export const NotasCreditoPage: React.FC = () => {
     setMensaje(null);
     setFieldErrors(prev => {
       const next = { ...prev };
-      if (name === 'rfcIniciales' || name === 'rfcFecha' || name === 'rfcHomoclave') delete next.rfc;
       // @ts-ignore
       if (next[name]) delete next[name as keyof typeof next];
       return next;
@@ -238,7 +415,7 @@ export const NotasCreditoPage: React.FC = () => {
   };
 
   const validarCampos = () => {
-    const rfcCompleto = `${formData.rfcIniciales}${formData.rfcFecha}${formData.rfcHomoclave}`;
+    const rfcCompleto = (formData.rfc || '').trim().toUpperCase();
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const rfcRegex = /^[A-Z&Ñ]{3,4}[0-9]{6}[A-Z0-9]{3}$/;
     const errors: any = {};
@@ -251,7 +428,7 @@ export const NotasCreditoPage: React.FC = () => {
     const regimenFiscal = formData.regimenFiscal?.trim() || '';
 
     if (!emailRegex.test(correo)) errors.correoElectronico = 'Email inválido';
-    if (!rfcRegex.test((rfcCompleto || '').toUpperCase())) errors.rfc = 'RFC inválido';
+    if (!rfcRegex.test(rfcCompleto)) errors.rfc = 'RFC inválido';
 
     if (tipoPersona !== 'fisica' && !razonSocial) {
       errors.razonSocial = 'Campo requerido';
@@ -306,7 +483,7 @@ export const NotasCreditoPage: React.FC = () => {
       setMensaje({ tipo: 'error', texto: 'Especifica la descripción libre del concepto' });
       return null;
     }
-    const rfcReceptor = `${formData.rfcIniciales}${formData.rfcFecha}${formData.rfcHomoclave}`.toUpperCase();
+    const rfcReceptor = (formData.rfc || '').trim().toUpperCase();
     const { subtotal, iva, total } = calcularImportes();
     const uuidInfo = await obtenerUuidNotaCredito(formData.referenciaFactura);
     const descripcionConcepto = obtenerDescripcionConcepto();
@@ -790,18 +967,64 @@ ${tieneImpuestos ? `  <cfdi:Impuestos TotalImpuestosTrasladados="${notaData.iva.
 
   return (
     <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
-      <DatosFiscalesSection
-        formData={formData}
-        handleChange={handleChange}
-        isRFCRequired={true}
-        isRazonSocialRequired={true}
-        isDomicilioFiscalRequired={true}
-        isRegimenFiscalRequired={true}
-        isUsoCfdiRequired={true}
-        isCorreoElectronicoRequired={true}
-        fieldErrors={fieldErrors}
-        mostrarRazonSocial={tipoPersona === 'moral' || tipoPersona === null}
-        mostrarNombreCompleto={tipoPersona === 'fisica' || tipoPersona === null}
+      <Card>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Datos fiscales:</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="md:col-span-2 lg:col-span-3">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              RFC *
+            </label>
+            <RfcAutocomplete
+              value={formData.rfc}
+              onChange={(rfc) => setFormData(prev => ({ ...prev, rfc }))}
+              onSelect={handleClienteSelect}
+              onNotFound={handleRfcNotFound}
+              required
+            />
+            {fieldErrors.rfc && (
+              <p className="text-red-600 text-xs mt-1">{fieldErrors.rfc}</p>
+            )}
+          </div>
+        </div>
+      </Card>
+
+      <Card>
+        <DatosFiscalesSection
+          formData={{
+            rfcIniciales: '',
+            rfcFecha: '',
+            rfcHomoclave: '',
+            correoElectronico: formData.correoElectronico,
+            razonSocial: formData.razonSocial,
+            nombre: formData.nombre,
+            paterno: formData.paterno,
+            materno: formData.materno,
+            pais: formData.pais,
+            noRegistroIdentidadTributaria: formData.noRegistroIdentidadTributaria,
+            domicilioFiscal: formData.domicilioFiscal,
+            regimenFiscal: formData.regimenFiscal,
+            usoCfdi: formData.usoCfdi,
+          }}
+          handleChange={handleChange}
+          isRFCRequired={false}
+          isRazonSocialRequired={true}
+          isDomicilioFiscalRequired={true}
+          isRegimenFiscalRequired={true}
+          isUsoCfdiRequired={true}
+          isCorreoElectronicoRequired={true}
+          fieldErrors={fieldErrors}
+          mostrarRazonSocial={tipoPersona === 'moral' || tipoPersona === null}
+          mostrarNombreCompleto={tipoPersona === 'fisica' || tipoPersona === null}
+          ocultarRFC={true}
+        />
+      </Card>
+
+      {/* Modal de Alta de Cliente */}
+      <AltaClienteModal
+        isOpen={mostrarAltaCliente}
+        onClose={() => setMostrarAltaCliente(false)}
+        onSave={handleGuardarCliente}
+        rfcInicial={formData.rfc}
       />
 
       <Card>

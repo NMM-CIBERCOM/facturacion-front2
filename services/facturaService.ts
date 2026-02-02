@@ -547,7 +547,7 @@ export class FacturaService {
       
       return {
         exitoso: true,
-        logoUrl: data.logoUrl || '/images/cibercom-logo.svg',
+        logoUrl: data.logoUrl || (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL ? import.meta.env.BASE_URL : '/') + 'images/cibercom-logo.svg',
         logoBase64: effectiveLogoBase64,
         customColors: data.customColors || {
           primary: '#2E86AB',
@@ -560,7 +560,7 @@ export class FacturaService {
       const savedLogo = typeof window !== 'undefined' ? (logoService.obtenerLogo() || '') : '';
       return {
         exitoso: false,
-        logoUrl: '/images/cibercom-logo.svg',
+        logoUrl: (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL ? import.meta.env.BASE_URL : '/') + 'images/cibercom-logo.svg',
         logoBase64: savedLogo.trim() ? savedLogo : undefined,
         customColors: {
           primary: '#2E86AB',

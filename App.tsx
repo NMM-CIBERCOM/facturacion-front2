@@ -9,7 +9,7 @@ import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { MainContent } from './components/MainContent';
 import { LoginPage } from './components/LoginPage';
-import { DEFAULT_COLORS, DEFAULT_USER, NAV_ITEMS } from './constants';
+import { DEFAULT_COLORS, DEFAULT_USER, getDefaultLogoUrl, NAV_ITEMS } from './constants';
 import type { CustomColors, NavItem, Theme, UsuarioLogin } from './types';
 import { EmpresaProvider } from './context/EmpresaContext';
 import { DashboardPage } from './components/DashboardPage';
@@ -28,6 +28,7 @@ import { ConsultasSkuPage } from './components/ConsultasSkuPage';
 import { ConsultasBoletasPage } from './components/ConsultasBoletasPage';
 import { ConsultasReportesPage } from './components/ConsultasReportesPage';
 import { ConsultasRepsSustituidosPage } from './components/ConsultasRepsSustituidosPage';
+import { RefacturaPage } from './components/RefacturaPage';
 import { FacturasSustituidasPage } from './components/FacturasSustituidasPage';
 import { FacturasPorUsuarioPage } from './components/FacturasPorUsuarioPage';
 import { AdminEmpleadosPage } from './components/AdminEmpleadosPage';
@@ -88,7 +89,7 @@ const defaultThemeContext: ThemeContextValue = {
   toggleTheme: () => {},
   customColors: DEFAULT_COLORS,
   setCustomColors: () => {},
-  logoUrl: '/images/cibercom-logo.svg',
+  logoUrl: getDefaultLogoUrl(),
   setLogoUrl: () => {},
 };
 
@@ -168,7 +169,7 @@ const getStoredLogo = (): string => {
   if (stored && stored.trim().length > 0) {
     return stored;
   }
-  return '/images/cibercom-logo.svg';
+  return getDefaultLogoUrl();
 };
 
 const getStoredTheme = (): Theme => {
@@ -177,6 +178,14 @@ const getStoredTheme = (): Theme => {
 };
 
 const getStoredActivePath = (): string => {
+  // Si la URL tiene hash (#vista), usarlo para abrir esa vista directamente
+  const hash = typeof window !== 'undefined' ? window.location.hash.slice(1).trim() : '';
+  if (hash) {
+    const match = flattenNavItems(NAV_ITEMS).find(
+      (item) => item.path && (item.path === hash || item.path === hash.toLowerCase()),
+    );
+    if (match?.path) return match.path;
+  }
   const stored = localStorage.getItem(ACTIVE_PATH_STORAGE_KEY);
   return stored || 'dashboard';
 };
@@ -332,6 +341,27 @@ export const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem(ACTIVE_PATH_STORAGE_KEY, activePath);
   }, [activePath]);
+
+  // Sincronizar hash con la vista actual: al cambiar activePath actualizar URL (#vista)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const newHash = activePath ? `#${activePath}` : '';
+    if (window.location.hash !== newHash) {
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${newHash}`);
+    }
+  }, [activePath]);
+
+  // Si el usuario cambia el hash en la URL, cambiar la vista
+  useEffect(() => {
+    const onHashChange = () => {
+      const hash = window.location.hash.slice(1).trim();
+      if (!hash) return;
+      const match = flatNavItems.find((item) => item.path && item.path === hash);
+      if (match?.path && match.path !== activePath) setActivePath(match.path);
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, [activePath, flatNavItems]);
 
   const toggleTheme = useCallback(() => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
@@ -584,6 +614,8 @@ export const App: React.FC = () => {
         return <ConsultasReportesPage setActivePage={setActivePage} />;
       case 'consultas-reps-sustituidos':
         return <ConsultasRepsSustituidosPage />;
+      case 'refactura':
+        return <RefacturaPage />;
       case 'facturas-sustituidas':
         return <FacturasSustituidasPage />;
       case 'facturas-por-usuario':

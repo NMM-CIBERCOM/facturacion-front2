@@ -107,7 +107,7 @@ export class PDFService {
       // Si no tiene prefijo, asumir SVG (backend retorna SVG por defecto)
       return `data:image/svg+xml;base64,${v}`;
     }
-    return logoUrl || '/images/cibercom-logo.svg';
+    return logoUrl || (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL ? import.meta.env.BASE_URL : '/') + 'images/cibercom-logo.svg';
   }
 
   // Cargar script externo de forma dinámica
