@@ -39,6 +39,8 @@ interface DatosFiscalesSectionProps {
   // Control de visibilidad basado en tipo de persona (física o moral)
   mostrarRazonSocial?: boolean;
   mostrarNombreCompleto?: boolean;
+  // Ocultar campo RFC cuando se usa RfcAutocomplete en otro lugar
+  ocultarRFC?: boolean;
 }
 
 export const DatosFiscalesSection: React.FC<DatosFiscalesSectionProps> = ({
@@ -57,32 +59,37 @@ export const DatosFiscalesSection: React.FC<DatosFiscalesSectionProps> = ({
   fieldErrors = {},
   mostrarRazonSocial = true,
   mostrarNombreCompleto = true,
+  ocultarRFC = false,
 }) => {
   return (
     <>
       <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Datos fiscales:</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
-        <RfcField
-          label="RFC:"
-          namePrefix="rfc"
-          values={{
-            iniciales: formData.rfcIniciales,
-            fecha: formData.rfcFecha,
-            homoclave: formData.rfcHomoclave,
-          }}
-          onChange={handleChange}
-          onSearchClick={onRfcSearchClick}
-          required={isRFCRequired}
-          className="lg:col-span-2"
-          disabled={rfcDisabled}
-          error={Boolean(fieldErrors.rfc)}
-        />
-        {fieldErrors.rfc && (
-          <div className="lg:col-span-1">
-            <p className="text-red-600 text-xs mt-1">{fieldErrors.rfc}</p>
-          </div>
+        {!ocultarRFC && (
+          <>
+            <RfcField
+              label="RFC:"
+              namePrefix="rfc"
+              values={{
+                iniciales: formData.rfcIniciales,
+                fecha: formData.rfcFecha,
+                homoclave: formData.rfcHomoclave,
+              }}
+              onChange={handleChange}
+              onSearchClick={onRfcSearchClick}
+              required={isRFCRequired}
+              className="lg:col-span-2"
+              disabled={rfcDisabled}
+              error={Boolean(fieldErrors.rfc)}
+            />
+            {fieldErrors.rfc && (
+              <div className="lg:col-span-1">
+                <p className="text-red-600 text-xs mt-1">{fieldErrors.rfc}</p>
+              </div>
+            )}
+            <div></div>
+          </>
         )}
-        <div></div>
         
         <FormField label="Correo Electrónico:" name="correoElectronico" type="email" value={formData.correoElectronico} onChange={handleChange} required={isCorreoElectronicoRequired} error={Boolean(fieldErrors.correoElectronico)} />
         {fieldErrors.correoElectronico && (

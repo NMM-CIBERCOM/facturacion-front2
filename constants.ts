@@ -68,6 +68,7 @@ export const NAV_ITEMS: NavItem[] = [
       { label: 'Tickets', path: 'consultas-tickets', icon: DocumentTextIcon },
       { label: 'Reportes', path: 'consultas-reportes', icon: ChartBarIcon },
       { label: 'REPs Sustituidos', path: 'consultas-reps-sustituidos', icon: DocumentTextIcon },
+      { label: 'Refactura', path: 'refactura', icon: DocumentTextIcon },
     ],
   },
   {
@@ -154,6 +155,12 @@ export const NAV_ITEMS: NavItem[] = [
     ]
   }
 ];
+
+/** URL del logo por defecto; respeta el base path en producción (ej. /facturacion-backend/). */
+export function getDefaultLogoUrl(): string {
+  const base = typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL ? import.meta.env.BASE_URL : '/';
+  return (base.endsWith('/') ? base : base + '/') + 'images/cibercom-logo.svg';
+}
 
 export const DEFAULT_COLORS: CustomColors = {
   primary: '#2E86AB', 
@@ -286,6 +293,14 @@ export const MOTIVO_SUSTITUCION_OPTIONS = [
     { value: '03', label: 'No se llevó a cabo la operación' },
     { value: '04', label: 'Operación nominativa relacionada en una factura global' },
     { value: 'menu', label: 'Sustitución por menú de artículos' },
+];
+
+// Motivos de refactura válidos según SAT/Finkok
+export const MOTIVO_REFACTURA_OPTIONS = [
+    { value: '01', label: '01 - Comprobante emitido con errores con relación' },
+    { value: '02', label: '02 - Comprobante emitido con errores sin relación' },
+    { value: '03', label: '03 - No se llevó a cabo la operación' },
+    { value: '04', label: '04 - Operación nominativa relacionada en una factura global' },
 ];
 
 export const TIPO_RELACION_CFDI_OPTIONS = [

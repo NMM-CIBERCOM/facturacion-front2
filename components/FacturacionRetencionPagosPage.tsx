@@ -3,9 +3,12 @@ import { Card } from './Card';
 import { FormField } from './FormField';
 import { SelectField } from './SelectField';
 import { Button } from './Button';
+import { RfcAutocomplete } from './RfcAutocomplete';
+import { AltaClienteModal, ClienteFormData } from './AltaClienteModal';
 import { useEmpresa } from '../context/EmpresaContext';
 import { retencionesService } from '../services/retencionesService';
 import { apiUrl, getHeadersWithUsuario } from '../services/api';
+import { ClienteDatos } from '../services/clienteCatalogoService';
 
 // Mapeo de claves de retención según catRetenciones.xsd.xml (01-28)
 const CLAVES_RETENCION = [
@@ -174,6 +177,164 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [uuidRetencionGuardado, setUuidRetencionGuardado] = useState<string | null>(null);
+  const [mostrarAltaCliente, setMostrarAltaCliente] = useState(false);
+
+  // Función auxiliar para parsear el domicilio fiscal
+  const parsearDomicilioFiscal = (domicilioFiscal: string | undefined) => {
+    if (!domicilioFiscal) {
+      return { codigoPostal: '', calle: '', numeroExterior: '', numeroInterior: '', colonia: '', municipio: '', estado: '' };
+    }
+    
+    const resultado: any = {
+      codigoPostal: '',
+      calle: '',
+      numeroExterior: '',
+      numeroInterior: '',
+      colonia: '',
+      municipio: '',
+      estado: '',
+    };
+
+    // Extraer código postal (formato: "C.P. 12345" o "CP 12345")
+    const cpMatch = domicilioFiscal.match(/(?:C\.?P\.?\s*)?(\d{5})(?:\s|$|,)/i);
+    if (cpMatch) {
+      resultado.codigoPostal = cpMatch[1];
+    }
+
+    // Dividir por comas para extraer partes
+    const partes = domicilioFiscal.split(',').map(p => p.trim());
+    
+    if (partes.length > 0) {
+      // La primera parte generalmente contiene: Calle NumExt Int. NumInt
+      const primeraParte = partes[0];
+      // Intentar extraer número exterior e interior
+      const numExtMatch = primeraParte.match(/(\d+[A-Za-z]?|MZ\s*\d+|LT\s*\d+|EDIF\s*\w+)/i);
+      if (numExtMatch) {
+        resultado.numeroExterior = numExtMatch[1];
+        const antesNumExt = primeraParte.substring(0, numExtMatch.index).trim();
+        resultado.calle = antesNumExt;
+      } else {
+        resultado.calle = primeraParte;
+      }
+      
+      // Buscar "Int." para número interior
+      const numIntMatch = primeraParte.match(/Int\.\s*(\S+)/i);
+      if (numIntMatch) {
+        resultado.numeroInterior = numIntMatch[1];
+      }
+    }
+
+    // Buscar colonia, municipio, estado antes del código postal
+    let encontradoCP = false;
+    for (let i = 1; i < partes.length && !encontradoCP; i++) {
+      const parte = partes[i];
+      if (parte.match(/C\.?P\.?\s*\d{5}/i)) {
+        encontradoCP = true;
+        // La parte anterior al CP puede ser el estado
+        if (i > 1) {
+          resultado.estado = partes[i - 1];
+        }
+        // La parte anterior al estado puede ser el municipio
+        if (i > 2) {
+          resultado.municipio = partes[i - 2];
+        }
+        // La parte anterior al municipio puede ser la colonia
+        if (i > 3) {
+          resultado.colonia = partes[i - 3];
+        }
+        break;
+      }
+    }
+
+    // Si no encontramos el CP pero hay partes, asignar las últimas partes como estado/municipio/colonia
+    if (!encontradoCP && partes.length >= 3) {
+      resultado.colonia = partes[partes.length - 3] || '';
+      resultado.municipio = partes[partes.length - 2] || '';
+      resultado.estado = partes[partes.length - 1] || '';
+    }
+
+    return resultado;
+  };
+
+  // Manejar selección de cliente desde autocompletado
+  const handleClienteSelect = async (cliente: ClienteDatos) => {
+    // Parsear domicilio fiscal para extraer código postal
+    const domicilioParseado = parsearDomicilioFiscal(cliente.domicilioFiscal);
+    
+    setFormData(prev => ({
+      ...prev,
+      rfcReceptor: cliente.rfc,
+      razonSocial: cliente.razonSocial || prev.razonSocial,
+      nombre: cliente.nombre || prev.nombre,
+      paterno: cliente.paterno || prev.paterno,
+      materno: cliente.materno || prev.materno,
+      correoReceptor: cliente.correoElectronico || prev.correoReceptor,
+      // Usar el código postal parseado del domicilio fiscal
+      domicilioFiscalReceptor: domicilioParseado.codigoPostal || prev.domicilioFiscalReceptor,
+    }));
+  };
+
+  // Manejar cuando no se encuentra el RFC
+  const handleRfcNotFound = () => {
+    setMostrarAltaCliente(true);
+  };
+
+  // Guardar cliente desde modal de alta
+  const handleGuardarCliente = async (clienteData: ClienteFormData) => {
+    try {
+      // Construir objeto cliente para el backend
+      const clientePayload: any = {
+        rfc: clienteData.rfc,
+        razon_social: clienteData.razonSocial,
+        nombre: clienteData.nombre,
+        paterno: clienteData.apellidoPaterno,
+        materno: clienteData.apellidoMaterno,
+        correo_electronico: clienteData.correoElectronico,
+        telefono: clienteData.telefono,
+        codigo_postal: clienteData.codigoPostal,
+        estado: clienteData.estado,
+        municipio: clienteData.municipio,
+        colonia: clienteData.colonia,
+        calle: clienteData.calle,
+        numero_exterior: clienteData.numeroExterior,
+        numero_interior: clienteData.numeroInterior,
+        pais: clienteData.pais,
+        regimen_fiscal: clienteData.regimenFiscal,
+        uso_cfdi: clienteData.usoCfdi,
+        registro_tributario: clienteData.esExtranjero ? 'EXT' : null,
+      };
+
+      // Guardar cliente en el backend usando el endpoint POST /catalogo-clientes
+      const response = await fetch(apiUrl('/catalogo-clientes'), {
+        method: 'POST',
+        headers: getHeadersWithUsuario(),
+        body: JSON.stringify(clientePayload),
+      });
+
+      const responseData = await response.json();
+      
+      if (!response.ok || responseData.error) {
+        throw new Error(responseData.error || 'Error al guardar cliente');
+      }
+
+      // Actualizar formulario con los datos del cliente
+      setFormData(prev => ({
+        ...prev,
+        rfcReceptor: clienteData.rfc,
+        razonSocial: clienteData.razonSocial,
+        nombre: clienteData.nombre || prev.nombre,
+        paterno: clienteData.apellidoPaterno || prev.paterno,
+        materno: clienteData.apellidoMaterno || prev.materno,
+        correoReceptor: clienteData.correoElectronico,
+        domicilioFiscalReceptor: clienteData.codigoPostal,
+      }));
+
+      setMostrarAltaCliente(false);
+    } catch (error) {
+      console.error('Error al guardar cliente:', error);
+      throw error;
+    }
+  };
 
   // Detectar tipo de persona según RFC
   useEffect(() => {
@@ -236,37 +397,31 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
   // Calcular montos automáticamente
   useEffect(() => {
     const montoOperacion = parseFloat(formData.montoTotOperacion || '0');
-    const montoGrav = parseFloat(formData.montoTotGrav || '0');
     const montoExent = parseFloat(formData.montoTotExent || '0');
+    
+    // Calcular monto gravado automáticamente: Monto Operación - Monto Exento
+    const nuevoMontoGrav = Math.max(0, montoOperacion - montoExent);
     
     // Calcular total retenido desde impRetenidos
     const totalRetenido = formData.impRetenidos.reduce((sum, imp) => {
       return sum + parseFloat(imp.montoRet || '0');
     }, 0);
     
-    // Actualizar montos
+    // Actualizar montos solo si hay cambios
     setFormData(prev => {
       const cambios: Partial<RetencionFormData> = {};
       
-      if (prev.montoTotGrav !== montoGrav.toFixed(2)) {
-        cambios.montoTotGrav = montoGrav.toFixed(2);
-      }
-      
-      if (prev.montoTotExent !== montoExent.toFixed(2)) {
-        cambios.montoTotExent = montoExent.toFixed(2);
+      if (prev.montoTotGrav !== nuevoMontoGrav.toFixed(2)) {
+        cambios.montoTotGrav = nuevoMontoGrav.toFixed(2);
       }
       
       if (prev.montoTotRet !== totalRetenido.toFixed(2)) {
         cambios.montoTotRet = totalRetenido.toFixed(2);
       }
       
-      if (prev.montoTotOperacion !== montoOperacion.toFixed(2)) {
-        cambios.montoTotOperacion = montoOperacion.toFixed(2);
-      }
-      
       return Object.keys(cambios).length > 0 ? { ...prev, ...cambios } : prev;
     });
-  }, [formData.montoTotOperacion, formData.montoTotGrav, formData.montoTotExent, formData.impRetenidos]);
+  }, [formData.montoTotOperacion, formData.montoTotExent, formData.impRetenidos]);
 
   const handleFormChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -279,34 +434,99 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
     [],
   );
 
+  // Obtener tasa de retención según el tipo de impuesto y clave de retención
+  const obtenerTasaRetencion = useCallback((impuestoRet: string, cveRetenc: string): number => {
+    // Tasas comunes de retención en México
+    if (impuestoRet === '001') { // ISR
+      // Tasas de ISR según tipo de retención
+      const tasasISR: Record<string, number> = {
+        '08': 0.10,  // Servicios profesionales: 10%
+        '25': 0.10,  // ISR Servicios profesionales: 10%
+        '27': 0.10,  // Servicios mediante plataformas tecnológicas: 10%
+        '05': 0.10,  // Arrendamiento: 10%
+        '23': 0.10,  // Arrendamiento en fideicomiso: 10%
+        '02': 0.10,  // Dividendos: 10%
+        '28': 0.10,  // Dividendos: 10%
+        '03': 0.20,  // Intereses: 20% (puede variar)
+        '15': 0.20,  // Intereses: 20%
+        '04': 0.25,  // Regalías: 25%
+        '26': 0.25,  // ISR Regalías: 25%
+        '09': 0.00,  // Sueldos: variable según tabla
+      };
+      return tasasISR[cveRetenc] || 0.10; // Por defecto 10%
+    } else if (impuestoRet === '002') { // IVA
+      // IVA típicamente se retiene al 10.67% o 16% según el caso
+      // Para retención de IVA, comúnmente es 10.67% cuando el proveedor no está acreditado
+      return 0.1067; // 10.67%
+    } else if (impuestoRet === '003') { // IEPS
+      // IEPS varía según el producto, por defecto 0%
+      return 0.00;
+    }
+    return 0.00;
+  }, []);
+
   const handleImpRetenidoChange = useCallback((index: number, field: string, value: string) => {
     setFormData(prev => {
       const nuevosImpRetenidos = [...prev.impRetenidos];
-      nuevosImpRetenidos[index] = {
-        ...nuevosImpRetenidos[index],
-        [field]: value,
-      };
+      const impActual = nuevosImpRetenidos[index];
+      
+      // Si cambia la base de retención o el tipo de impuesto, calcular automáticamente el monto
+      if (field === 'baseRet' || field === 'impuestoRet') {
+        const baseRet = field === 'baseRet' ? parseFloat(value || '0') : parseFloat(impActual.baseRet || '0');
+        const impuestoRet = field === 'impuestoRet' ? value : impActual.impuestoRet;
+        
+        if (baseRet > 0 && impuestoRet) {
+          const tasa = obtenerTasaRetencion(impuestoRet, prev.cveRetenc || '08');
+          const montoCalculado = baseRet * tasa;
+          
+          nuevosImpRetenidos[index] = {
+            ...impActual,
+            [field]: value,
+            baseRet: field === 'baseRet' ? value : impActual.baseRet,
+            impuestoRet: field === 'impuestoRet' ? value : impActual.impuestoRet,
+            montoRet: montoCalculado.toFixed(2),
+          };
+        } else {
+          nuevosImpRetenidos[index] = {
+            ...impActual,
+            [field]: value,
+          };
+        }
+      } else {
+        nuevosImpRetenidos[index] = {
+          ...impActual,
+          [field]: value,
+        };
+      }
+      
       return {
         ...prev,
         impRetenidos: nuevosImpRetenidos,
       };
     });
-  }, []);
+  }, [obtenerTasaRetencion]);
 
   const agregarImpRetenido = useCallback(() => {
-    setFormData(prev => ({
-      ...prev,
-      impRetenidos: [
-        ...prev.impRetenidos,
-        {
-          baseRet: prev.montoTotOperacion || '',
-          impuestoRet: '001',
-          montoRet: '',
-          tipoPagoRet: '01',
-        },
-      ],
-    }));
-  }, []);
+    setFormData(prev => {
+      const baseRet = prev.montoTotOperacion || '';
+      const impuestoRet = '001';
+      const tasa = obtenerTasaRetencion(impuestoRet, prev.cveRetenc || '08');
+      const montoCalculado = parseFloat(baseRet || '0') * tasa;
+      
+      return {
+        ...prev,
+        impRetenidos: [
+          ...prev.impRetenidos,
+          {
+            baseRet: baseRet,
+            impuestoRet: impuestoRet,
+            montoRet: montoCalculado > 0 ? montoCalculado.toFixed(2) : '',
+            tipoPagoRet: '01',
+          },
+        ],
+      };
+    });
+  }, [obtenerTasaRetencion]);
 
   const eliminarImpRetenido = useCallback((index: number) => {
     setFormData(prev => ({
@@ -807,34 +1027,7 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
         </div>
       )}
 
-      <Card title="Datos del Emisor">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <FormField
-            label="RFC del Emisor"
-            name="rfcEmisor"
-            value={formData.rfcEmisor}
-            onChange={handleFormChange}
-            placeholder="Ej. ABC123456789"
-            required
-          />
-          <FormField
-            label="Nombre del Emisor"
-            name="nombreEmisor"
-            value={formData.nombreEmisor}
-            onChange={handleFormChange}
-            placeholder="Razón social o nombre"
-            required
-          />
-          <FormField
-            label="Régimen Fiscal del Emisor"
-            name="regimenFiscalEmisor"
-            value={formData.regimenFiscalEmisor}
-            onChange={handleFormChange}
-            placeholder="Ej. 601"
-            required
-          />
-        </div>
-      </Card>
+      {/* Datos del Emisor - Ocultos, se toman del sistema por defecto */}
 
       <Card title="Datos del Receptor">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -849,14 +1042,18 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
             ]}
             required
           />
-          <FormField
-            label="RFC del Receptor"
-            name="rfcReceptor"
-            value={formData.rfcReceptor}
-            onChange={handleFormChange}
-            placeholder="Ej. XAXX010101000 (13 chars) o ABC123456789 (12 chars)"
-            required
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              RFC del Receptor *
+            </label>
+            <RfcAutocomplete
+              value={formData.rfcReceptor}
+              onChange={(rfc) => setFormData(prev => ({ ...prev, rfcReceptor: rfc }))}
+              onSelect={handleClienteSelect}
+              onNotFound={handleRfcNotFound}
+              required
+            />
+          </div>
         </div>
 
         {formData.nacionalidadReceptor === 'Nacional' && (
@@ -1043,7 +1240,7 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
       <Card title="Totales">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           <FormField
-            label="Monto Total de la Operación"
+            label="Monto Total de la Operación *"
             name="montoTotOperacion"
             type="number"
             step="0.01"
@@ -1053,17 +1250,16 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
             placeholder="0.00"
             required
           />
-          <FormField
-            label="Monto Total Gravado"
-            name="montoTotGrav"
-            type="number"
-            step="0.01"
-            min="0"
-            value={formData.montoTotGrav}
-            onChange={handleFormChange}
-            placeholder="0.00"
-            required
-          />
+          <div className="flex items-end">
+            <div className="w-full rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                Monto Total Gravado (Calculado)
+              </label>
+              <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">
+                ${parseFloat(formData.montoTotGrav || '0').toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+            </div>
+          </div>
           <FormField
             label="Monto Total Exento"
             name="montoTotExent"
@@ -1078,7 +1274,7 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
           <div className="flex items-end">
             <div className="w-full rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
               <label className="block text-xs font-medium text-blue-700 dark:text-blue-300">
-                Monto Total Retenido
+                Monto Total Retenido (Calculado)
               </label>
               <p className="mt-1 text-lg font-semibold text-blue-900 dark:text-blue-100">
                 ${parseFloat(formData.montoTotRet || '0').toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1087,7 +1283,9 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
           </div>
         </div>
         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-          El monto total retenido se calcula automáticamente desde los impuestos retenidos
+          * El monto total gravado se calcula automáticamente como: Monto Total Operación - Monto Total Exento
+          <br />
+          El monto total retenido se calcula automáticamente desde la suma de los impuestos retenidos
         </p>
       </Card>
 
@@ -1110,7 +1308,7 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
               <FormField
-                label="Base de Retención"
+                label="Base de Retención *"
                 name={`baseRet_${index}`}
                 type="number"
                 step="0.01"
@@ -1118,28 +1316,34 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
                 value={imp.baseRet}
                 onChange={(e) => handleImpRetenidoChange(index, 'baseRet', e.target.value)}
                 placeholder="0.00"
+                required
               />
               <SelectField
-                label="Impuesto Retenido"
+                label="Impuesto Retenido *"
                 name={`impuestoRet_${index}`}
                 value={imp.impuestoRet}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleImpRetenidoChange(index, 'impuestoRet', e.target.value)}
                 options={IMPUESTO_OPTIONS}
                 required
               />
-              <FormField
-                label="Monto Retenido"
-                name={`montoRet_${index}`}
-                type="number"
-                step="0.01"
-                min="0"
-                value={imp.montoRet}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleImpRetenidoChange(index, 'montoRet', e.target.value)}
-                placeholder="0.00"
-                required
-              />
+              <div>
+                <FormField
+                  label="Monto Retenido (Calculado automáticamente)"
+                  name={`montoRet_${index}`}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={imp.montoRet}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleImpRetenidoChange(index, 'montoRet', e.target.value)}
+                  placeholder="0.00"
+                  required
+                />
+                <p className="mt-1 text-xs text-green-600 dark:text-green-400">
+                  Se calcula automáticamente según la base y tipo de impuesto
+                </p>
+              </div>
               <SelectField
-                label="Tipo de Pago Ret"
+                label="Tipo de Pago Ret *"
                 name={`tipoPagoRet_${index}`}
                 value={imp.tipoPagoRet}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleImpRetenidoChange(index, 'tipoPagoRet', e.target.value)}
@@ -1147,6 +1351,11 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
                 required
               />
             </div>
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              * El monto retenido se calcula automáticamente según la base de retención y el tipo de impuesto seleccionado.
+              <br />
+              Tasas aplicadas: ISR (10-25% según tipo), IVA (10.67%), IEPS (variable). Puede ajustarse manualmente si es necesario.
+            </p>
           </div>
         ))}
         <Button variant="secondary" onClick={agregarImpRetenido} className="mt-2">
@@ -1207,6 +1416,14 @@ export const FacturacionRetencionPagosPage: React.FC = () => {
           </Button>
         )}
       </div>
+
+      {/* Modal de Alta de Cliente */}
+      <AltaClienteModal
+        isOpen={mostrarAltaCliente}
+        onClose={() => setMostrarAltaCliente(false)}
+        onSave={handleGuardarCliente}
+        rfcInicial={formData.rfcReceptor}
+      />
     </div>
   );
 };

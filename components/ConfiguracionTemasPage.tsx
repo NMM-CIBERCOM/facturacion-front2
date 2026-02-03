@@ -3,7 +3,7 @@ import { ThemeContext } from '../App';
 import { Button } from './Button';
 import { Card } from './Card';
 import type { CustomColors } from '../types';
-import { DEFAULT_COLORS } from '../constants';
+import { DEFAULT_COLORS, getDefaultLogoUrl } from '../constants';
 
 const ColorInputRow: React.FC<{ 
     fieldId: string; 
@@ -86,7 +86,7 @@ export const ConfiguracionTemasPage: React.FC = () => {
   };
   
   const handleResetToDefaults = () => {
-    const DEFAULT_LOGO_URL = '/images/cibercom-logo.svg';
+    const DEFAULT_LOGO_URL = getDefaultLogoUrl();
     setLocalColors(DEFAULT_COLORS);
     setCustomColors(DEFAULT_COLORS);  
     setLogoPreview(DEFAULT_LOGO_URL);

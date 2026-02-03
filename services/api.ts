@@ -18,8 +18,22 @@ function getDefaultApiBaseUrl(): string {
     return 'http://localhost:8080/api';
   }
   
-  // Por defecto, usar producción
-  return 'http://174.136.25.157:8080/facturacion-backend-0.0.1-SNAPSHOT/api';
+  // En producción, detectar automáticamente el context-path desde la URL actual
+  // Si el frontend está servido desde el mismo servidor, usar rutas relativas
+  const currentPath = window.location.pathname;
+  // Detectar el context-path del backend (ej: /facturacion-backend)
+  // Si estamos en /facturacion-backend/, el context-path es /facturacion-backend
+  let contextPath = '';
+  if (currentPath.startsWith('/facturacion-backend')) {
+    contextPath = '/facturacion-backend';
+  } else {
+    // Si no se detecta, usar el valor por defecto
+    contextPath = '/facturacion-backend';
+  }
+  
+  // Construir URL usando el mismo protocolo, host y puerto de la página actual
+  const baseUrl = `${window.location.protocol}//${window.location.host}${contextPath}/api`;
+  return baseUrl;
 }
 
 export const API_BASE_URL: string = getDefaultApiBaseUrl().replace(/\/+$/,'');
@@ -41,8 +55,9 @@ function getDefaultPacBaseUrl(): string {
     return 'http://localhost:8081/api';
   }
   
-  // Por defecto, usar producción
-  return 'http://174.136.25.157:8080/cib-ms-cdp/api';
+  // En producción, usar el mismo servidor con el context-path del servicio PAC
+  const baseUrl = `${window.location.protocol}//${window.location.host}/cib-ms-cdp/api`;
+  return baseUrl;
 }
 
 export const PAC_BASE_URL: string = getDefaultPacBaseUrl().replace(/\/+$/,'');

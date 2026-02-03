@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from './Card'; // O ajusta según tu estructura
 import { Button } from './Button';
+import { useEmpresa } from '../context/EmpresaContext';
 import { guardarNomina, NominaFormPayload, consultarHistorialNominas, NominaHistorialRecord } from '../services/nominaService';
 import { facturaService } from '../services/facturaService';
 import { apiUrl, getHeadersWithUsuario } from '../services/api';
@@ -93,6 +94,7 @@ const initialNominaFormData: NominaFormData = {
 
 
 export const FacturacionNominasPage: React.FC = () => {
+  const { empresaInfo } = useEmpresa();
   const [searchDate, setSearchDate] = useState('');
   const [employeeId, setEmployeeId] = useState('');
   const [formData, setFormData] = useState<NominaFormData>(initialNominaFormData);
@@ -110,6 +112,16 @@ export const FacturacionNominasPage: React.FC = () => {
     setPdfViewerUrl(null);
     setPdfViewerOpen(false);
   };
+
+  // Cargar RFC del emisor desde el sistema por defecto
+  useEffect(() => {
+    if (empresaInfo.rfc) {
+      setFormData((prev) => ({
+        ...prev,
+        rfcEmisor: empresaInfo.rfc,
+      }));
+    }
+  }, [empresaInfo]);
 
   // Para la demo, pre-llenamos el ID del empleado al cargar el componente
   useEffect(() => {
@@ -452,7 +464,7 @@ export const FacturacionNominasPage: React.FC = () => {
               </select>
             </div>
             {[
-              { label: 'RFC Emisor', name: 'rfcEmisor', type: 'text', required: true },
+              // RFC Emisor oculto - se toma del sistema por defecto
               { label: 'RFC Receptor', name: 'rfcReceptor', type: 'text', required: true },
               { label: 'Nombre', name: 'nombre', type: 'text', required: true },
               { label: 'CURP', name: 'curp', type: 'text' },

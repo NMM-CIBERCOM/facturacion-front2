@@ -3,6 +3,10 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
+    // Base path para producción: debe coincidir con el context-path del backend
+    // En desarrollo usa './' (relativo), en producción usa '/facturacion-backend/'
+    const base = mode === 'production' ? '/facturacion-backend/' : './';
+    
     return {
       plugins: [react()],
       define: {
@@ -22,7 +26,7 @@ export default defineConfig(({ mode }) => {
         },
         chunkSizeWarningLimit: 1000
       },
-      base: './',
+      base: base,
       publicDir: 'public'
     };
 });
